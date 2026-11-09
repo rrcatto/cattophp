@@ -109,6 +109,9 @@ says production: `new Kernel(RunMode::environment(), RunMode::debug())`.
 - **HTTP**: error pages in plain words with a reference for the log; the Content-Security-Policy with a nonce
   (`csp_nonce()`) and the other security headers; the form token (`form_token()`); a refused form back as typed
   (`TypedForm`, `typed_for()`); the bot check on public forms (`BotCheck`); rate limits (`Throttle`).
+- **The served page's layout** (`Http\HtmlLayout`): a whole page laid out so its source can be read, every element
+  holding a block on lines of its own, one tab a level, whitespace changed only where a browser draws nothing
+  differently; authored HTML is served byte for byte (`html_layout.verbatim_classes`, the Twig filter `authored`).
 - **Mail** (`Mail\Mailer`): through the configured transport (`MAILER_DSN` and the `MAIL_*` sender settings), a demo
   site's emails marked; `cattophp:test-email`.
 - **Building blocks**: lengths of time (`Foundation\Duration`: `30m`, `1d`, `1h30m`), Base32, the secret cipher and

@@ -6,6 +6,7 @@ namespace CattoPHP\Twig;
 
 use CattoPHP\Http\ContentSecurityPolicy;
 use CattoPHP\Http\FormToken;
+use CattoPHP\Http\HtmlLayout;
 use CattoPHP\Http\TypedForm;
 use CattoPHP\Installation\Installation;
 use CattoPHP\Runtime\SiteMode;
@@ -17,7 +18,8 @@ use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
- * What every template can use: the page's script nonce, the form token, what a refused form sent, times in the
+ * What every template can use: the page's script nonce, the form token, what a refused form sent, `authored` for HTML
+ * an author wrote (served byte for byte by HtmlLayout), times in the
  * installation's time zone, and under the one name `cattophp` the installation (`cattophp.installation`), demo or live
  * (`cattophp.site_mode`) and the layout CattoPHP's pages extend (`cattophp.layout`). A project's own function, filter or global of the same
  * name takes the place of CattoPHP's (this extension is added first).
@@ -31,6 +33,7 @@ final class CattoPHPExtension extends AbstractExtension implements GlobalsInterf
         private readonly SiteMode $siteMode,
         private readonly RequestStack $requests,
         private readonly string $layout,
+        private readonly HtmlLayout $htmlLayout,
     ) {
     }
 
@@ -47,6 +50,8 @@ final class CattoPHPExtension extends AbstractExtension implements GlobalsInterf
     {
         return [
             new TwigFilter('local_time', $this->localTime(...)),
+            // HTML written by an author, which the served page's layout serves byte for byte (HtmlLayout::asWritten).
+            new TwigFilter('authored', $this->htmlLayout->asWritten(...), ['is_safe' => ['html']]),
         ];
     }
 

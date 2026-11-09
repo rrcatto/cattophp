@@ -2,7 +2,24 @@
 
 What each version of CattoPHP brought, newest first.
 
-## Unreleased
+## 0.2.3 · 9 November 2026
+
+A served page whose source can be read: every element holding others on lines of its own, indented by level, with
+nothing a browser draws changed. Nothing to migrate. A project that wants it calls `HtmlLayout::document()` on the page
+it has drawn; the new settings `html_layout.verbatim_classes` and `html_layout.flex_classes` are optional.
+
+- Added: `Http\HtmlLayout`, which lays out a served page so its source can be read: every element that holds a block on
+  lines of its own, one tab a level, with whitespace changed only where a browser draws nothing differently (a run of
+  whitespace becomes another, and whitespace is added only beside or inside a block by HTML's default, or between the
+  children of a container whose whitespace is never drawn); pre, textarea, script and style, a drawing's text and the
+  project's authored HTML are served byte for byte; structured data is laid out; a page that does not nest cleanly is
+  served as it came. A project calls `document()` on a whole page it has drawn; `html_layout.verbatim_classes` names the
+  classes of elements holding its authored HTML, and the Twig filter `authored` marks authored HTML elsewhere while a
+  page is being drawn for the layout (`begin()`, `end()`). `html_layout.flex_classes` names the classes the project's CSS
+  always lays out as flex or grid, whose children (when they are elements and no words of their own) each go on a line of
+  their own, since whitespace between and around a flex or grid container's children is never drawn.
+  A page is laid out only when PHP's memory limit leaves room for it (about 28 bytes for each byte of the page); one
+  without that room is served as it came, since running out of memory cannot be caught.
 
 ## 0.2.2 · 9 November 2026
 

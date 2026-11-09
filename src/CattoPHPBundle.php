@@ -23,6 +23,7 @@ use CattoPHP\Activity\ActivityStore;
 use CattoPHP\Activity\DbalActivityStore;
 use CattoPHP\Activity\FileActivityStore;
 use CattoPHP\Http\ContentSecurityPolicy;
+use CattoPHP\Http\HtmlLayout;
 use CattoPHP\Http\ErrorPageListener;
 use CattoPHP\Http\TwigErrorPageDrawer;
 use CattoPHP\Http\FormToken;
@@ -111,6 +112,10 @@ final class CattoPHPBundle extends AbstractBundle
                     ->booleanNode('no_index')->defaultFalse()->info('Ask search engines to keep away, demo or live')->end()
                     ->booleanNode('no_store')->defaultFalse()->info('Ask browsers to keep no copy of any page')->end()
                 ->end()->end()
+                ->arrayNode('html_layout')->addDefaultsIfNotSet()->children()
+                    ->arrayNode('verbatim_classes')->scalarPrototype()->end()->info('Classes of the elements that hold a project\'s authored HTML, which the layout serves byte for byte')->end()
+                    ->arrayNode('flex_classes')->scalarPrototype()->end()->info('Classes the project\'s CSS always lays out as flex or grid, whose children the layout puts on lines of their own')->end()
+                ->end()->end()
                 ->arrayNode('error_pages')->canBeDisabled()->children()
                     ->arrayNode('skip_paths')->scalarPrototype()->end()->info('Path prefixes whose errors the project answers itself, such as /api/')->end()
                     ->scalarNode('drawer')->defaultValue(TwigErrorPageDrawer::class)->info('The service that draws an error page in the project\'s look (CattoPHP\Http\ErrorPageDrawer)')->end()
@@ -151,6 +156,8 @@ final class CattoPHPBundle extends AbstractBundle
         $headers = $config['security_headers'];
         /** @var array{enabled:bool,skip_paths:list<string>,drawer:string} $errors */
         $errors = $config['error_pages'];
+        /** @var array{verbatim_classes:list<string>,flex_classes:list<string>} $layout */
+        $layout = $config['html_layout'];
         $database = $storage['type'] === 'database';
         if (!$database && ($storage['folder'] === null || $storage['folder'] === '')) {
             throw new InvalidArgumentException('cattophp.storage.folder must name a folder when cattophp.storage.type is files.');
@@ -211,6 +218,8 @@ final class CattoPHPBundle extends AbstractBundle
         $services->set(TestEmailCommand::class)->tag('console.command');
         $services->set(FormToken::class)->args([service('security.csrf.token_manager')->nullOnInvalid()]);
         $services->set(ContentSecurityPolicy::class)->args([service('request_stack'), $headers['policy']]);
+        // The served page's layout, which a project calls on a whole page it has drawn (HtmlLayout::document).
+        $services->set(HtmlLayout::class)->args([$layout['verbatim_classes'], $layout['flex_classes']])->public();
         // Added before the project's own extensions, so a project function, filter or global of the same name wins.
         $services->set(CattoPHPExtension::class)->arg('$layout', $config['layout'])->tag('twig.extension', ['priority' => 100]);
 
