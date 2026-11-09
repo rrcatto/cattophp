@@ -285,4 +285,16 @@ final class HttpTest extends TestCase
         $next = Request::create('https://example.com/other');
         self::assertStringContainsString("form-action 'self';", $policy->header($next), 'another page keeps the policy as it is');
     }
+
+    public function testAProgramDrawingALinksPreviewIsNotAPerson(): void
+    {
+        foreach (['WhatsApp/2.23.20.0 A' => 'Link preview: WhatsApp', 'WhatsApp/2.2412.54 i' => 'Link preview: WhatsApp', 'Iframely/1.3.1 (+https://iframely.com/docs/about)' => 'Link preview: Iframely',
+            'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)' => null, 'TelegramBot (like TwitterBot)' => null, 'Twitterbot/1.0' => null] as $agent => $label) {
+            $read = \CattoPHP\Http\VisitorAgent::read($agent);
+            self::assertTrue($read->isAutomated(), $agent);
+            if ($label !== null) self::assertSame($label, $read->label, $agent);
+        }
+        $phone = \CattoPHP\Http\VisitorAgent::read('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 WhatsApp/2.24');
+        self::assertFalse($phone->isAutomated(), "a person's browser that mentions WhatsApp later on is still a person's");
+    }
 }

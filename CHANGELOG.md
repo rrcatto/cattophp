@@ -4,6 +4,15 @@ What each version of CattoPHP brought, newest first.
 
 ## Unreleased
 
+## 0.2.2 · 9 November 2026
+
+A fix for counting visitors: a program drawing a shared link's preview is not a person. Nothing to migrate and no
+setting changes.
+
+- Fixed: WhatsApp's link-preview fetcher (`WhatsApp/2.x`), which names no bot, was read as a person's browser, so every
+  preview of a page shared on WhatsApp counted as a visitor; it is now a crawler, labelled Link preview: WhatsApp, as are
+  Iframely and Embedly.
+
 ## 0.2.1 · 9 November 2026
 
 What a large application needed to keep its own look and a strict content policy: its error pages drawn in its own theme,

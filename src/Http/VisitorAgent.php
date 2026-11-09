@@ -38,6 +38,12 @@ final class VisitorAgent
 
     private const CRAWLERS = '/\b[\w.-]*(bot|spider|crawler)\b[\w.-]*|facebookexternalhit|slurp|semrush|ahrefs|preview/i';
 
+    /**
+     * The programs that fetch a page to draw its preview where a link to it was shared, whose names say nothing of a bot:
+     * WhatsApp's names only itself and its version (WhatsApp/2.24.1.6 A), Iframely and Embedly their own names.
+     */
+    private const LINK_PREVIEWS = '/^(WhatsApp)\/|\b(Iframely|Embedly)\b/i';
+
     private function __construct(public readonly string $kind, public readonly string $label, public readonly string $device)
     {
     }
@@ -58,6 +64,7 @@ final class VisitorAgent
         foreach (self::AI_CRAWLERS as $crawler) {
             if (stripos($agent, $crawler) !== false) return new self(self::CRAWLER, 'AI crawler: ' . $crawler, '');
         }
+        if (preg_match(self::LINK_PREVIEWS, $agent, $found) === 1) return new self(self::CRAWLER, 'Link preview: ' . ($found[1] !== '' ? $found[1] : $found[2]), '');
         if (preg_match(self::SCRIPTS, $agent, $found, PREG_OFFSET_CAPTURE) === 1) {
             // The word of the description that gave it away, such as HeadlessChrome/156.0 or python-requests/2.32.
             $start = (int) strrpos(' ' . substr($agent, 0, $found[0][1]), ' ');
