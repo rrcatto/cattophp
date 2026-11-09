@@ -10,14 +10,20 @@ use CattoPHP\Http\ErrorPageListener;
 use CattoPHP\Http\RequestReference;
 use CattoPHP\Http\Throttle;
 use CattoPHP\Http\TypedForm;
+use CattoPHP\Http\TypedFormListener;
 use CattoPHP\Foundation\Duration;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 final class HttpTest extends TestCase
 {
@@ -97,15 +103,63 @@ final class HttpTest extends TestCase
     public function testARefusedFormComesBackAsTypedOnceAndOnlyToItsOwnForm(): void
     {
         $session = new Session(new MockArraySessionStorage());
-        $sent = Request::create('/roles/new', 'POST', ['name' => 'Editor', '_token' => 'secret-token', 'password' => 'never', 'permissions' => ['PAGE.EDIT', 'PAGE.VIEW']]);
+        $sent = Request::create('/roles/new', 'POST', ['name' => 'Editor', '_token' => 'secret-token', 'csrf' => 'another-token', 'password' => 'never', 'one_time_code' => '123456', 'permissions' => ['PAGE.EDIT', 'PAGE.VIEW'], 'code' => 'EDT-101']);
         $sent->setSession($session);
         TypedForm::keep($sent);
 
-        $next = Request::create('/roles');
-        $next->setSession($session);
-        self::assertSame([], TypedForm::take($next, '/somewhere-else'));
-        self::assertSame(['name' => 'Editor', 'permissions' => ['PAGE.EDIT', 'PAGE.VIEW']], TypedForm::take($next, '/roles/new?step=2#form'));
-        self::assertSame([], TypedForm::take($next, '/roles/new'), 'it shows once');
+        $page = Request::create('/roles');
+        $page->setSession($session);
+        $typed = ['name' => 'Editor', 'permissions' => ['PAGE.EDIT', 'PAGE.VIEW'], 'code' => 'EDT-101'];
+        self::assertSame($typed, TypedForm::peek($page, '/roles/new'), 'looking takes nothing; a field called code (a course code) is kept');
+        self::assertSame([], TypedForm::take($page, '/somewhere-else'), 'another form on the page gets nothing');
+        self::assertSame($typed, TypedForm::take($page, '/roles/new?step=2#form'), 'its own form gets them, on the same page');
+
+        $later = Request::create('/roles');
+        $later->setSession($session);
+        self::assertSame([], TypedForm::take($later, '/roles/new'), 'it shows once');
+    }
+
+    public function testWhatTheNextPageDidNotUseIsForgottenOnceItIsSent(): void
+    {
+        $session = new Session(new MockArraySessionStorage());
+        $sent = Request::create('/roles/new', 'POST', ['name' => 'Editor']);
+        $sent->setSession($session);
+        TypedForm::keep($sent);
+        $listener = new TypedFormListener();
+        $kernel = $this->createStub(HttpKernelInterface::class);
+
+        foreach ([
+            'a redirect' => [Request::create('/roles'), new RedirectResponse('/roles')],
+            'a part of a page' => [Request::create('/roles', server: ['HTTP_HX_REQUEST' => 'true']), new Response('<p>part</p>')],
+            'a picture' => [Request::create('/logo.png'), new Response('png', 200, ['Content-Type' => 'image/png'])],
+        ] as $what => [$request, $response]) {
+            $request->setSession($session);
+            $listener->onResponse(new ResponseEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST, $response));
+            self::assertSame(['name' => 'Editor'], TypedForm::peek($request, '/roles/new'), $what . ' leaves them waiting');
+        }
+        $page = Request::create('/dashboard');
+        $page->setSession($session);
+        $listener->onResponse(new ResponseEvent($kernel, $page, HttpKernelInterface::MAIN_REQUEST, new Response('<p>a page without the form</p>')));
+        $later = Request::create('/roles');
+        $later->setSession($session);
+        self::assertSame([], TypedForm::peek($later, '/roles/new'), 'a page has been drawn: forgotten');
+    }
+
+    #[RunInSeparateProcess]
+    public function testAProjectRunningItsOwnPhpSessionKeepsThemThere(): void
+    {
+        ini_set('session.use_cookies', '0');
+        ini_set('session.cache_limiter', '');
+        ini_set('session.save_path', sys_get_temp_dir());
+        session_start();
+        $sent = Request::create('/roles/new', 'POST', ['name' => 'Editor']);
+        self::assertFalse($sent->hasSession());
+        TypedForm::keep($sent);
+        self::assertSame(['action' => '/roles/new', 'values' => ['name' => 'Editor']], $_SESSION[TypedForm::SESSION]);
+
+        self::assertSame(['name' => 'Editor'], TypedForm::take(Request::create('/roles'), '/roles/new'));
+        self::assertArrayNotHasKey(TypedForm::SESSION, $_SESSION);
+        session_destroy();
     }
 
     public function testTheThrottleCountsEachKeyAndRefusesWithoutCounting(): void

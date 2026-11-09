@@ -18,8 +18,12 @@ final class SettingsCatalogue
     /** @var array<string,string> setting name => group key */
     private array $names = [];
 
-    /** @param iterable<SettingsProvider> $providers */
-    public function __construct(iterable $providers)
+    /**
+     * @param iterable<SettingsProvider> $providers
+     * @param array<string,string> $defaults a project's own defaults, by name, in place of the settings' own: used when
+     *                                       .env and the Settings page give nothing
+     */
+    public function __construct(iterable $providers, array $defaults = [])
     {
         foreach ($providers as $provider) {
             foreach ($provider->settingGroups() as $group) {
@@ -34,6 +38,10 @@ final class SettingsCatalogue
                 }
                 $this->groups[$group->key] = $group;
             }
+        }
+        foreach ($defaults as $name => $default) {
+            $key = $this->names[$name] ?? throw new InvalidArgumentException(sprintf('A default is given for %s, which is no setting.', $name));
+            $this->groups[$key] = $this->groups[$key]->with([$name => $this->groups[$key]->settings[$name]->withDefault($default)]);
         }
     }
 

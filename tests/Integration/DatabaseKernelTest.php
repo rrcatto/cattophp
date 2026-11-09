@@ -26,7 +26,7 @@ final class DatabaseKernelTest extends DatabaseTestCase
             $kernel->boot();
             $command = new CommandTester((new Application($kernel))->find('cattophp:migrate'));
             $command->execute([]);
-            self::assertStringContainsString('Done: 4 steps applied.', $command->getDisplay());
+            self::assertStringContainsString('Done: 8 steps applied.', $command->getDisplay());
 
             $browser = $kernel->getContainer()->get('test.client');
             self::assertInstanceOf(KernelBrowser::class, $browser);
@@ -46,7 +46,7 @@ final class DatabaseKernelTest extends DatabaseTestCase
                 $this->connection->fetchFirstColumn('SELECT action FROM cattophp_activity ORDER BY id'),
             );
             self::assertSame('203.0.113.9', $this->connection->fetchOne("SELECT ip_address FROM cattophp_activity WHERE action = 'sign_in.link_sent'"));
-            self::assertNotNull($this->connection->fetchOne("SELECT used_at FROM cattophp_sign_in_links"));
+            self::assertNotNull($this->connection->fetchOne("SELECT used_at FROM cattophp_links WHERE purpose = 'sign_in'"));
 
             $container = $kernel->getContainer()->get('test.service_container');
             self::assertInstanceOf(\Symfony\Component\DependencyInjection\ContainerInterface::class, $container);

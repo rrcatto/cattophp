@@ -25,11 +25,27 @@ final class SignInRules
 
     public function maySignIn(SignInAccount $account): bool
     {
-        if (strtoupper($this->settings->get('AUTH_SIGNIN')) === 'EVERYONE' || $this->isAdministrator($account)) {
-            return true;
-        }
+        return $this->mayUse($account->email, $this->isAdministrator($account));
+    }
 
-        return in_array(mb_strtolower(trim($account->email)), $this->allowedEmails(), true);
+    /**
+     * Whether someone with this address may sign in, or register where the project lets people register: always an
+     * administrator, everyone when sign-in is not limited, else a listed address. For an address with no account yet.
+     */
+    public function mayUse(string $email, bool $administrator): bool
+    {
+        return $administrator || !$this->limited() || $this->isListed($email);
+    }
+
+    /** Whether only administrators and the listed addresses may sign in: AUTH_SIGNIN says anything but EVERYONE. */
+    public function limited(): bool
+    {
+        return strtoupper(trim($this->settings->get('AUTH_SIGNIN'))) !== 'EVERYONE';
+    }
+
+    public function isListed(string $email): bool
+    {
+        return in_array(mb_strtolower(trim($email)), $this->allowedEmails(), true);
     }
 
     public function mustUseTwoStep(SignInAccount $account): bool
@@ -41,11 +57,22 @@ final class SignInRules
         };
     }
 
-    /** @return list<string> */
+    /** @return list<string> the listed addresses, in small letters, each once */
     public function allowedEmails(): array
     {
-        $listed = preg_split('/[\s,;]+/', mb_strtolower($this->settings->get('AUTH_SIGNIN_ALLOWED_EMAILS'))) ?: [];
+        return self::addresses($this->settings->get('AUTH_SIGNIN_ALLOWED_EMAILS'));
+    }
 
-        return array_values(array_filter($listed, static fn (string $email): bool => $email !== ''));
+    /**
+     * The addresses in a list as AUTH_SIGNIN_ALLOWED_EMAILS writes it (separated by spaces, new lines, commas or
+     * semicolons), in small letters, each once; an entry that is not an email address is left out.
+     *
+     * @return list<string>
+     */
+    public static function addresses(string $text): array
+    {
+        $listed = preg_split('/[\s,;]+/', mb_strtolower($text)) ?: [];
+
+        return array_values(array_unique(array_filter($listed, static fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)));
     }
 }

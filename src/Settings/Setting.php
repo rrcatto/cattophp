@@ -38,6 +38,13 @@ final class Setting
         }
     }
 
+    /** The same setting with a project's own default in place of its own. */
+    public function withDefault(string $default): self
+    {
+        return new self($this->name, $this->label, $this->type, $default, $this->help, $this->optional, $this->secret, $this->min, $this->max,
+            $this->shortest, $this->choices, $this->httpsOnly, $this->longest);
+    }
+
     /** The longest value it takes, in characters. */
     public function longest(): int
     {

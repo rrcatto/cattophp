@@ -61,6 +61,11 @@ final class DbalActivityStore implements ActivityStore
         return $entries;
     }
 
+    public function removeBefore(DateTimeImmutable $before): int
+    {
+        return (int) $this->connection->executeStatement('DELETE FROM cattophp_activity WHERE happened_at < ?', [$before->format('Y-m-d H:i:s.uP')]);
+    }
+
     private static function text(mixed $value): ?string
     {
         return $value === null ? null : (string) $value;

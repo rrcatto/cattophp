@@ -7,6 +7,7 @@ namespace CattoPHP\SignIn;
 use CattoPHP\Activity\ActivityLog;
 use CattoPHP\Http\Throttle;
 use CattoPHP\Installation\Installation;
+use CattoPHP\Links\LinkStore;
 use CattoPHP\Mail\Mailer;
 use CattoPHP\Settings\Settings;
 use Psr\Clock\ClockInterface;
@@ -26,8 +27,14 @@ final class SignInLinks
     public const NOT_ALLOWED = 'not_allowed';
     public const TOO_MANY = 'too_many';
 
+    /** A sign-in link's purpose among the links that work once. */
+    public const PURPOSE = 'sign_in';
+
+    /** How long a used or run-out link is kept, so a project can still count requests by it. */
+    private const KEPT_FOR = '-7 days';
+
     public function __construct(
-        private readonly SignInLinkStore $store,
+        private readonly LinkStore $store,
         private readonly SignInAccounts $accounts,
         private readonly SignInRules $rules,
         private readonly Settings $settings,
@@ -79,8 +86,10 @@ final class SignInLinks
     {
         $now = $this->clock->now();
         $token = bin2hex(random_bytes(32));
-        $this->store->add(self::hash($token), new SignInLink($account->id, $this->settings->duration('AUTH_MAGIC_LINK_TTL')->after($now), self::safePath($returnPath)), $now);
-        $this->store->forgetOld($now);
+        $path = self::safePath($returnPath);
+        $this->store->add(self::hash($token), self::PURPOSE, $account->email, $account->id, $path === null ? [] : ['return_path' => $path], null, $now,
+            $this->settings->duration('AUTH_MAGIC_LINK_TTL')->after($now));
+        $this->store->forgetOld($now->modify(self::KEPT_FOR));
 
         return $token;
     }
@@ -93,12 +102,25 @@ final class SignInLinks
 
     public function usable(string $token): ?SignInLink
     {
-        return self::isWellFormed($token) ? $this->store->usable(self::hash($token), $this->clock->now()) : null;
+        $link = self::isWellFormed($token) ? $this->store->usable(self::hash($token), self::PURPOSE, $this->clock->now()) : null;
+
+        return $link === null ? null : self::signInLink($link);
     }
 
+    /** Uses the link up and returns it; of two attempts at the same moment only one gets it. */
     public function claim(string $token): ?SignInLink
     {
-        return self::isWellFormed($token) ? $this->store->claim(self::hash($token), $this->clock->now()) : null;
+        $now = $this->clock->now();
+        $link = self::isWellFormed($token) ? $this->store->usable(self::hash($token), self::PURPOSE, $now) : null;
+
+        return $link !== null && $link->accountId !== null && $this->store->use($link->id, $now) ? self::signInLink($link) : null;
+    }
+
+    private static function signInLink(\CattoPHP\Links\Link $link): ?SignInLink
+    {
+        $path = $link->context['return_path'] ?? null;
+
+        return $link->accountId === null ? null : new SignInLink($link->accountId, $link->expiresAt, is_string($path) ? $path : null);
     }
 
     public static function isWellFormed(string $token): bool

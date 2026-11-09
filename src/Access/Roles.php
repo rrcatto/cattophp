@@ -134,10 +134,41 @@ final class Roles
         $this->roles = null;
         $this->activity->record($before === null ? 'access.role_made' : 'access.role_changed', [
             'name' => $name,
+            'description' => $description,
             'permissions' => $permissions,
             'old_name' => $before?->name,
+            'old_description' => $before?->description,
             'old_permissions' => $before?->permissions,
         ], 'role', $key, $actor);
+    }
+
+    /** Gives a role a new key, its permissions and holders going with it. The Administrator role keeps its own. */
+    public function rename(string $from, string $to, ?Actor $actor = null): void
+    {
+        $role = $this->get($from);
+        $to = strtoupper(trim($to));
+        if ($role->isAdministrator() || $to === self::ADMIN) {
+            throw new AccessRefused('The Administrator role keeps its key.');
+        }
+        if ($to === $from) {
+            return;
+        }
+        if (preg_match('/^[A-Z][A-Z0-9_]{1,39}$/', $to) !== 1) {
+            throw new AccessRefused('A role\'s key is 2 to 40 capital letters, digits and underscores, starting with a letter, such as EDITOR.');
+        }
+        if (isset($this->all()[$to])) {
+            throw new AccessRefused(sprintf('Another role already has the key %s.', $to));
+        }
+        $this->store->renameRole($from, $to);
+        $this->refresh();
+        $this->activity->record('access.role_renamed', ['name' => $role->name, 'old_key' => $from, 'key' => $to], 'role', $to, $actor);
+    }
+
+    /** Forgets what was read, so the next question reads the store again: for a process that lives on after a change elsewhere. */
+    public function refresh(): void
+    {
+        $this->roles = null;
+        $this->held = [];
     }
 
     public function delete(string $key, ?Actor $actor = null): void

@@ -12,6 +12,16 @@ final class SettingGroup
     /** @var array<string,Setting> by name */
     public readonly array $settings;
 
+    /**
+     * The same group with some of its settings replaced, by name.
+     *
+     * @param array<string,Setting> $replacements
+     */
+    public function with(array $replacements): self
+    {
+        return new self($this->key, $this->label, $this->description, array_values(array_replace($this->settings, array_intersect_key($replacements, $this->settings))));
+    }
+
     /** @param list<Setting> $settings */
     public function __construct(
         public readonly string $key,

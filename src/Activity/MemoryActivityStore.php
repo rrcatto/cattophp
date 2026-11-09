@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CattoPHP\Activity;
 
+use DateTimeImmutable;
+
 /** The activity log held for one run: for tests. */
 final class MemoryActivityStore implements ActivityStore
 {
@@ -30,5 +32,14 @@ final class MemoryActivityStore implements ActivityStore
         }
 
         return $found;
+    }
+
+    public function removeBefore(DateTimeImmutable $before): int
+    {
+        $kept = array_values(array_filter($this->entries, static fn (ActivityEntry $entry): bool => $entry->at >= $before));
+        $removed = count($this->entries) - count($kept);
+        $this->entries = $kept;
+
+        return $removed;
     }
 }

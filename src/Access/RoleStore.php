@@ -17,6 +17,9 @@ interface RoleStore
 
     public function deleteRole(string $key): void;
 
+    /** Gives a role a new key, its permissions and holders going with it. */
+    public function renameRole(string $from, string $to): void;
+
     /** @return list<string> the keys of the roles an account holds */
     public function rolesOf(string $accountId): array;
 

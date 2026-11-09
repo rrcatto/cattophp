@@ -44,6 +44,20 @@ final class MemoryRoleStore implements RoleStore
         }
     }
 
+    public function renameRole(string $from, string $to): void
+    {
+        $this->writable();
+        $role = $this->roles[$from];
+        unset($this->roles[$from]);
+        $this->roles[$to] = new Role($to, $role->name, $role->description, $role->permissions);
+        foreach ($this->held as $account => $keys) {
+            if (isset($keys[$from])) {
+                unset($this->held[$account][$from]);
+                $this->held[$account][$to] = true;
+            }
+        }
+    }
+
     public function rolesOf(string $accountId): array
     {
         $keys = array_keys($this->held[$accountId] ?? []);

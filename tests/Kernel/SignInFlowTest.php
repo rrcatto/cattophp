@@ -194,13 +194,18 @@ final class SignInFlowTest extends TestCase
         self::assertStringContainsString('The address may be mistyped', $page->text());
     }
 
-    public function testARefusedFormComesBackAsItWasTyped(): void
+    public function testARefusedFormComesBackAsItWasTypedOnTheNextPageOnly(): void
     {
         $this->browser->request('POST', '/open/refused', ['email' => 'typed@example.org', '_token' => 'x']);
-        $this->browser->followRedirect();
-        $kept = $this->browser->getRequest()->getSession()->get('_cattophp_typed_form');
+        self::assertSame('typed@example.org', $this->browser->followRedirect()->filter('.typed')->text());
+        $this->browser->request('GET', '/open/form');
+        self::assertSame('', $this->browser->getCrawler()->filter('.typed')->text(), 'once only');
 
-        self::assertSame(['action' => '/open/refused', 'values' => ['email' => 'typed@example.org']], $kept);
+        // Sent back to a page without the form: forgotten once that page is drawn.
+        $this->browser->request('POST', '/open/refused?back=/sign-in', ['email' => 'again@example.org']);
+        $this->browser->followRedirect();
+        $this->browser->request('GET', '/open/form');
+        self::assertSame('', $this->browser->getCrawler()->filter('.typed')->text());
     }
 
     /** Asks for a link as a person's browser would, and returns its path. */

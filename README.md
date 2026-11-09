@@ -21,7 +21,7 @@ Require it from GitHub in the project's `composer.json`:
 
 ```json
 "repositories": [{"type": "vcs", "url": "https://github.com/rrcatto/cattophp"}],
-"require": {"rrcatto/cattophp": "^0.1"}
+"require": {"rrcatto/cattophp": "^0.2"}
 ```
 
 Register the bundle in `config/bundles.php` beside Symfony's framework, security and Twig bundles:
@@ -90,19 +90,22 @@ says production: `new Kernel(RunMode::environment(), RunMode::debug())`.
   starting value, what the Settings page saves overrides it until Reset, a secret is stored encrypted and never shown,
   and every change is in the activity log. A module or the application adds its own by a `Settings\SettingsProvider`.
 - **The installation** (`Installation\Installation`): `APP_NAME`, `APP_ORGANISATION`, `APP_URL`, `APP_ADMIN_EMAIL`
-  and `APP_TIMEZONE`; every time shown in its time zone (`|local_time` in a template).
+  and `APP_TIMEZONE`; every time shown in its time zone (`|local_time` in a template). Templates reach it, demo or
+  live and the layout as `cattophp.installation`, `cattophp.site_mode` and `cattophp.layout`.
 - **Run mode and site mode** (`Runtime\RunMode`, `Runtime\SiteMode`): `APP_ENV`, development or production, read only
   from `.env`; `APP_SITE_MODE`, demo or live, which a demo site says on every page and in every email.
 - **Sign-in** (`SignIn\`): an emailed link that works once and is kept only as a hash; who may sign in
   (`AUTH_SIGNIN`, `AUTH_SIGNIN_ALLOWED_EMAILS`); two-step sign-in with a QR code drawn on the server and recovery
-  codes (`AUTH_TWO_STEP`); limits on asking for links (`AUTH_REQUEST_*`); how long a link and a sign-in last
+  codes (`AUTH_TWO_STEP`); limits on asking for links (`AUTH_REQUEST_*`); links that work once of any purpose, such as
+  a registration before there is an account (`Links\LinkStore`); sign-ins kept in the database, which a person can list
+  and end (`Sessions\SessionStore`); how long a link and a sign-in last
   (`AUTH_MAGIC_LINK_TTL`, `AUTH_SESSION_TTL`); `cattophp:sign-in-link` and `cattophp:two-step-reset` for when email or
   a phone is lost. The application says who its accounts are with a `SignIn\SignInAccounts`;
   `SignIn\OwnerOnlyAccounts` is a page with one owner.
 - **Roles and permissions** (`Access\`): permissions named `AREA.THING.ACTION`, from `Access\PermissionProvider`s;
   ADMIN holds every one; a voter, so `is_granted('PLATFORM.SETTINGS.VIEW')` works everywhere.
 - **The activity log** (`Activity\ActivityLog`): every change, who made it, from where and with the request's
-  reference, never a secret.
+  reference, never a secret; kept as long as the project keeps it (`removeBefore()`).
 - **HTTP**: error pages in plain words with a reference for the log; the Content-Security-Policy with a nonce
   (`csp_nonce()`) and the other security headers; the form token (`form_token()`); a refused form back as typed
   (`TypedForm`, `typed_for()`); the bot check on public forms (`BotCheck`); rate limits (`Throttle`).

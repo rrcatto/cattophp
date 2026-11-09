@@ -4,10 +4,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title|default('') }}{% if installation.name %} · {{ installation.name }}{% endif %}</title>
+<title>{{ title|default('') }}{% if cattophp.installation.name %} · {{ cattophp.installation.name }}{% endif %}</title>
 </head>
 <body>
-{% if site_mode.isDemo %}<div class="cl-site-demo" role="note"><strong>{{ site_mode.heading }}</strong> {{ site_mode.notice }}</div>{% endif %}
+{% if cattophp.site_mode.isDemo %}<div class="cl-site-demo" role="note"><strong>{{ cattophp.site_mode.heading }}</strong> {{ cattophp.site_mode.notice }}</div>{% endif %}
 {% block body %}{% endblock %}
 </body>
 </html>

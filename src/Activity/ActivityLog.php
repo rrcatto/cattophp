@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Activity;
 
+use DateTimeImmutable;
 use CattoPHP\Http\RequestReference;
 use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
@@ -60,6 +61,12 @@ final class ActivityLog
     public function recent(int $limit = 50, ?string $action = null, ?string $subjectType = null, ?string $subjectId = null, ?string $actorId = null): array
     {
         return $this->store->recent($limit, $action, $subjectType, $subjectId, $actorId);
+    }
+
+    /** Removes every entry from before a moment, for a log kept only so long; returns how many went. */
+    public function removeBefore(DateTimeImmutable $before): int
+    {
+        return $this->store->removeBefore($before);
     }
 
     /** The signed-in person, if there is one. */

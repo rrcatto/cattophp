@@ -17,7 +17,7 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 /** The test application's own pages. */
 final class PagesController
 {
-    public function __construct(private readonly Security $security, private readonly FormToken $tokens)
+    public function __construct(private readonly Security $security, private readonly FormToken $tokens, private readonly \Twig\Environment $twig)
     {
     }
 
@@ -47,6 +47,12 @@ final class PagesController
     {
         TypedForm::keep($request);
 
-        return new RedirectResponse('/sign-in', Response::HTTP_SEE_OTHER);
+        return new RedirectResponse((string) $request->query->get('back', '/open/form'), Response::HTTP_SEE_OTHER);
+    }
+
+    /** A page with the form a refusal sends the person back to. */
+    public function form(): Response
+    {
+        return new Response($this->twig->createTemplate('<!doctype html><title>Form</title><p class="typed">{{ typed_for(\'/open/refused\').email ?? \'\' }}</p>')->render());
     }
 }

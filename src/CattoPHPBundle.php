@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace CattoPHP;
 
+use CattoPHP\Sessions\DbalSessionStore;
+use CattoPHP\Sessions\FileSessionStore;
+use CattoPHP\Sessions\SessionStore;
+use CattoPHP\Links\DbalLinkStore;
+use CattoPHP\Links\FileLinkStore;
+use CattoPHP\Links\LinkStore;
 use CattoPHP\Access\DbalRoleStore;
 use CattoPHP\Access\FoundationPermissions;
 use CattoPHP\Access\MemoryRoleStore;
@@ -22,17 +28,15 @@ use CattoPHP\Http\FormToken;
 use CattoPHP\Http\RequestReference;
 use CattoPHP\Http\SecurityHeadersListener;
 use CattoPHP\Http\Throttle;
+use CattoPHP\Http\TypedFormListener;
 use CattoPHP\Installation\Installation;
 use CattoPHP\Mail\Mailer;
 use CattoPHP\Mail\TestEmailCommand;
 use CattoPHP\Runtime\SiteMode;
+use CattoPHP\Schema\FoundationSteps;
 use CattoPHP\Schema\MigrateCommand;
 use CattoPHP\Schema\SchemaRunner;
 use CattoPHP\Schema\SchemaStep;
-use CattoPHP\Schema\Steps\Step202611091000Settings;
-use CattoPHP\Schema\Steps\Step202611091001Activity;
-use CattoPHP\Schema\Steps\Step202611091002Access;
-use CattoPHP\Schema\Steps\Step202611091003SignIn;
 use CattoPHP\Security\KeyedHash;
 use CattoPHP\Security\SecretCipher;
 use CattoPHP\Security\TwoStep\DbalTwoStepStore;
@@ -47,8 +51,6 @@ use CattoPHP\Settings\Settings;
 use CattoPHP\Settings\SettingsCatalogue;
 use CattoPHP\Settings\SettingsProvider;
 use CattoPHP\Settings\SettingsStore;
-use CattoPHP\SignIn\DbalSignInLinkStore;
-use CattoPHP\SignIn\FileSignInLinkStore;
 use CattoPHP\SignIn\OwnerOnlyAccounts;
 use CattoPHP\SignIn\SignInAccounts;
 use CattoPHP\SignIn\SignInAuthenticator;
@@ -57,7 +59,6 @@ use CattoPHP\SignIn\SignInEntryPoint;
 use CattoPHP\SignIn\SignInFlow;
 use CattoPHP\SignIn\SignInLinkCommand;
 use CattoPHP\SignIn\SignInLinks;
-use CattoPHP\SignIn\SignInLinkStore;
 use CattoPHP\SignIn\SignInRules;
 use CattoPHP\SignIn\SignInUserProvider;
 use CattoPHP\SignIn\TwoStepResetCommand;
@@ -95,6 +96,7 @@ final class CattoPHPBundle extends AbstractBundle
                 ->booleanNode('site_mode')->defaultTrue()->info('Whether the site is a demo or live; false for a project without the distinction')->end()
                 ->scalarNode('layout')->defaultValue('@CattoPHP/layout.html.twig')->info('The template CattoPHP\'s pages extend')->end()
                 ->arrayNode('starting_values')->normalizeKeys(false)->useAttributeAsKey('name')->scalarPrototype()->end()->info('Starting values in place of .env\'s, by name')->end()
+                ->arrayNode('defaults')->normalizeKeys(false)->useAttributeAsKey('name')->scalarPrototype()->end()->info('The project\'s own defaults, by name: used when .env and the Settings page give nothing')->end()
                 ->arrayNode('sign_in')->canBeDisabled()->children()
                     ->scalarNode('accounts')->defaultValue(OwnerOnlyAccounts::class)->info('The service that finds the application\'s accounts')->end()
                     ->scalarNode('after')->defaultValue('/')->info('Where a person goes after signing in')->end()
@@ -115,7 +117,24 @@ final class CattoPHPBundle extends AbstractBundle
 
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
-        $builder->prependExtensionConfig('framework', ['csrf_protection' => true]);
+        // Form tokens live in Symfony's session. A project that keeps the session off (one that runs its own) gets none,
+        // rather than a container Symfony refuses to build.
+        if (self::sessionIsOn($builder)) {
+            $builder->prependExtensionConfig('framework', ['csrf_protection' => true]);
+        }
+    }
+
+    /** Whether the project's own configuration leaves Symfony's session on. */
+    private static function sessionIsOn(ContainerBuilder $builder): bool
+    {
+        foreach ($builder->getExtensionConfig('framework') as $config) {
+            $session = $config['session'] ?? null;
+            if ($session === false || (is_array($session) && ($session['enabled'] ?? true) === false)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param array<string,mixed> $config */
@@ -153,9 +172,10 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(SettingsStore::class, DbalSettingsStore::class)->args([$connection]);
             $services->set(ActivityStore::class, DbalActivityStore::class)->args([$connection]);
             $services->set(RoleStore::class, DbalRoleStore::class)->args([$connection]);
-            $services->set(SignInLinkStore::class, DbalSignInLinkStore::class)->args([$connection]);
+            $services->set(LinkStore::class, DbalLinkStore::class)->args([$connection]);
+            $services->set(SessionStore::class, DbalSessionStore::class)->args([$connection]);
             $services->set(TwoStepStore::class, DbalTwoStepStore::class)->args([$connection]);
-            foreach ([Step202611091000Settings::class, Step202611091001Activity::class, Step202611091002Access::class, Step202611091003SignIn::class] as $step) {
+            foreach (FoundationSteps::classes() as $step) {
                 $services->set($step)->tag(SchemaStep::TAG);
             }
             $services->set(SchemaRunner::class)->args([$connection, tagged_iterator(SchemaStep::TAG)]);
@@ -164,14 +184,15 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(SettingsStore::class, MemorySettingsStore::class)->args([false]);
             $services->set(ActivityStore::class, FileActivityStore::class)->args([$folder]);
             $services->set(RoleStore::class, MemoryRoleStore::class)->args([false]);
-            $services->set(SignInLinkStore::class, FileSignInLinkStore::class)->args([$folder . '/sign-in-links']);
+            $services->set(LinkStore::class, FileLinkStore::class)->args([$folder . '/links.json']);
+            $services->set(SessionStore::class, FileSessionStore::class)->args([$folder . '/sessions.json']);
             $services->set(TwoStepStore::class, FileTwoStepStore::class)->args([$signIn['two_step_file'] ?? $folder . '/two-step/{account}.json']);
         }
 
         // The foundations.
         $services->set(ActivityLog::class)->args([service(ActivityStore::class), service('clock'), service('request_stack')->nullOnInvalid(), service('security.token_storage')->nullOnInvalid()]);
         $services->set(FoundationSettings::class)->args([$config['site_mode'], $signIn['enabled']])->tag(SettingsProvider::TAG);
-        $services->set(SettingsCatalogue::class)->args([tagged_iterator(SettingsProvider::TAG)]);
+        $services->set(SettingsCatalogue::class)->args([tagged_iterator(SettingsProvider::TAG), $config['defaults']]);
         $services->set(Settings::class);
         $services->set(Installation::class);
         $services->set(SiteMode::class)->args([$config['site_mode'] ? service(Settings::class) : null]);
@@ -185,9 +206,10 @@ final class CattoPHPBundle extends AbstractBundle
             service('mailer.transport_factory')->nullOnInvalid(),
         ]);
         $services->set(TestEmailCommand::class)->tag('console.command');
-        $services->set(FormToken::class)->args([service('security.csrf.token_manager')]);
+        $services->set(FormToken::class)->args([service('security.csrf.token_manager')->nullOnInvalid()]);
         $services->set(ContentSecurityPolicy::class)->args([service('request_stack'), $headers['policy']]);
-        $services->set(CattoPHPExtension::class)->arg('$layout', $config['layout'])->tag('twig.extension');
+        // Added before the project's own extensions, so a project function, filter or global of the same name wins.
+        $services->set(CattoPHPExtension::class)->arg('$layout', $config['layout'])->tag('twig.extension', ['priority' => 100]);
 
         if ($headers['enabled']) {
             $services->set(SecurityHeadersListener::class)
@@ -195,6 +217,8 @@ final class CattoPHPBundle extends AbstractBundle
                 ->tag('kernel.event_listener', ['event' => KernelEvents::REQUEST, 'method' => 'onRequest', 'priority' => 512])
                 ->tag('kernel.event_listener', ['event' => KernelEvents::RESPONSE, 'method' => 'onResponse', 'priority' => -16]);
         }
+        $services->set(TypedFormListener::class)
+            ->tag('kernel.event_listener', ['event' => KernelEvents::RESPONSE, 'method' => 'onResponse', 'priority' => -32]);
         if ($errors['enabled']) {
             $services->set(ErrorPageListener::class)
                 ->args([service('twig'), service('logger'), param('kernel.debug'), $errors['skip_paths']])

@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace CattoPHP\Tests\Support;
 
+use CattoPHP\Schema\FoundationSteps;
 use CattoPHP\Schema\SchemaRunner;
-use CattoPHP\Schema\Steps\Step202611091000Settings;
-use CattoPHP\Schema\Steps\Step202611091001Activity;
-use CattoPHP\Schema\Steps\Step202611091002Access;
-use CattoPHP\Schema\Steps\Step202611091003SignIn;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -43,8 +40,6 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function runner(): SchemaRunner
     {
-        return new SchemaRunner($this->connection, [
-            new Step202611091003SignIn(), new Step202611091001Activity(), new Step202611091000Settings(), new Step202611091002Access(),
-        ], new MockClock('2026-11-09 10:00:00'));
+        return new SchemaRunner($this->connection, array_reverse(FoundationSteps::all()), new MockClock('2026-11-09 10:00:00'));
     }
 }

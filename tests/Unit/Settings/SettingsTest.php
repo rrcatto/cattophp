@@ -194,6 +194,73 @@ final class SettingsTest extends TestCase
         self::assertCount(2, $this->site->activity->recent(10, 'settings.reset'));
     }
 
+    public function testABlankSavedOverridesEnvForASettingThatMayBeBlank(): void
+    {
+        $site = new Foundations(['AUTH_SIGNIN_ALLOWED_EMAILS' => 'listed@example.org', 'APP_ORGANISATION' => 'From .env'], $this->store);
+
+        $site->settings->set('AUTH_SIGNIN_ALLOWED_EMAILS', '');
+        self::assertSame('', $site->settings->get('AUTH_SIGNIN_ALLOWED_EMAILS'), 'no addresses listed, whatever .env lists');
+        self::assertSame(Settings::FROM_SETTINGS, $site->settings->source('AUTH_SIGNIN_ALLOWED_EMAILS'));
+        $site->settings->reset('AUTH_SIGNIN_ALLOWED_EMAILS');
+        self::assertSame('listed@example.org', $site->settings->get('AUTH_SIGNIN_ALLOWED_EMAILS'), 'Reset returns to .env');
+        $site->settings->set('AUTH_REQUEST_LIMIT_EMAIL', '');
+        self::assertSame(5, $site->settings->int('AUTH_REQUEST_LIMIT_EMAIL'), 'a number left blank takes its default');
+        self::assertFalse($site->settings->isOverridden('AUTH_REQUEST_LIMIT_EMAIL'));
+    }
+
+    public function testOneSettingIsSavedOnItsOwn(): void
+    {
+        $settings = $this->site->settings;
+
+        self::assertTrue($settings->set('AUTH_REQUEST_LIMIT_EMAIL', '8'));
+        self::assertSame(8, $settings->int('AUTH_REQUEST_LIMIT_EMAIL'));
+        self::assertSame(['AUTH_REQUEST_LIMIT_EMAIL'], array_keys($this->store->all()), 'nothing else of its group is saved');
+        self::assertFalse($settings->set('AUTH_REQUEST_LIMIT_EMAIL', '8'), 'the same value again changes nothing');
+        self::assertTrue($settings->set('AUTH_REQUEST_LIMIT_EMAIL', '5'), 'back to the default');
+        self::assertSame([], $this->store->all(), 'the default is no override');
+        try {
+            $settings->set('AUTH_REQUEST_LIMIT_EMAIL', 'many');
+            self::fail('A word is no number.');
+        } catch (SettingsRefused $refused) {
+            self::assertSame(['AUTH_REQUEST_LIMIT_EMAIL'], array_keys($refused->errors()));
+        }
+        $settings->set('MAILER_DSN', 'smtp://user:hunter2@mail.example.com:587');
+        self::assertFalse($settings->set('MAILER_DSN', ''), 'a secret left blank keeps the one there is');
+        self::assertSame('smtp://user:hunter2@mail.example.com:587', $settings->get('MAILER_DSN'));
+    }
+
+    public function testWhatAnotherProcessSavedIsSeenWithinSeconds(): void
+    {
+        $worker = new Settings($this->site->catalogue, $this->store, $this->site->cipher, new \CattoPHP\Settings\EnvironmentValues(['APP_SITE_MODE' => 'live']), $this->site->activity, $this->site->clock);
+        self::assertSame('live', $worker->get('APP_SITE_MODE'), 'the worker reads it once');
+
+        $this->site->settings->set('APP_SITE_MODE', 'demo');
+        self::assertSame('live', $worker->get('APP_SITE_MODE'), 'and trusts it for a few seconds');
+        $this->site->clock->modify('+' . Settings::FRESH_FOR . ' seconds');
+        self::assertSame('demo', $worker->get('APP_SITE_MODE'), 'then reads it again');
+
+        $this->site->settings->set('APP_SITE_MODE', 'live');
+        $worker->refresh();
+        self::assertSame('live', $worker->get('APP_SITE_MODE'), 'or at once, when told');
+    }
+
+    public function testAProjectsOwnDefaultComesAfterEnvAndTheSettingsPage(): void
+    {
+        $catalogue = new SettingsCatalogue([new \CattoPHP\Settings\FoundationSettings()], ['APP_DEMO_NOTICE' => 'Nothing here is for sale yet.', 'AUTH_SESSION_TTL' => '12h']);
+        $settings = static fn (array $env): Settings => new Settings($catalogue, new MemorySettingsStore(), (new Foundations())->cipher, new \CattoPHP\Settings\EnvironmentValues($env), (new Foundations())->activity, (new Foundations())->clock);
+
+        self::assertSame('Nothing here is for sale yet.', $settings([])->get('APP_DEMO_NOTICE'));
+        self::assertSame('12h', $settings([])->get('AUTH_SESSION_TTL'));
+        self::assertSame('From .env.', $settings(['APP_DEMO_NOTICE' => 'From .env.'])->get('APP_DEMO_NOTICE'), '.env comes before the project\'s default');
+        $own = $settings([]);
+        $own->set('APP_DEMO_NOTICE', 'Saved on the page.');
+        self::assertSame('Saved on the page.', $own->get('APP_DEMO_NOTICE'));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('A default is given for APP_DEMO_NOTCE, which is no setting.');
+        new SettingsCatalogue([new \CattoPHP\Settings\FoundationSettings()], ['APP_DEMO_NOTCE' => 'A typing mistake.']);
+    }
+
     /**
      * The sign-in group as its form sends it, with changes.
      *

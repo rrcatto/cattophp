@@ -84,6 +84,50 @@ final class FileActivityStore implements ActivityStore
         return $entries;
     }
 
+    /**
+     * Rewrites the file without the entries from before the moment, in place and under the lock every entry is added
+     * under, so an entry added meanwhile waits and is never lost. A line that cannot be read, so cannot be dated, is kept.
+     */
+    public function removeBefore(DateTimeImmutable $before): int
+    {
+        $path = $this->path();
+        if (!is_file($path)) {
+            return 0;
+        }
+        $handle = fopen($path, 'r+');
+        if ($handle === false) {
+            throw new RuntimeException('The activity log could not be opened.');
+        }
+        try {
+            if (!flock($handle, LOCK_EX)) {
+                throw new RuntimeException('The activity log could not be locked.');
+            }
+            $kept = [];
+            $removed = 0;
+            while (($line = fgets($handle)) !== false) {
+                $row = json_decode(trim($line), true);
+                if (is_array($row) && is_string($row['at'] ?? null) && new DateTimeImmutable($row['at']) < $before) {
+                    ++$removed;
+                    continue;
+                }
+                if (trim($line) !== '') {
+                    $kept[] = rtrim($line, "\n") . "\n";
+                }
+            }
+            if ($removed > 0) {
+                ftruncate($handle, 0);
+                rewind($handle);
+                fwrite($handle, implode('', $kept));
+                fflush($handle);
+            }
+            flock($handle, LOCK_UN);
+
+            return $removed;
+        } finally {
+            fclose($handle);
+        }
+    }
+
     private function path(): string
     {
         return rtrim($this->folder, '/') . '/activity.log';

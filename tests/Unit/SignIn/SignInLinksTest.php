@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Tests\Unit\SignIn;
 
-use CattoPHP\SignIn\FileSignInLinkStore;
+use CattoPHP\Links\FileLinkStore;
 use CattoPHP\SignIn\SignInAccount;
 use CattoPHP\SignIn\SignInAccounts;
 use CattoPHP\SignIn\SignInLinks;
@@ -71,8 +71,8 @@ final class SignInLinksTest extends TestCase
 
         $kept = (string) shell_exec('grep -rl ' . escapeshellarg($token) . ' ' . escapeshellarg($this->folder));
         self::assertSame('', trim($kept));
-        self::assertFileExists($this->folder . '/' . hash('sha256', $token));
-        self::assertSame(0600, fileperms($this->folder . '/' . hash('sha256', $token)) & 0777);
+        self::assertStringContainsString(hash('sha256', $token), (string) file_get_contents($this->folder . '/links.json'), 'its hash, in the one file of links');
+        self::assertSame(0600, fileperms($this->folder . '/links.json') & 0777);
     }
 
     public function testAnAddressMayAskOnlySoOften(): void
@@ -120,6 +120,20 @@ final class SignInLinksTest extends TestCase
         self::assertSame(SignInLinks::SENT, $everyone->signInLinks($this->folder, $accounts)->request('learner@example.org', '203.0.113.5'));
     }
 
+    public function testAnAddressMaySignInAsTheSettingsSay(): void
+    {
+        $limited = new SignInRules((new Foundations(['AUTH_SIGNIN' => 'ADMIN', 'AUTH_SIGNIN_ALLOWED_EMAILS' => "Listed@Example.org, not-an-address;\nother@example.org listed@example.org"]))->settings);
+        self::assertTrue($limited->limited());
+        self::assertSame(['listed@example.org', 'other@example.org'], $limited->allowedEmails(), 'small letters, each once, nothing that is not an address');
+        self::assertTrue($limited->mayUse(' LISTED@example.org ', false));
+        self::assertFalse($limited->mayUse('stranger@example.org', false));
+        self::assertTrue($limited->mayUse('stranger@example.org', true), 'an administrator always may');
+        $open = new SignInRules((new Foundations(['AUTH_SIGNIN' => 'everyone']))->settings);
+        self::assertFalse($open->limited());
+        self::assertTrue($open->mayUse('stranger@example.org', false));
+        self::assertTrue((new SignInRules((new Foundations(['AUTH_SIGNIN' => 'nonsense']))->settings))->limited(), 'anything but EVERYONE is limited, the safe one');
+    }
+
     public function testTwoStepIsRequiredAsTheSettingSays(): void
     {
         $person = new SignInAccount('7', 'ada@example.org', 'Ada', false);
@@ -155,12 +169,14 @@ final class SignInLinksTest extends TestCase
         $site = new Foundations(['AUTH_MAGIC_LINK_TTL' => '1m']);
         $links = $site->signInLinks($this->folder);
         $owner = new SignInAccount('owner', 'owner@example.com', 'Owner', true);
-        $links->create($owner);
+        $old = $links->create($owner);
         $site->clock->modify('+2 minutes');
+        self::assertNull($links->usable($old), 'it ran out');
         $links->create($owner);
-
-        self::assertCount(1, glob($this->folder . '/*') ?: [], 'making a link clears the ones that ran out');
-        (new FileSignInLinkStore($this->folder))->forgetOld($site->clock->now()->modify('+1 hour'));
-        self::assertCount(0, glob($this->folder . '/*') ?: []);
+        $store = new FileLinkStore($this->folder . '/links.json');
+        self::assertNotNull($store->find(hash('sha256', $old), 'sign_in'), 'kept a week, so requests can still be counted');
+        $site->clock->modify('+8 days');
+        $links->create($owner);
+        self::assertNull($store->find(hash('sha256', $old), 'sign_in'), 'then cleared when a link is made');
     }
 }

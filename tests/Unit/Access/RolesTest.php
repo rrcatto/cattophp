@@ -103,6 +103,45 @@ final class RolesTest extends TestCase
         );
     }
 
+    public function testARoleIsRenamedWithItsHoldersButTheAdministratorKeepsItsKey(): void
+    {
+        $roles = $this->site->roles;
+        $roles->save('EDITOR', 'Editor', 'Edits pages.', ['PAGE.EDIT']);
+        $roles->grant('7', 'EDITOR');
+        $roles->rename('EDITOR', 'writer');
+
+        self::assertSame(['WRITER'], $roles->rolesOf('7'));
+        self::assertTrue($roles->may('7', 'PAGE.EDIT'));
+        self::assertSame(['name' => 'Editor', 'old_key' => 'EDITOR', 'key' => 'WRITER'], $this->site->activity->recent(1)[0]->details);
+        foreach ([['ADMIN', 'BOSS'], ['WRITER', 'ADMIN'], ['WRITER', 'x'], ['NOBODY', 'SOMEONE']] as [$from, $to]) {
+            try {
+                $roles->rename($from, $to);
+                self::fail($from . ' became ' . $to);
+            } catch (AccessRefused) {
+                self::assertSame(['WRITER'], $roles->rolesOf('7'));
+            }
+        }
+        $roles->save('READER', 'Reader', '', []);
+        $this->expectException(AccessRefused::class);
+        $roles->rename('WRITER', 'READER');
+    }
+
+    public function testAChangeRecordsTheDescriptionBeforeAndAfterAndRefreshReadsTheStoreAgain(): void
+    {
+        $roles = $this->site->roles;
+        $roles->save('EDITOR', 'Editor', 'Edits pages.', ['PAGE.EDIT']);
+        $roles->save('EDITOR', 'Editor', 'Edits every page.', ['PAGE.EDIT']);
+        $details = $this->site->activity->recent(1)[0]->details;
+        self::assertSame(['Edits every page.', 'Edits pages.'], [$details['description'], $details['old_description']]);
+
+        $roles->grant('7', 'EDITOR');
+        self::assertSame(['EDITOR'], $roles->rolesOf('7'));
+        $this->site->roleStore->revoke('7', 'EDITOR');
+        self::assertSame(['EDITOR'], $roles->rolesOf('7'), 'what was read is remembered');
+        $roles->refresh();
+        self::assertSame([], $roles->rolesOf('7'), 'until refreshed');
+    }
+
     public function testThePermissionVoterAsksTheRolesAndLetsAdministratorsDoAnything(): void
     {
         $roles = $this->site->roles;

@@ -16,7 +16,8 @@ use Throwable;
 /**
  * Every setting's value: what the Settings page saved, else what .env gives, else the setting's own default. .env is
  * never written. Saving a value equal to what .env gives (or, with nothing in .env, the default) removes the override,
- * so a later change to .env applies again; Reset removes it outright. A secret is stored encrypted and decrypted only
+ * so a later change to .env applies again; Reset removes it outright. A setting that may be blank can be saved blank,
+ * which overrides .env too; one that cannot be blank takes its default when left blank. A secret is stored encrypted and decrypted only
  * when the code asks for it; a secret left blank on the page keeps the one there is. Every change is in the activity
  * log with its old and new values, and a secret's change without them.
  */
@@ -28,8 +29,13 @@ final class Settings
 
     private const TRUE = ['1', 'true', 'on', 'yes'];
 
-    /** @var array<string,StoredSetting>|null the overrides, read once */
+    /** How long the overrides read are trusted before they are read again, in seconds. */
+    public const FRESH_FOR = 5;
+
+    /** @var array<string,StoredSetting>|null the overrides, read at $readAt */
     private ?array $overrides = null;
+
+    private int $readAt = 0;
 
     public function __construct(
         private readonly SettingsCatalogue $catalogue,
@@ -163,33 +169,60 @@ final class Settings
         if ($errors !== []) {
             throw new SettingsRefused($errors);
         }
-        $at = $this->clock->now();
         $changed = [];
         foreach ($values as $name => $value) {
-            $setting = $group->settings[$name];
-            if ($value === null) {
-                // A secret left blank: the one there is stays.
-                continue;
-            }
-            $before = $this->safely($name);
-            $inherited = $this->inherited($setting);
-            $isOverridden = isset($this->overrides()[$name]);
-            if ($value === $inherited) {
-                if ($isOverridden) {
-                    $this->store->remove($name);
-                    $this->forget();
-                }
-            } elseif (!$isOverridden || $before !== $value) {
-                $this->store->save($name, $setting->secret ? $this->cipher->encrypt($value) : $value, $setting->secret, $at, $actor !== null ? $actor->id : $this->activity->signedIn()?->id);
-                $this->forget();
-            }
-            if ($before !== $value) {
+            // A secret left blank (null) keeps the one there is.
+            if ($value !== null && $this->apply($group->settings[$name], $value, $actor)) {
                 $changed[] = $name;
-                $this->activity->record('settings.changed', $setting->secret ? ['setting' => $name, 'secret_changed' => true] : ['setting' => $name, 'old' => $before, 'new' => $value], 'setting', $name, $actor);
             }
         }
 
         return $changed;
+    }
+
+    /**
+     * Checks one setting as typed and saves it on its own, for a page that changes one value of a group. True when its
+     * value changed.
+     *
+     * @throws SettingsRefused
+     */
+    public function set(string $name, mixed $typed, ?Actor $actor = null): bool
+    {
+        if (!$this->store->isWritable()) {
+            throw new SettingsRefused(['' => 'This installation keeps its settings in .env: change them there.']);
+        }
+        $setting = $this->catalogue->setting($name);
+        try {
+            $value = $this->checked($setting, $typed);
+        } catch (InvalidArgumentException $refused) {
+            throw new SettingsRefused([$name => $refused->getMessage()]);
+        }
+
+        // A secret left blank keeps the one there is.
+        return $value !== null && $this->apply($setting, $value, $actor);
+    }
+
+    /** Saves a checked value: an override, or none when it is what .env or the default gives. True when it changed. */
+    private function apply(Setting $setting, string $value, ?Actor $actor): bool
+    {
+        $name = $setting->name;
+        $before = $this->safely($name);
+        $isOverridden = isset($this->overrides()[$name]);
+        if ($value === $this->inherited($setting)) {
+            if ($isOverridden) {
+                $this->store->remove($name);
+                $this->forget();
+            }
+        } elseif (!$isOverridden || $before !== $value) {
+            $this->store->save($name, $setting->secret ? $this->cipher->encrypt($value) : $value, $setting->secret, $this->clock->now(), $actor !== null ? $actor->id : $this->activity->signedIn()?->id);
+            $this->forget();
+        }
+        if ($before === $value) {
+            return false;
+        }
+        $this->activity->record('settings.changed', $setting->secret ? ['setting' => $name, 'secret_changed' => true] : ['setting' => $name, 'old' => $before, 'new' => $value], 'setting', $name, $actor);
+
+        return true;
     }
 
     /** Removes one override, so .env, else the default, applies again. */
@@ -232,8 +265,12 @@ final class Settings
             if ($setting->secret && $this->get($setting->name) !== '') {
                 return null;
             }
-            if ($setting->optional || $setting->default !== '') {
-                // Blank means the default: what .env gives, else the setting's own.
+            if ($setting->optional) {
+                // Blank is a value of its own (no addresses listed, no organisation), overriding .env until Reset.
+                return '';
+            }
+            if ($setting->default !== '') {
+                // A value that cannot be blank (a number, a length of time) takes the default: .env's, else its own.
                 return $this->inherited($setting);
             }
             throw new InvalidArgumentException(sprintf('%s cannot be empty.', $setting->label));
@@ -333,14 +370,27 @@ final class Settings
         }
     }
 
-    /** @return array<string,StoredSetting> */
+    /**
+     * The overrides, read again once they are FRESH_FOR seconds old, so a process that runs for hours (a scheduler, a
+     * worker) sees what the Settings page saved since it started.
+     *
+     * @return array<string,StoredSetting>
+     */
     private function overrides(): array
     {
-        if ($this->overrides === null) {
+        $now = $this->clock->now()->getTimestamp();
+        if ($this->overrides === null || $now - $this->readAt >= self::FRESH_FOR) {
             $this->overrides = array_filter($this->store->all(), fn (string $name): bool => $this->catalogue->has($name), ARRAY_FILTER_USE_KEY);
+            $this->readAt = $now;
         }
 
         return $this->overrides;
+    }
+
+    /** Forgets what was read, so the next value is read afresh: for a long-running process between its jobs. */
+    public function refresh(): void
+    {
+        $this->forget();
     }
 
     private function forget(): void

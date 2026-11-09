@@ -35,8 +35,11 @@ final class TestKernel extends Kernel
 {
     use MicroKernelTrait;
 
-    /** @param array<string,string> $starting starting values in place of .env's */
-    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [])
+    /**
+     * @param array<string,string> $starting starting values in place of .env's
+     * @param bool $ownSessions a project that runs its own PHP sessions, with Symfony's off and CattoPHP's sign-in pages off
+     */
+    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false)
     {
         parent::__construct('test', false);
     }
@@ -53,7 +56,7 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting]));
+        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions]));
     }
 
     public function getLogDir(): string
@@ -70,10 +73,13 @@ final class TestKernel extends Kernel
             'handle_all_throwables' => true,
             'php_errors' => ['log' => true],
             'router' => ['utf8' => true],
-            'session' => ['storage_factory_id' => 'session.storage.factory.mock_file'],
+            'session' => $this->ownSessions ? ['enabled' => false] : ['storage_factory_id' => 'session.storage.factory.mock_file'],
         ]);
         $container->extension('twig', ['strict_variables' => true]);
-        $container->extension('security', [
+        if ($this->ownSessions) {
+            $container->extension('security', ['providers' => ['none' => ['memory' => null]], 'firewalls' => ['main' => ['security' => false]]]);
+        } else {
+            $container->extension('security', [
             'providers' => ['cattophp' => ['id' => SignInUserProvider::class]],
             'firewalls' => ['main' => [
                 'lazy' => true,
@@ -85,7 +91,8 @@ final class TestKernel extends Kernel
                 ['path' => '^/(sign-in|open)', 'roles' => 'PUBLIC_ACCESS'],
                 ['path' => '^/', 'roles' => 'ROLE_USER'],
             ],
-        ]);
+            ]);
+        }
         $container->extension('cattophp', [
             'application_key' => 'cattophp-test-key-not-used-anywhere',
             'storage' => $this->databaseUrl === null ? ['type' => 'files', 'folder' => $this->folder . '/storage'] : ['type' => 'database', 'connection' => 'test.connection'],
@@ -96,13 +103,14 @@ final class TestKernel extends Kernel
                 'MAIL_FROM_ADDRESS' => 'site@example.com',
                 'APP_SITE_MODE' => 'live',
             ],
-            'sign_in' => ['after' => '/'],
+            'sign_in' => $this->ownSessions ? ['enabled' => false] : ['after' => '/'],
             // A directive with a hyphen, as a project writes it in YAML.
             'security_headers' => ['policy' => ['img-src' => "'self'"]],
         ]);
 
         $services = $container->services()->defaults()->autowire()->autoconfigure();
         $services->set(PagesController::class)->public()->tag('controller.service_arguments');
+        $services->set(ProjectExtension::class);
         $services->set(RecordingTransport::class)->public();
         $services->set('logger', RecordingLogger::class)->public();
         $services->set(Mailer::class)->args([
@@ -118,10 +126,13 @@ final class TestKernel extends Kernel
 
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
-        $routes->import(dirname(__DIR__, 3) . '/config/routes/sign_in.php');
+        if (!$this->ownSessions) {
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/sign_in.php');
+        }
         $routes->add('home', '/')->controller([PagesController::class, 'home']);
         $routes->add('settings_page', '/settings')->controller([PagesController::class, 'settings']);
         $routes->add('broken', '/open/broken')->controller([PagesController::class, 'broken']);
         $routes->add('refused', '/open/refused')->controller([PagesController::class, 'refused'])->methods(['POST']);
+        $routes->add('form', '/open/form')->controller([PagesController::class, 'form'])->methods(['GET']);
     }
 }

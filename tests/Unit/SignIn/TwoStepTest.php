@@ -45,6 +45,39 @@ final class TwoStepTest extends TestCase
         self::assertSame(['left' => 7], $site->activity->recent(1, 'two_step.recovery_code_used')[0]->details);
     }
 
+    public function testConfirmSaysWhichCodeWorkedAndTheSetUpDateStays(): void
+    {
+        $folder = Foundations::folder();
+        try {
+            foreach (['memory' => null, 'file' => new FileTwoStepStore($folder . '/{account}.json')] as $kind => $store) {
+                $site = new Foundations();
+                $twoStep = $site->twoStep($store);
+                $setUp = $site->clock->now();
+                $codes = (array) $twoStep->setUp('7', self::SECRET, OneTimeCode::codeAt(self::SECRET, $setUp->getTimestamp()));
+                self::assertSame($setUp->getTimestamp(), self::stamp($twoStep->setUpAt('7')), $kind);
+
+                $site->clock->modify('+30 seconds');
+                self::assertSame('code', $twoStep->confirm('7', OneTimeCode::codeAt(self::SECRET, $site->clock->now()->getTimestamp())), $kind);
+                self::assertSame('recovery', $twoStep->confirm('7', $codes[0]), $kind);
+                self::assertNull($twoStep->confirm('7', $codes[0]), $kind . ': each works once');
+                self::assertNull($twoStep->confirm('7', '000000'), $kind);
+                $twoStep->renewRecoveryCodes('7');
+                self::assertSame($setUp->getTimestamp(), self::stamp($twoStep->setUpAt('7')), $kind . ': using codes keeps the date');
+
+                $site->clock->modify('+1 day');
+                $twoStep->setUp('7', strrev(self::SECRET), OneTimeCode::codeAt(strrev(self::SECRET), $site->clock->now()->getTimestamp()));
+                self::assertSame($site->clock->now()->getTimestamp(), self::stamp($twoStep->setUpAt('7')), $kind . ': a new key, a new date');
+                self::assertNull($twoStep->setUpAt('8'), $kind);
+            }
+            file_put_contents($folder . '/old.json', json_encode(['secret' => self::SECRET, 'last_counter' => 1]));
+            $old = (new Foundations())->twoStep(new FileTwoStepStore($folder . '/old.json'));
+            self::assertTrue($old->isSetUp('anyone'));
+            self::assertNull($old->setUpAt('anyone'), 'kept before the date was noted');
+        } finally {
+            Foundations::remove($folder);
+        }
+    }
+
     public function testResettingStartsAgain(): void
     {
         $site = new Foundations();
@@ -90,5 +123,10 @@ final class TwoStepTest extends TestCase
         } finally {
             Foundations::remove($folder);
         }
+    }
+
+    private static function stamp(?\DateTimeImmutable $at): ?int
+    {
+        return $at?->getTimestamp();
     }
 }

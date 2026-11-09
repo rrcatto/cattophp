@@ -17,13 +17,13 @@ use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
- * What every template can use: the page's script nonce, the form token, what a refused form sent, the installation,
- * demo or live, and times in the installation's time zone.
+ * What every template can use: the page's script nonce, the form token, what a refused form sent, times in the
+ * installation's time zone, and under the one name `cattophp` the installation (`cattophp.installation`), demo or live
+ * (`cattophp.site_mode`) and the layout CattoPHP's pages extend (`cattophp.layout`). A project's own function, filter or global of the same
+ * name takes the place of CattoPHP's (this extension is added first).
  */
 final class CattoPHPExtension extends AbstractExtension implements GlobalsInterface
 {
-    private const TYPED = '_cattophp_typed_values';
-
     public function __construct(
         private readonly ContentSecurityPolicy $policy,
         private readonly FormToken $tokens,
@@ -52,35 +52,21 @@ final class CattoPHPExtension extends AbstractExtension implements GlobalsInterf
 
     public function getGlobals(): array
     {
-        return [
-            'cattophp_layout' => $this->layout,
-            'installation' => $this->installation,
-            'site_mode' => $this->siteMode,
-        ];
+        // One name of CattoPHP's own, so no variable a project's templates already use is taken.
+        return ['cattophp' => ['layout' => $this->layout, 'installation' => $this->installation, 'site_mode' => $this->siteMode]];
     }
 
     /**
-     * What a refused form sent to $action, for its fields to show again; nothing for any other form.
+     * What a refused form sent to $action, for its fields to show again; nothing for any other form. The page drawn
+     * takes the kept values (TypedForm::take).
      *
      * @return array<string,mixed>
      */
     public function typedFor(string $action): array
     {
         $request = $this->requests->getMainRequest();
-        if ($request === null) {
-            return [];
-        }
-        // Taken from the session once, then kept on the request, so every field of the form can read it.
-        $taken = $request->attributes->get(self::TYPED);
-        if (!is_array($taken)) {
-            $taken = [];
-        }
-        if (!array_key_exists($action, $taken)) {
-            $taken[$action] = TypedForm::take($request, $action);
-            $request->attributes->set(self::TYPED, $taken);
-        }
 
-        return $taken[$action];
+        return $request === null ? [] : TypedForm::take($request, $action);
     }
 
     /** A moment in the installation's time zone, such as "9 November 2026, 14:05". */

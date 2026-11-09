@@ -28,11 +28,11 @@ use CattoPHP\Settings\Settings;
 use CattoPHP\Settings\SettingsCatalogue;
 use CattoPHP\Settings\SettingsProvider;
 use CattoPHP\Settings\SettingsStore;
-use CattoPHP\SignIn\FileSignInLinkStore;
+use CattoPHP\Links\FileLinkStore;
 use CattoPHP\SignIn\OwnerOnlyAccounts;
 use CattoPHP\SignIn\SignInAccounts;
 use CattoPHP\SignIn\SignInLinks;
-use CattoPHP\SignIn\SignInLinkStore;
+use CattoPHP\Links\LinkStore;
 use CattoPHP\SignIn\SignInRules;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Clock\MockClock;
@@ -60,6 +60,7 @@ final class Foundations
     public readonly Installation $installation;
     public readonly SiteMode $siteMode;
     public readonly Roles $roles;
+    public readonly MemoryRoleStore $roleStore;
     public readonly RecordingTransport $transport;
     public readonly Mailer $mailer;
     public readonly Environment $twig;
@@ -90,7 +91,8 @@ final class Foundations
         ]), $this->activity, $this->clock);
         $this->installation = new Installation($this->settings);
         $this->siteMode = new SiteMode($siteMode ? $this->settings : null);
-        $this->roles = new Roles(new MemoryRoleStore(), new PermissionCatalogue([new FoundationPermissions(), ...$permissionProviders]), $this->activity, $this->clock);
+        $this->roleStore = new MemoryRoleStore();
+        $this->roles = new Roles($this->roleStore, new PermissionCatalogue([new FoundationPermissions(), ...$permissionProviders]), $this->activity, $this->clock);
         $loader = new FilesystemLoader();
         $loader->addPath(dirname(__DIR__, 2) . '/templates', 'CattoPHP');
         // As Symfony's Twig bundle has it: a .txt.twig template escapes nothing, a .html.twig one escapes HTML.
@@ -109,12 +111,12 @@ final class Foundations
         return new TwoStep($store ?? new MemoryTwoStepStore(), $this->keyedHash(), $this->activity, $this->clock, $recoveryCodes);
     }
 
-    public function signInLinks(string $folder, ?SignInAccounts $accounts = null, ?SignInLinkStore $store = null): SignInLinks
+    public function signInLinks(string $folder, ?SignInAccounts $accounts = null, ?LinkStore $store = null): SignInLinks
     {
         $accounts ??= new OwnerOnlyAccounts($this->installation);
 
         return new SignInLinks(
-            $store ?? new FileSignInLinkStore($folder),
+            $store ?? new FileLinkStore($folder . '/links.json'),
             $accounts,
             new SignInRules($this->settings, $this->roles),
             $this->settings,

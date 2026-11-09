@@ -101,4 +101,30 @@ final class ActivityLogTest extends TestCase
             Foundations::remove($folder);
         }
     }
+
+    public function testEntriesFromBeforeAMomentAreRemovedFromMemoryAndFromAFile(): void
+    {
+        $folder = Foundations::folder();
+        try {
+            foreach (['memory' => new MemoryActivityStore(), 'file' => new FileActivityStore($folder)] as $kind => $store) {
+                $site = new Foundations(activityStore: $store);
+                $site->activity->record('area.old');
+                $site->clock->modify('+2 days');
+                $site->activity->record('area.new');
+                if ($kind === 'file') {
+                    file_put_contents($folder . '/activity.log', "not an entry\n", FILE_APPEND);
+                }
+
+                self::assertSame(1, $site->activity->removeBefore($site->clock->now()->modify('-1 day')), $kind);
+                self::assertSame(['area.new'], array_map(static fn ($entry): string => $entry->action, $store->recent()), $kind);
+                self::assertSame(0, $site->activity->removeBefore($site->clock->now()->modify('-1 day')), $kind . ': nothing more');
+                if ($kind === 'file') {
+                    self::assertStringContainsString("not an entry\n", (string) file_get_contents($folder . '/activity.log'), 'a line that cannot be dated is kept');
+                    self::assertSame(0600, fileperms($folder . '/activity.log') & 0777);
+                }
+            }
+        } finally {
+            Foundations::remove($folder);
+        }
+    }
 }

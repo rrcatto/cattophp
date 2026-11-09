@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Security\TwoStep;
 
+use DateTimeImmutable;
 use CattoPHP\Activity\ActivityLog;
 use CattoPHP\Activity\Actor;
 use CattoPHP\Security\KeyedHash;
@@ -49,18 +50,35 @@ final class TwoStep
         }
         $codes = $this->recoveryCodes ? RecoveryCodes::make() : [];
         $hashes = array_map(fn (string $recovery): string => RecoveryCodes::hash($this->hash, $accountId, $recovery), $codes);
-        $this->store->change($accountId, static fn (?TwoStepRecord $before): TwoStepRecord => new TwoStepRecord($secret, $counter, $hashes));
+        $now = $this->clock->now();
+        $this->store->change($accountId, static fn (?TwoStepRecord $before): TwoStepRecord => new TwoStepRecord($secret, $counter, $hashes, $now));
         $this->activity->record('two_step.set_up', ['recovery_codes' => count($codes)], 'account', $accountId);
 
         return $codes;
     }
 
+    /** When the account's key was set up, or null when it has none or it was kept before that was noted. */
+    public function setUpAt(string $accountId): ?DateTimeImmutable
+    {
+        return $this->store->find($accountId)?->setUpAt;
+    }
+
     /** Whether $typed is the account's code now, or one of its unused recovery codes; either is then used up. */
     public function check(string $accountId, string $typed): bool
     {
+        return $this->confirm($accountId, $typed) !== null;
+    }
+
+    /**
+     * Which worked, 'code' (the app's code now) or 'recovery' (an unused recovery code), each then used up; or null.
+     *
+     * @return 'code'|'recovery'|null
+     */
+    public function confirm(string $accountId, string $typed): ?string
+    {
         $recovery = RecoveryCodes::normalise($typed);
         if ($recovery !== null) {
-            return $this->useRecoveryCode($accountId, $recovery);
+            return $this->useRecoveryCode($accountId, $recovery) ? 'recovery' : null;
         }
         $right = false;
         $now = $this->clock->now()->getTimestamp();
@@ -77,7 +95,7 @@ final class TwoStep
             return $record->withCounter($counter);
         });
 
-        return $right;
+        return $right ? 'code' : null;
     }
 
     /** How many recovery codes the account has left. */

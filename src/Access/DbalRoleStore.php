@@ -49,6 +49,12 @@ final class DbalRoleStore implements RoleStore
         $this->connection->executeStatement('DELETE FROM cattophp_roles WHERE key = ?', [$key]);
     }
 
+    public function renameRole(string $from, string $to): void
+    {
+        // Its permissions and holders follow by the tables' own links (ON UPDATE CASCADE).
+        $this->connection->executeStatement('UPDATE cattophp_roles SET key = ? WHERE key = ?', [$to, $from]);
+    }
+
     public function rolesOf(string $accountId): array
     {
         /** @var list<string> $keys */

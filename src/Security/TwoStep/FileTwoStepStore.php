@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Security\TwoStep;
 
+use DateTimeImmutable;
 use RuntimeException;
 
 /**
@@ -41,6 +42,9 @@ final class FileTwoStepStore implements TwoStepStore
             $after = $change(is_string($text) ? self::read($text) : null);
             if ($after !== null) {
                 $value = ['secret' => $after->secret, 'last_counter' => $after->lastCounter];
+                if ($after->setUpAt !== null) {
+                    $value['set_up_at'] = $after->setUpAt->format(DATE_ATOM);
+                }
                 if ($after->recoveryHashes !== []) {
                     $value['recovery'] = $after->recoveryHashes;
                 }
@@ -73,6 +77,8 @@ final class FileTwoStepStore implements TwoStepStore
         }
         $recovery = is_array($value['recovery'] ?? null) ? array_values(array_filter($value['recovery'], 'is_string')) : [];
 
-        return new TwoStepRecord($value['secret'], $value['last_counter'], $recovery);
+        $setUpAt = is_string($value['set_up_at'] ?? null) ? DateTimeImmutable::createFromFormat(DATE_ATOM, $value['set_up_at']) : false;
+
+        return new TwoStepRecord($value['secret'], $value['last_counter'], $recovery, $setUpAt === false ? null : $setUpAt);
     }
 }
