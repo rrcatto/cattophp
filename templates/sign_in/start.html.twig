@@ -1,0 +1,15 @@
+{% extends cattophp_layout %}
+{% block body %}
+<main class="cl-sign-in">
+<h1>{{ title }}</h1>
+<p>Type your email address and we will email you a link to sign in.</p>
+{% if note %}<p class="cl-sign-in-note" role="status"><strong>{{ note }}</strong></p>{% endif %}
+<form method="post" action="{{ path('cattophp_sign_in_send') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% if return %}<input type="hidden" name="return" value="{{ return }}">{% endif %}
+<div class="cl-trap" hidden><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+<label>Email address <input type="email" name="email" required autocomplete="email" maxlength="254"></label>
+<button type="submit">Email me a link</button>
+</form>
+</main>
+{% endblock %}

@@ -1,0 +1,8 @@
+{%- block subject -%}Sign in to {{ name }}{%- endblock -%}
+{%- block text -%}
+Open this link to sign in to {{ name }}:
+
+{{ link }}
+
+It works once, for {{ lifetime }}. If you did not ask for it, {% if two_step %}nobody can use it without your one-time code as well{% else %}you can ignore this email{% endif %}.
+{%- endblock -%}

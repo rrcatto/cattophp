@@ -1,0 +1,11 @@
+{% extends cattophp_layout %}
+{% block body %}
+<main class="cl-sign-in">
+<h1>{{ title }}</h1>
+<p>Press the button to sign in. The link then cannot be used again.</p>
+<form method="post" action="{{ path('cattophp_sign_in_link_use', {token: link}) }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+<button type="submit">Sign in</button>
+</form>
+</main>
+{% endblock %}

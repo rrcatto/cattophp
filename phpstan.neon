@@ -1,0 +1,7 @@
+parameters:
+  level: 8
+  paths:
+    # The tests are analysed too: the code that proves the package works is held to the same standard.
+    - src
+    - tests
+  tmpDir: var/phpstan

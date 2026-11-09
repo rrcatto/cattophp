@@ -1,0 +1,9 @@
+{% extends cattophp_layout %}
+{% block body %}
+<main class="cl-sign-in">
+<h1>{{ title }}</h1>
+<p>If you lose your phone, each of these codes signs you in once in place of the code from your app. Keep them somewhere safe now: they are not shown again.</p>
+<ul class="cl-recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+<p><a href="{{ continue }}">I have kept them: continue</a></p>
+</main>
+{% endblock %}

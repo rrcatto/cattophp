@@ -1,0 +1,59 @@
+{
+    "name": "rrcatto/cattophp",
+    "description": "A Symfony bundle with the foundations of a web application: sign-in with two-step codes, settings over .env, roles and permissions, an activity log, error pages, security headers and mail.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Richard Catto",
+            "role": "Project creator and maintainer"
+        }
+    ],
+    "require": {
+        "php": ">=8.5.12 <9.0",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "bacon/bacon-qr-code": "^3.1",
+        "doctrine/dbal": "^4.4",
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0",
+        "symfony/clock": "~8.1.0",
+        "symfony/console": "~8.1.0",
+        "symfony/framework-bundle": "~8.1.0",
+        "symfony/mailer": "~8.1.0",
+        "symfony/rate-limiter": "~8.1.0",
+        "symfony/security-bundle": "~8.1.0",
+        "symfony/security-csrf": "~8.1.0",
+        "symfony/twig-bundle": "~8.1.0",
+        "twig/twig": "^3.21"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^13.4",
+        "symfony/browser-kit": "~8.1.0",
+        "symfony/css-selector": "~8.1.0",
+        "symfony/dom-crawler": "~8.1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CattoPHP\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CattoPHP\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite Unit,Kernel",
+        "analyse": "phpstan analyse --no-progress --memory-limit=512M",
+        "check": [
+            "@test",
+            "@analyse"
+        ]
+    }
+}

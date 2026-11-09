@@ -1,0 +1,12 @@
+{% extends cattophp_layout %}
+{% block body %}
+<main class="cl-error-page">
+<h1>{{ title }}</h1>
+<p>{{ message }}</p>
+<p>
+{% if retry_url %}<a href="{{ retry_url }}">Try again</a> · {% endif %}
+<a href="/">Go to the home page</a>
+</p>
+<p class="cl-error-reference"><small>{{ status }} · Reference {{ reference }}</small></p>
+</main>
+{% endblock %}
