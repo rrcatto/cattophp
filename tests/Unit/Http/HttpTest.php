@@ -191,4 +191,98 @@ final class HttpTest extends TestCase
     {
         self::assertSame($plain, ErrorPageListener::plain($message, $status));
     }
+
+    public function testAProjectDrawsTheErrorPageAndAFailingDrawerGivesPlainHtml(): void
+    {
+        $drawer = new class implements \CattoPHP\Http\ErrorPageDrawer {
+            /** @var list<\CattoPHP\Http\ErrorPage> */
+            public array $drawn = [];
+
+            public bool $fails = false;
+
+            public function draw(\CattoPHP\Http\ErrorPage $page, \Symfony\Component\HttpFoundation\Request $request): string
+            {
+                if ($this->fails) {
+                    throw new \RuntimeException('The theme is broken.');
+                }
+                $this->drawn[] = $page;
+
+                return '<p>Drawn: ' . $page->title . '</p>';
+            }
+        };
+        $kernel = new class implements \Symfony\Component\HttpKernel\HttpKernelInterface {
+            public function handle(\Symfony\Component\HttpFoundation\Request $request, int $type = self::MAIN_REQUEST, bool $catch = true): \Symfony\Component\HttpFoundation\Response
+            {
+                return new \Symfony\Component\HttpFoundation\Response();
+            }
+        };
+        $listener = new \CattoPHP\Http\ErrorPageListener($drawer, new \Psr\Log\NullLogger(), false, ['/api/']);
+        $event = new \Symfony\Component\HttpKernel\Event\ExceptionEvent($kernel, \Symfony\Component\HttpFoundation\Request::create('/missing'), \Symfony\Component\HttpKernel\HttpKernelInterface::MAIN_REQUEST,
+            new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException('No route found for "GET /missing"'));
+        $listener->onException($event);
+        self::assertSame(404, $event->getResponse()?->getStatusCode());
+        self::assertSame('<p>Drawn: Not found</p>', $event->getResponse()->getContent());
+        self::assertSame(['not_found', 'The address may be mistyped, or the page has moved or been removed.', '/missing'], [$drawer->drawn[0]->kind, $drawer->drawn[0]->message, $drawer->drawn[0]->retryUrl]);
+        self::assertNotSame('', $drawer->drawn[0]->reference);
+
+        $drawer->fails = true;
+        $broken = new \Symfony\Component\HttpKernel\Event\ExceptionEvent($kernel, \Symfony\Component\HttpFoundation\Request::create('/oops'), \Symfony\Component\HttpKernel\HttpKernelInterface::MAIN_REQUEST, new \LogicException('secret detail'));
+        $listener->onException($broken);
+        self::assertSame(500, $broken->getResponse()?->getStatusCode());
+        self::assertStringContainsString('It is not something you did.', (string) $broken->getResponse()->getContent());
+        self::assertStringNotContainsString('secret detail', (string) $broken->getResponse()->getContent());
+
+        $api = new \Symfony\Component\HttpKernel\Event\ExceptionEvent($kernel, \Symfony\Component\HttpFoundation\Request::create('/api/v1/x'), \Symfony\Component\HttpKernel\HttpKernelInterface::MAIN_REQUEST, new \LogicException('x'));
+        $listener->onException($api);
+        self::assertNull($api->getResponse(), 'the project answers its own');
+    }
+
+    public function testFramingFollowsThePolicyAndAResponsesOwnHeadersStay(): void
+    {
+        $kernel = new class implements \Symfony\Component\HttpKernel\HttpKernelInterface {
+            public function handle(Request $request, int $type = self::MAIN_REQUEST, bool $catch = true): \Symfony\Component\HttpFoundation\Response
+            {
+                return new \Symfony\Component\HttpFoundation\Response();
+            }
+        };
+        $headersFor = static function (array $changes, string $permissions, ?\Symfony\Component\HttpFoundation\Response $response = null) use ($kernel): \Symfony\Component\HttpFoundation\ResponseHeaderBag {
+            $requests = new RequestStack();
+            $request = Request::create('https://example.com/');
+            $requests->push($request);
+            $site = new \CattoPHP\Tests\Support\Foundations(['APP_SITE_MODE' => 'live']);
+            $listener = new \CattoPHP\Http\SecurityHeadersListener(new ContentSecurityPolicy($requests, $changes), $site->siteMode, permissionsPolicy: $permissions);
+            $event = new \Symfony\Component\HttpKernel\Event\ResponseEvent($kernel, $request, \Symfony\Component\HttpKernel\HttpKernelInterface::MAIN_REQUEST, $response ?? new \Symfony\Component\HttpFoundation\Response());
+            $listener->onResponse($event);
+
+            return $event->getResponse()->headers;
+        };
+        self::assertSame('DENY', $headersFor([], \CattoPHP\Http\SecurityHeadersListener::PERMISSIONS_POLICY)->get('X-Frame-Options'));
+        $own = $headersFor(['frame-ancestors' => "'self'"], 'microphone=(self)');
+        self::assertSame('SAMEORIGIN', $own->get('X-Frame-Options'), 'a project showing its own pages in frames');
+        self::assertSame('microphone=(self)', $own->get('Permissions-Policy'));
+        self::assertNull($headersFor(['frame-ancestors' => 'https://partner.example.org'], '')->get('X-Frame-Options'), 'only frame-ancestors can say that');
+        $kept = $headersFor([], \CattoPHP\Http\SecurityHeadersListener::PERMISSIONS_POLICY, new \Symfony\Component\HttpFoundation\Response('', 200, ['X-Frame-Options' => 'SAMEORIGIN', 'Content-Security-Policy' => "default-src 'none'"]));
+        self::assertSame(['SAMEORIGIN', "default-src 'none'"], [$kept->get('X-Frame-Options'), $kept->get('Content-Security-Policy')], 'a response that says these for itself keeps them');
+    }
+
+    public function testAPageMayAllowOneMoreSourceForItselfOnly(): void
+    {
+        $requests = new RequestStack();
+        $page = Request::create('https://example.com/verify');
+        $requests->push($page);
+        $policy = new ContentSecurityPolicy($requests, ['form-action' => "'self'", 'frame-src' => "'none'"]);
+        $policy->allow('form-action', 'https:');
+        $policy->allow('form-action', 'https:');
+        $policy->allow('frame-src', 'https://video.example.org');
+        $policy->allow('form-action', "https: 'unsafe-inline'");
+        $policy->allow('script-src;', 'https:');
+
+        $header = $policy->header($page);
+        self::assertStringContainsString("form-action 'self' https:;", $header, 'once, beside what the policy says');
+        self::assertStringContainsString('frame-src https://video.example.org;', $header, "'none' gives way to the one source");
+        self::assertStringContainsString("script-src 'self';", $header, 'a source or directive that is not one is ignored');
+
+        $next = Request::create('https://example.com/other');
+        self::assertStringContainsString("form-action 'self';", $policy->header($next), 'another page keeps the policy as it is');
+    }
 }

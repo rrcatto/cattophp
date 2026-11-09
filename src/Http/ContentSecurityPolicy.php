@@ -18,6 +18,7 @@ final class ContentSecurityPolicy
 {
     public const AUTHORED = 'authored';
     private const NONCE = '_cattophp_csp_nonce';
+    private const ALLOWED = '_cattophp_csp_allowed';
 
     public const DIRECTIVES = [
         'default-src' => "'none'",
@@ -54,12 +55,40 @@ final class ContentSecurityPolicy
         return $nonce;
     }
 
+    /**
+     * One more source for one directive on the current page only, such as form-action https: on the one page whose form
+     * leads to another site (a browser holds a form's redirect to the policy of the page the form is on).
+     */
+    public function allow(string $directive, string $source): void
+    {
+        $request = $this->requests->getMainRequest();
+        if ($request === null || preg_match('/^[a-z-]+$/', $directive) !== 1 || preg_match('/^[^\s;,]+$/', $source) !== 1) {
+            return;
+        }
+        $allowed = $request->attributes->get(self::ALLOWED);
+        $allowed = is_array($allowed) ? $allowed : [];
+        $allowed[$directive][$source] = true;
+        $request->attributes->set(self::ALLOWED, $allowed);
+    }
+
+    /** A directive as the policy gives it, the project's changes included, or null when it has none. */
+    public function directive(string $name): ?string
+    {
+        return array_merge(self::DIRECTIVES, $this->changes)[$name] ?? null;
+    }
+
     public function header(Request $request): string
     {
         $directives = array_merge(self::DIRECTIVES, $this->changes);
         $nonce = $request->attributes->get(self::NONCE);
         if (is_string($nonce)) {
             $directives['script-src'] .= " 'nonce-" . $nonce . "'";
+        }
+        $allowed = $request->attributes->get(self::ALLOWED);
+        foreach (is_array($allowed) ? $allowed : [] as $directive => $sources) {
+            if (is_string($directive) && is_array($sources)) {
+                $directives[$directive] = trim(str_replace("'none'", '', $directives[$directive] ?? '') . ' ' . implode(' ', array_keys($sources)));
+            }
         }
         if ($request->attributes->get('_csp') === self::AUTHORED) {
             $directives['style-src'] .= " 'unsafe-inline'";

@@ -32,6 +32,15 @@ final class MailerTest extends TestCase
         self::assertSame('[DEMO] Hello', $email->getSubject());
         self::assertStringStartsWith($site->siteMode->emailNotice() . "\n\nWords.", (string) $email->getTextBody());
         self::assertStringContainsString('<body><p><strong>' . htmlspecialchars($site->siteMode->emailNotice()) . '</strong></p><p>Words.</p>', (string) $email->getHtmlBody());
+
+        // An email whose own design already says it: said once, the subject's [DEMO] too.
+        $notice = $site->siteMode->emailNotice();
+        $site->mailer->send((new Email())->to('ada@example.org')->subject('[DEMO] Again')->text($notice . "\n\nWords.")
+            ->html('<html><body><div class="banner">' . htmlspecialchars($notice) . '</div><p>Words.</p></body></html>'));
+        $again = $site->transport->last();
+        self::assertSame('[DEMO] Again', $again->getSubject());
+        self::assertSame(1, substr_count((string) $again->getTextBody(), $notice));
+        self::assertSame(1, substr_count((string) $again->getHtmlBody(), htmlspecialchars($notice)));
     }
 
     public function testATestEmailGoesTheWayEveryOtherDoes(): void
@@ -62,5 +71,17 @@ final class MailerTest extends TestCase
         self::assertSame('Sign in to Bits & Bobs', $email->getSubject());
         self::assertStringContainsString('https://example.com/sign-in/link/x?a=1&b=2', (string) $email->getTextBody());
         self::assertStringContainsString('you can ignore this email', (string) $email->getTextBody());
+    }
+
+    public function testAMailServerChangedInSettingsIsUsedFromTheNextEmail(): void
+    {
+        $site = new Foundations(['MAILER_DSN' => 'null://first']);
+        $mailer = new \CattoPHP\Mail\Mailer($site->settings, $site->installation, $site->siteMode, new \Twig\Environment(new \Twig\Loader\ArrayLoader()), $site->clock);
+        $built = new \ReflectionProperty(\CattoPHP\Mail\Mailer::class, 'builtFor');
+        $mailer->send((new Email())->to('ada@example.org')->subject('One')->text('Words.'));
+        self::assertSame('null://first', $built->getValue($mailer));
+        $site->settings->set('MAILER_DSN', 'null://second');
+        $mailer->send((new Email())->to('ada@example.org')->subject('Two')->text('Words.'));
+        self::assertSame('null://second', $built->getValue($mailer), 'the changed server, without a restart');
     }
 }

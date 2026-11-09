@@ -4,6 +4,30 @@ What each version of CattoPHP brought, newest first.
 
 ## Unreleased
 
+## 0.2.1 · 9 November 2026
+
+What a large application needed to keep its own look and a strict content policy: its error pages drawn in its own theme,
+a page of its own allowed one more source, the browser's permissions and framing as it needs them, and its own email
+design. Nothing to migrate: no schema step and no setting changes. A project that builds `Http\ErrorPageListener`
+itself passes it an `Http\ErrorPageDrawer` (`Http\TwigErrorPageDrawer` is CattoPHP's own); the bundle does that for
+every other project. The default Permissions-Policy no longer names interest-cohort.
+
+- Added: a project draws the error page in its own look (`Http\ErrorPageDrawer`, `error_pages.drawer`): CattoPHP
+  decides what it says (`Http\ErrorPage`: the kind, the words, the request's reference) and the project how it looks;
+  CattoPHP's template is the default drawer (`Http\TwigErrorPageDrawer`).
+- Added: `ContentSecurityPolicy::allow()`, one more source for one directive on the current page only (such as
+  `form-action https:` on the page whose form leads to another site).
+- Changed: the default Permissions-Policy no longer names interest-cohort, which browsers no longer know and Chrome
+  reports as an error in every page's console.
+- Added: `security_headers.permissions_policy`, a project's own (such as `microphone=(self)` for a page that records).
+- Changed: X-Frame-Options follows the policy's frame-ancestors (SAMEORIGIN for `'self'`, for a project that shows its
+  own pages in frames; none for anything else), and a response that sets X-Content-Type-Options, X-Frame-Options,
+  Referrer-Policy or Permissions-Policy itself keeps what it set, as it already kept its own Content-Security-Policy.
+- Changed: the mail transport is built again when the mail server's address changes in Settings, so a long-running
+  worker uses the new one from its next email.
+- Changed: a demo site's notice already in an email (a project's own email design may place it) is not added again,
+  as the subject's [DEMO] already was not.
+
 ## 0.2.0 · 9 November 2026
 
 What a large application needed to stand on CattoPHP: one that runs its own PHP sessions, keeps its sign-ins in the

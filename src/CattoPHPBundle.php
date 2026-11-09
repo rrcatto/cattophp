@@ -24,6 +24,7 @@ use CattoPHP\Activity\DbalActivityStore;
 use CattoPHP\Activity\FileActivityStore;
 use CattoPHP\Http\ContentSecurityPolicy;
 use CattoPHP\Http\ErrorPageListener;
+use CattoPHP\Http\TwigErrorPageDrawer;
 use CattoPHP\Http\FormToken;
 use CattoPHP\Http\RequestReference;
 use CattoPHP\Http\SecurityHeadersListener;
@@ -106,11 +107,13 @@ final class CattoPHPBundle extends AbstractBundle
                 ->arrayNode('security_headers')->canBeDisabled()->children()
                     ->arrayNode('policy')->normalizeKeys(false)->useAttributeAsKey('directive')->scalarPrototype()->end()->info('Content-Security-Policy directives replaced or added')->end()
                     ->scalarNode('referrer_policy')->defaultValue('strict-origin-when-cross-origin')->end()
+                    ->scalarNode('permissions_policy')->defaultValue(SecurityHeadersListener::PERMISSIONS_POLICY)->info('What the browser may let a page use, such as microphone=(self) for a page that records')->end()
                     ->booleanNode('no_index')->defaultFalse()->info('Ask search engines to keep away, demo or live')->end()
                     ->booleanNode('no_store')->defaultFalse()->info('Ask browsers to keep no copy of any page')->end()
                 ->end()->end()
                 ->arrayNode('error_pages')->canBeDisabled()->children()
                     ->arrayNode('skip_paths')->scalarPrototype()->end()->info('Path prefixes whose errors the project answers itself, such as /api/')->end()
+                    ->scalarNode('drawer')->defaultValue(TwigErrorPageDrawer::class)->info('The service that draws an error page in the project\'s look (CattoPHP\Http\ErrorPageDrawer)')->end()
                 ->end()->end()
             ->end();
     }
@@ -144,9 +147,9 @@ final class CattoPHPBundle extends AbstractBundle
         $storage = $config['storage'];
         /** @var array{enabled:bool,accounts:string,after:string,recovery_codes:bool,two_step_file:?string} $signIn */
         $signIn = $config['sign_in'];
-        /** @var array{enabled:bool,policy:array<string,string>,referrer_policy:string,no_index:bool,no_store:bool} $headers */
+        /** @var array{enabled:bool,policy:array<string,string>,referrer_policy:string,permissions_policy:string,no_index:bool,no_store:bool} $headers */
         $headers = $config['security_headers'];
-        /** @var array{enabled:bool,skip_paths:list<string>} $errors */
+        /** @var array{enabled:bool,skip_paths:list<string>,drawer:string} $errors */
         $errors = $config['error_pages'];
         $database = $storage['type'] === 'database';
         if (!$database && ($storage['folder'] === null || $storage['folder'] === '')) {
@@ -213,15 +216,18 @@ final class CattoPHPBundle extends AbstractBundle
 
         if ($headers['enabled']) {
             $services->set(SecurityHeadersListener::class)
-                ->args([service(ContentSecurityPolicy::class), service(SiteMode::class), $headers['referrer_policy'], $headers['no_index'], $headers['no_store']])
+                ->args([service(ContentSecurityPolicy::class), service(SiteMode::class), $headers['referrer_policy'], $headers['no_index'], $headers['no_store'], $headers['permissions_policy']])
                 ->tag('kernel.event_listener', ['event' => KernelEvents::REQUEST, 'method' => 'onRequest', 'priority' => 512])
                 ->tag('kernel.event_listener', ['event' => KernelEvents::RESPONSE, 'method' => 'onResponse', 'priority' => -16]);
         }
         $services->set(TypedFormListener::class)
             ->tag('kernel.event_listener', ['event' => KernelEvents::RESPONSE, 'method' => 'onResponse', 'priority' => -32]);
         if ($errors['enabled']) {
+            if ($errors['drawer'] === TwigErrorPageDrawer::class) {
+                $services->set(TwigErrorPageDrawer::class)->args([service('twig')]);
+            }
             $services->set(ErrorPageListener::class)
-                ->args([service('twig'), service('logger'), param('kernel.debug'), $errors['skip_paths']])
+                ->args([service($errors['drawer']), service('logger'), param('kernel.debug'), $errors['skip_paths']])
                 ->tag('kernel.event_listener', ['event' => KernelEvents::EXCEPTION, 'method' => 'onException', 'priority' => -16]);
         }
 

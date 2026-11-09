@@ -9,7 +9,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
-use Twig\Environment;
 
 /**
  * The error page, in plain words: what kind of error it was (not found, not allowed, something broken, or a request
@@ -28,7 +27,7 @@ final class ErrorPageListener
 
     /** @param list<string> $skipPaths path prefixes whose errors are the project's own, such as /api/ */
     public function __construct(
-        private readonly Environment $twig,
+        private readonly ErrorPageDrawer $drawer,
         private readonly LoggerInterface $logger,
         private readonly bool $debug,
         private readonly array $skipPaths = [],
@@ -70,16 +69,9 @@ final class ErrorPageListener
             : self::plain($error->getMessage(), $status);
         $headers = $error instanceof HttpExceptionInterface ? $error->getHeaders() : [];
         try {
-            $page = $this->twig->render('@CattoPHP/error.html.twig', [
-                'title' => self::TITLES[$kind],
-                'kind' => $kind,
-                'status' => $status,
-                'message' => $message,
-                'reference' => $reference,
-                'retry_url' => $request->isMethod('GET') ? $request->getRequestUri() : '',
-            ]);
+            $page = $this->drawer->draw(new ErrorPage($kind, self::TITLES[$kind], $status, $message, $reference, $request->isMethod('GET') ? $request->getRequestUri() : ''), $request);
         } catch (Throwable $drawing) {
-            // The page itself could not be drawn: plain HTML instead, never the same templates again.
+            // The page itself could not be drawn: plain HTML instead, never the same drawer again.
             $this->logger->error('Request {reference}: the error page could not be drawn: {message}', ['reference' => $reference, 'message' => $drawing->getMessage(), 'exception' => $drawing]);
             $page = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                 . '<title>' . self::TITLES[$kind] . '</title></head><body><main><h1>' . self::TITLES[$kind] . '</h1><p>'

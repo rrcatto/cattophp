@@ -34,6 +34,9 @@ final class Mailer
 {
     private ?TransportInterface $built = null;
 
+    /** The mail server the built transport is for: one changed in Settings is used from the next email, in a long-running worker too. */
+    private string $builtFor = '';
+
     public function __construct(
         private readonly Settings $settings,
         private readonly Installation $installation,
@@ -117,11 +120,12 @@ final class Mailer
         }
         $notice = $this->siteMode->emailNotice();
         $text = $email->getTextBody();
-        if (is_string($text)) {
+        // A project may have put the notice in its own email design already: it is said once.
+        if (is_string($text) && !str_contains($text, $notice)) {
             $email->text($notice . "\n\n" . $text);
         }
         $html = $email->getHtmlBody();
-        if (is_string($html)) {
+        if (is_string($html) && !str_contains($html, htmlspecialchars($notice, ENT_QUOTES, 'UTF-8'))) {
             $paragraph = '<p><strong>' . htmlspecialchars($notice, ENT_QUOTES, 'UTF-8') . '</strong></p>';
             $email->html(preg_match('/<body[^>]*>/i', $html) === 1 ? (string) preg_replace('/(<body[^>]*>)/i', '$1' . $paragraph, $html, 1) : $paragraph . $html);
         }
@@ -137,7 +141,12 @@ final class Mailer
             throw new MailNotSent('No mail server is set: set it in Settings, under Mail, or MAILER_DSN in .env.');
         }
         try {
-            return $this->built ??= ($this->transports !== null ? $this->transports->fromString($dsn) : Transport::fromDsn($dsn));
+            if ($this->built === null || $this->builtFor !== $dsn) {
+                $this->built = $this->transports !== null ? $this->transports->fromString($dsn) : Transport::fromDsn($dsn);
+                $this->builtFor = $dsn;
+            }
+
+            return $this->built;
         } catch (Throwable $unusable) {
             throw new MailNotSent('The mail server\'s address cannot be used: check it in Settings, under Mail.', 0, $unusable);
         }
