@@ -34,6 +34,9 @@ use CattoPHP\Http\TypedFormListener;
 use CattoPHP\Installation\Installation;
 use CattoPHP\Mail\Mailer;
 use CattoPHP\Mail\TestEmailCommand;
+use CattoPHP\Payments\GatewayDefinitions;
+use CattoPHP\Payments\PaymentGateways;
+use CattoPHP\Payments\PaymentSettings;
 use CattoPHP\Runtime\SiteMode;
 use CattoPHP\Schema\FoundationSteps;
 use CattoPHP\Schema\MigrateCommand;
@@ -65,6 +68,18 @@ use CattoPHP\SignIn\SignInRules;
 use CattoPHP\SignIn\SignInUserProvider;
 use CattoPHP\SignIn\TwoStepResetCommand;
 use CattoPHP\Twig\CattoPHPExtension;
+use CattoPHP\Twig\UiExtension;
+use CattoPHP\Theme\InstallThemesCommand;
+use CattoPHP\Theme\MemoryThemeChoice;
+use CattoPHP\Theme\PackageValidator;
+use CattoPHP\Theme\PageRenderer;
+use CattoPHP\Theme\Publisher;
+use CattoPHP\Theme\Templates;
+use CattoPHP\Theme\ThemeManager;
+use CattoPHP\Ui\Components;
+use CattoPHP\Ui\ComponentSet;
+use CattoPHP\Ui\DrawingCheck;
+use CattoPHP\Ui\IconLibrary;
 use InvalidArgumentException;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -116,6 +131,38 @@ final class CattoPHPBundle extends AbstractBundle
                     ->arrayNode('verbatim_classes')->scalarPrototype()->end()->info('Classes of the elements that hold a project\'s authored HTML, which the layout serves byte for byte')->end()
                     ->arrayNode('flex_classes')->scalarPrototype()->end()->info('Classes the project\'s CSS always lays out as flex or grid, whose children the layout puts on lines of their own')->end()
                 ->end()->end()
+                ->arrayNode('ui')->addDefaultsIfNotSet()->children()
+                    ->scalarNode('icon_sprite')->defaultValue('/img/icons.svg')->info('The icon sprite\'s address on the site, whose symbols the icon component draws')->end()
+                    ->scalarNode('public_root')->defaultValue('%kernel.project_dir%/public')->info('The served web root, where the icon sprite is found for its fingerprint')->end()
+                    ->arrayNode('icon_subjects')->useAttributeAsKey('word')->arrayPrototype()->scalarPrototype()->end()->end()->info('The subjects the project\'s names are about, each with the library icons that picture it best')->end()
+                    ->arrayNode('icon_name_stop_words')->scalarPrototype()->end()->info('More words the project\'s names use that say nothing about a picture')->end()
+                ->end()->end()
+                ->arrayNode('theme')->canBeEnabled()->children()
+                    ->scalarNode('default')->defaultValue('default')->info('The slug of the bundled theme a site is drawn in until another is chosen')->end()
+                    ->scalarNode('package_format')->defaultValue('cattophp-theme')->info('The package format\'s name, as a theme\'s theme.json says it')->end()
+                    ->arrayNode('page_families')->scalarPrototype()->end()->info('The page families a theme may wrap with pages/<family>.html.twig')->end()
+                    ->scalarNode('bundled')->defaultValue('%kernel.project_dir%/themes')->info('The project\'s own themes, in its code')->end()
+                    ->scalarNode('installed')->defaultValue('%kernel.project_dir%/var/themes')->info('The site\'s installed themes')->end()
+                    ->scalarNode('staging')->defaultValue('%kernel.project_dir%/var/theme-imports')->info('Where an uploaded theme package waits to be installed')->end()
+                    ->scalarNode('public_root')->defaultValue('%kernel.project_dir%/public')->info('The served web root, whose themes/ folder holds each theme\'s browser files')->end()
+                    ->scalarNode('choice')->defaultValue(MemoryThemeChoice::class)->info('The service that keeps which theme is active (CattoPHP\Theme\ThemeChoice)')->end()
+                    ->scalarNode('registry')->defaultNull()->info('An optional service that indexes the installed themes (CattoPHP\Theme\ThemeRegistry)')->end()
+                    ->scalarNode('pages')->defaultNull()->info('The service that tells PageRenderer about the project\'s pages (CattoPHP\Theme\PageProject), for a project that draws its pages with it')->end()
+                ->end()->end()
+                ->arrayNode('payments')->canBeEnabled()->children()
+                    ->arrayNode('gateways')->info('Each payment gateway by the project\'s name for it, through Omnipay')->useAttributeAsKey('name')->arrayPrototype()->children()
+                        ->scalarNode('omnipay')->isRequired()->cannotBeEmpty()->info('The Omnipay gateway: a short name such as Stitch, or a class')->end()
+                        ->scalarNode('label')->isRequired()->cannotBeEmpty()->info('Its name on the Settings page')->end()
+                        ->scalarNode('description')->defaultValue('')->end()
+                        ->arrayNode('parameters')->isRequired()->requiresAtLeastOneElement()->normalizeKeys(false)->useAttributeAsKey('parameter')->arrayPrototype()->children()
+                            ->scalarNode('name')->isRequired()->cannotBeEmpty()->info('The setting that holds it, named as in .env')->end()
+                            ->scalarNode('label')->isRequired()->cannotBeEmpty()->end()
+                            ->booleanNode('secret')->defaultFalse()->info('Stored encrypted, never shown again')->end()
+                            ->booleanNode('optional')->defaultFalse()->end()
+                            ->scalarNode('help')->defaultValue('')->end()
+                        ->end()->end()->end()
+                    ->end()->end()->end()
+                ->end()->end()
                 ->arrayNode('error_pages')->canBeDisabled()->children()
                     ->arrayNode('skip_paths')->scalarPrototype()->end()->info('Path prefixes whose errors the project answers itself, such as /api/')->end()
                     ->scalarNode('drawer')->defaultValue(TwigErrorPageDrawer::class)->info('The service that draws an error page in the project\'s look (CattoPHP\Http\ErrorPageDrawer)')->end()
@@ -158,6 +205,8 @@ final class CattoPHPBundle extends AbstractBundle
         $errors = $config['error_pages'];
         /** @var array{verbatim_classes:list<string>,flex_classes:list<string>} $layout */
         $layout = $config['html_layout'];
+        /** @var array{icon_sprite:string,public_root:string,icon_subjects:array<string,list<string>>,icon_name_stop_words:list<string>} $ui */
+        $ui = $config['ui'];
         $database = $storage['type'] === 'database';
         if (!$database && ($storage['folder'] === null || $storage['folder'] === '')) {
             throw new InvalidArgumentException('cattophp.storage.folder must name a folder when cattophp.storage.type is files.');
@@ -167,6 +216,8 @@ final class CattoPHPBundle extends AbstractBundle
         $builder->registerForAutoconfiguration(SettingsProvider::class)->addTag(SettingsProvider::TAG);
         $builder->registerForAutoconfiguration(PermissionProvider::class)->addTag(PermissionProvider::TAG);
         $builder->registerForAutoconfiguration(SchemaStep::class)->addTag(SchemaStep::TAG);
+        $builder->registerForAutoconfiguration(ComponentSet::class)->addTag(ComponentSet::TAG);
+        $builder->registerForAutoconfiguration(DrawingCheck::class)->addTag(DrawingCheck::TAG);
 
         $services = $container->services()->defaults()->private()->autowire();
         $container->parameters()->set('cattophp.application_key', $config['application_key']);
@@ -222,6 +273,39 @@ final class CattoPHPBundle extends AbstractBundle
         $services->set(HtmlLayout::class)->args([$layout['verbatim_classes'], $layout['flex_classes']])->public();
         // Added before the project's own extensions, so a project function, filter or global of the same name wins.
         $services->set(CattoPHPExtension::class)->arg('$layout', $config['layout'])->tag('twig.extension', ['priority' => 100]);
+        // The component registry, with the project's own components and the drawings it allows in a feature card.
+        $services->set(Components::class)->args([tagged_iterator(ComponentSet::TAG), tagged_iterator(DrawingCheck::TAG), $ui['icon_sprite'], $ui['public_root']])->public();
+        $services->set(IconLibrary::class)->args([$ui['icon_subjects'], $ui['icon_name_stop_words']])->public();
+        $services->set(UiExtension::class)->args([service(Components::class), service(IconLibrary::class)])->tag('twig.extension', ['priority' => 100]);
+        // Payment gateways through Omnipay, each one's keys in Settings, for a project that takes payments.
+        $payments = $config['payments'];
+        if ($payments['enabled']) {
+            $services->set(GatewayDefinitions::class)->args([$payments['gateways']]);
+            $services->set(PaymentSettings::class)->args([service(GatewayDefinitions::class)])->tag(SettingsProvider::TAG);
+            $services->set(PaymentGateways::class)->args([service(GatewayDefinitions::class), service(Settings::class), service('request_stack')->nullOnInvalid()])->public();
+        }
+        // The theme system, for a project with themes: their packages checked, installed, published, chosen and previewed,
+        // and Twig's @theme pointed at the theme a request is drawn in.
+        $theme = $config['theme'];
+        if ($theme['enabled']) {
+            $services->set(PackageValidator::class)->args([$theme['package_format'], $theme['page_families']]);
+            $services->set(Publisher::class);
+            if ($theme['choice'] === MemoryThemeChoice::class) {
+                $services->set(MemoryThemeChoice::class);
+            }
+            $services->set(ThemeManager::class)->args([
+                $theme['bundled'], $theme['installed'], $theme['staging'], $theme['public_root'], $theme['default'],
+                service($theme['choice']), service(ActivityLog::class), $theme['registry'] !== null ? service($theme['registry']) : null,
+                service(PackageValidator::class), service(Publisher::class),
+            ])->public();
+            $services->set(Templates::class)->args([service('twig.loader.native_filesystem')])->public();
+            $services->set(InstallThemesCommand::class)->args([service(ThemeManager::class)])->tag('console.command');
+            if ($theme['pages'] !== null) {
+                $services->set(PageRenderer::class)
+                    ->args([service('twig'), service(Templates::class), service(ThemeManager::class), service($theme['pages']), service(HtmlLayout::class), param('kernel.debug')])
+                    ->public();
+            }
+        }
 
         if ($headers['enabled']) {
             $services->set(SecurityHeadersListener::class)

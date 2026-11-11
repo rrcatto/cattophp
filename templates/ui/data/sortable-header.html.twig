@@ -1,0 +1,25 @@
+{#
+	A table's column heading, a link that sorts the list by it when it can (sh: key, label, href, sortable, active,
+	direction, width, wide; sort_region and sort_results: the list's region and results, swapped by htmx). The attributes
+	are written as literal markup with only their values interpolated: built as a string by an expression, Twig would
+	escape the quotes and the browser would receive the width as text.
+
+	sh.wide marks a column a phone does not show (data-phone="hide"): Core hides the whole column
+	at 700px and narrower, and the row's tooltip still shows its value.
+#}
+{% if sh.sortable %}
+	<th class="sortable-header {{ sh.active ? 'is-sorted' : '' }}"
+	    {% if sh.width %}style="width:{{ sh.width }}%"{% endif %}
+	    {% if sh.wide|default(false) %}data-phone="hide"{% endif %}
+	    {% if sh.active %}aria-sort="{{ sh.direction == 'desc' ? 'descending' : 'ascending' }}"{% endif %}>
+		<a href="{{ sh.href }}"
+			   hx-get="{{ sh.href }}" hx-target="#{{ sort_region }}" hx-select="#{{ sort_results }}"
+			   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .cl-ui-table">
+		{{ sh.label }}<span class="sortable-indicator" aria-hidden="true">{{ sh.active ? (sh.direction == 'desc' ? '▼' : '▲') : '↕' }}</span>
+		</a>
+	</th>
+{% else %}
+	<th {% if sh.width %}style="width:{{ sh.width }}%"{% endif %} {% if sh.wide|default(false) %}data-phone="hide"{% endif %}>
+		{{ sh.label }}
+	</th>
+{% endif %}

@@ -71,18 +71,23 @@ final class Mailer
     }
 
     /**
-     * Sends an email after giving it its sender, its reply-to address and, on a demo site, the demo marks.
+     * Sends an email after giving it its sender (unless it names its own), its reply-to address and, on a demo site, the
+     * demo marks.
      *
      * @throws MailNotSent
      */
     public function send(Email $email): void
     {
-        $from = $this->settings->get('MAIL_FROM_ADDRESS');
-        if ($from === '') {
-            throw new MailNotSent('No From address is set: set it in Settings, under Mail, or MAIL_FROM_ADDRESS in .env.');
+        // An email that names its own sender keeps it (a reply sent from a project's own mailbox); every other comes from
+        // the settings' sender.
+        if ($email->getFrom() === []) {
+            $from = $this->settings->get('MAIL_FROM_ADDRESS');
+            if ($from === '') {
+                throw new MailNotSent('No From address is set: set it in Settings, under Mail, or MAIL_FROM_ADDRESS in .env.');
+            }
+            $name = $this->settings->get('MAIL_FROM_NAME');
+            $email->from(new Address($from, $name !== '' ? $name : $this->installation->name()));
         }
-        $name = $this->settings->get('MAIL_FROM_NAME');
-        $email->from(new Address($from, $name !== '' ? $name : $this->installation->name()));
         $replyTo = $this->settings->get('MAIL_REPLY_TO');
         if ($replyTo !== '' && $email->getReplyTo() === []) {
             $email->replyTo($replyTo);

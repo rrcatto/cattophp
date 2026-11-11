@@ -1,0 +1,10 @@
+{% if props.heading %}{{ ui('layout.section-head', {heading: props.heading, summary: props.summary}) }}{% endif %}
+{% if props.search %}{% include '@CattoPHP/ui/data/dataset-search.html.twig' with props.search %}{% endif %}
+<div id="{{ props.name }}-view">
+{% block toolbar %}{% endblock %}
+<div id="{{ props.name }}-region" data-server-search-target><div id="{{ props.name }}-results">
+{% if props.pagination %}{% include '@CattoPHP/ui/data/pagination.html.twig' with {pg: props.pagination, pg_position: 'top'} %}{% endif %}
+{% block results %}{% endblock %}
+{% if props.pagination %}{% include '@CattoPHP/ui/data/pagination.html.twig' with {pg: props.pagination, pg_position: 'bottom'} %}{% else %}{% block preview %}{% endblock %}{% endif %}
+</div></div>
+</div>

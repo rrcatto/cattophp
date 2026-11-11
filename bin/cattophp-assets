@@ -1,0 +1,55 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Copies CattoPHP's browser files (its components' styles and scripts, public/) into a project's web root, under
+ * cattophp/, replacing what an earlier version put there. A project runs it after every Composer install and update
+ * (composer.json "post-install-cmd" and "post-update-cmd": "@php vendor/bin/cattophp-assets public"), so its install and
+ * update copy the web root as they always have and the files come with it.
+ *
+ *     php vendor/bin/cattophp-assets <web root, relative to the project or absolute>
+ */
+
+$root = $argv[1] ?? 'public';
+if ($root === '' || str_contains($root, "\0")) {
+    fwrite(STDERR, "Name the web root: php vendor/bin/cattophp-assets public\n");
+    exit(2);
+}
+$project = getcwd() ?: '.';
+$webRoot = str_starts_with($root, '/') ? $root : $project . '/' . $root;
+if (!is_dir($webRoot)) {
+    fwrite(STDERR, "There is no web root at " . $webRoot . ".\n");
+    exit(1);
+}
+$from = dirname(__DIR__) . '/public';
+$to = rtrim($webRoot, '/') . '/cattophp';
+
+$remove = static function (string $path) use (&$remove): void {
+    if (is_dir($path) && !is_link($path)) {
+        foreach (scandir($path) ?: [] as $entry) {
+            if ($entry !== '.' && $entry !== '..') $remove($path . '/' . $entry);
+        }
+        rmdir($path);
+    } elseif (file_exists($path) || is_link($path)) {
+        unlink($path);
+    }
+};
+$copy = static function (string $source, string $target) use (&$copy): int {
+    if (is_dir($source)) {
+        if (!is_dir($target)) mkdir($target, 0755, true);
+        $count = 0;
+        foreach (scandir($source) ?: [] as $entry) {
+            if ($entry !== '.' && $entry !== '..') $count += $copy($source . '/' . $entry, $target . '/' . $entry);
+        }
+        return $count;
+    }
+    copy($source, $target);
+    chmod($target, 0644);
+    return 1;
+};
+
+$remove($to);
+$count = $copy($from, $to);
+fwrite(STDOUT, 'CattoPHP: ' . $count . ' browser files in ' . $to . "\n");

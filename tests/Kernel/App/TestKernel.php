@@ -38,8 +38,9 @@ final class TestKernel extends Kernel
     /**
      * @param array<string,string> $starting starting values in place of .env's
      * @param bool $ownSessions a project that runs its own PHP sessions, with Symfony's off and CattoPHP's sign-in pages off
+     * @param array{bundled:string,installed:string,staging:string,public_root:string,pages_folder:string}|null $theme a project with themes, its folders and its pages' templates
      */
-    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false)
+    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null)
     {
         parent::__construct('test', false);
     }
@@ -56,7 +57,7 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions]));
+        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme]));
     }
 
     public function getLogDir(): string
@@ -75,7 +76,7 @@ final class TestKernel extends Kernel
             'router' => ['utf8' => true],
             'session' => $this->ownSessions ? ['enabled' => false] : ['storage_factory_id' => 'session.storage.factory.mock_file'],
         ]);
-        $container->extension('twig', ['strict_variables' => true]);
+        $container->extension('twig', ['strict_variables' => true] + ($this->theme !== null ? ['paths' => [$this->theme['pages_folder'] => 'platform']] : []));
         if ($this->ownSessions) {
             $container->extension('security', ['providers' => ['none' => ['memory' => null]], 'firewalls' => ['main' => ['security' => false]]]);
         } else {
@@ -106,11 +107,17 @@ final class TestKernel extends Kernel
             'sign_in' => $this->ownSessions ? ['enabled' => false] : ['after' => '/'],
             // A directive with a hyphen, as a project writes it in YAML.
             'security_headers' => ['policy' => ['img-src' => "'self'"]],
-        ]);
+        ] + ($this->theme !== null ? ['theme' => [
+            'default' => 'plain', 'bundled' => $this->theme['bundled'], 'installed' => $this->theme['installed'], 'staging' => $this->theme['staging'],
+            'public_root' => $this->theme['public_root'], 'package_format' => 'cattophp-theme', 'page_families' => ['admin'], 'pages' => ExamplePages::class,
+        ]] : []));
 
         $services = $container->services()->defaults()->autowire()->autoconfigure();
         $services->set(PagesController::class)->public()->tag('controller.service_arguments');
         $services->set(ProjectExtension::class);
+        if ($this->theme !== null) {
+            $services->set(ExamplePages::class);
+        }
         $services->set(RecordingTransport::class)->public();
         $services->set('logger', RecordingLogger::class)->public();
         $services->set(Mailer::class)->args([

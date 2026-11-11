@@ -1,0 +1,5 @@
+{#
+	A list shown as cards: whole rows of data.card, 4 or 5 to a row at full width and fewer on a
+	narrow screen, never more. A list, so a reader with a screen reader hears how many there are.
+#}
+<ul class="cl-ui-card-grid" data-columns="{{ props.columns }}"{% if props.label %} aria-label="{{ props.label }}"{% endif %}>{% block body %}{% endblock %}</ul>

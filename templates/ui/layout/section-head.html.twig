@@ -1,0 +1,6 @@
+<header class="cl-ui-section-head">
+<div class="cl-ui-section-head-content">{% if props.eyebrow %}<div class="cl-ui-eyebrow">{{ props.eyebrow }}</div>{% endif %}
+<h{{ props.heading_level }}>{{ props.heading }}</h{{ props.heading_level }}>
+{% if props.summary %}<p>{{ props.summary }}</p>{% endif %}</div>
+{% set actions %}{% block section_actions %}{% endblock %}{% endset %}{% if actions|trim %}<div class="cl-ui-section-actions">{{ actions }}</div>{% endif %}
+</header>

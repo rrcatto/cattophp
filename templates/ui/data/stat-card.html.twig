@@ -1,0 +1,6 @@
+{# size 'large': the one figure a page is opened for, such as an account's balance: larger, bold and bordered, so the eye does not have to hunt for it. #}
+{# size 'small': a money amount in a row of figures, its value 0.88 of the theme's own size (so a money amount stays inside its card). #}
+{# icon: a sprite symbol above the value. #}
+{% set card_class = 'cl-ui-stat-card' ~ (props.size != 'normal' ? ' cl-ui-stat-card--' ~ props.size : '') %}
+{% set card_body %}{% if props.icon %}<span class="cl-ui-stat-icon">{{ ui('icon', {name: props.icon, decorative: true}) }}</span>{% endif %}<div class="cl-ui-stat-value">{% if props.size == 'small' %}<span>{{ props.value }}</span>{% else %}{{ props.value }}{% endif %}</div><div class="cl-ui-stat-label">{{ props.label }}</div>{% if props.note %}<div class="cl-ui-stat-note">{{ props.note }}</div>{% endif %}{% endset %}
+{% if props.href %}<a class="{{ card_class }} cl-ui-stat-link" href="{{ props.href }}">{{ card_body }}</a>{% else %}<div class="{{ card_class }}">{{ card_body }}</div>{% endif %}

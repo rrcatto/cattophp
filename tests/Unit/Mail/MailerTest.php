@@ -23,6 +23,16 @@ final class MailerTest extends TestCase
         self::assertSame('Words.', $email->getTextBody());
     }
 
+    public function testAnEmailThatNamesItsOwnSenderKeepsIt(): void
+    {
+        $site = new Foundations(['APP_SITE_MODE' => 'live', 'MAIL_REPLY_TO' => 'help@example.com']);
+        $site->mailer->send((new Email())->from('Support <support@example.com>')->replyTo('answers@example.com')->to('ada@example.org')->subject('Re: your message')->text('Words.'));
+
+        $email = $site->transport->last();
+        self::assertSame('"Support" <support@example.com>', $email->getFrom()[0]->toString());
+        self::assertSame('answers@example.com', $email->getReplyTo()[0]->getAddress(), 'Its own reply-to is kept too.');
+    }
+
     public function testADemoSitesEmailSaysSo(): void
     {
         $site = new Foundations();

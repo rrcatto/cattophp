@@ -1,0 +1,82 @@
+{#
+	The shared pagination row, kept short so it fits one line, with few words on the page: icons for first, previous, next and last (their words for screen readers), "Pg", "Show Pg", the
+	page count said once, and the rows drop-down before its words. The page controls show only when there is another
+	page; the rows drop-down whenever the list is longer than the smallest size, so a reader who chose more rows than the
+	list holds can always choose fewer again; the rows shown and the total whenever there are any, so
+	"Pg 1 of 1" says why there is one page.
+	pg.swap: how a page is put in, innerHTML unless the list says otherwise (a page holding two lists morphs
+	them, innerMorph, so turning a page of one leaves the other as it is).
+#}
+{% set pg_swap = pg.swap|default('innerHTML') %}
+{% set pg_id = pg.prefix ~ '-' ~ pg_position|default('single') %}
+<nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}" data-page-sizes="{{ pg.page_sizes|default([])|length }}">
+	<div class="pagination-summary" aria-live="polite">
+		{% if pg.total > 0 %}<span>{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
+		<span class="pagination-pages">Pg {{ pg.page }} of {{ pg.total_pages }}</span>
+	</div>
+	{% if pg.has_pages %}
+		<div class="pagination-controls">
+			{% if pg.has_previous %}
+				{{ ui('action.link', {label: 'First page', icon: 'page-first', icon_only: true, variant: 'secondary', size: 'small', href: (pg.first_href), aria_label: 'First page', get: (pg.first_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', swap: pg_swap, push_url: true}) }}
+				{{ ui('action.link', {label: 'Previous page', icon: 'page-previous', icon_only: true, variant: 'secondary', size: 'small', href: (pg.previous_href), aria_label: 'Previous page', get: (pg.previous_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', swap: pg_swap, rel: 'prev', push_url: true}) }}
+			{% else %}
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-first', decorative: true}) }}<span class="visually-hidden">First page</span></span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-previous', decorative: true}) }}<span class="visually-hidden">Previous page</span></span>
+			{% endif %}
+			<ol class="pagination-pages-list">
+				{% for pg_item in pg.pages %}
+					<li>
+						{% if pg_item.is_gap %}
+							<span class="pagination-gap" aria-hidden="true">&hellip;</span>
+						{% else %}
+							{% if pg_item.is_current %}
+								<span class="pagination-state" aria-current="page">{{ pg_item.page }}</span>
+							{% else %}
+								{{ ui('action.link', {label: (pg_item.page), variant: 'secondary', size: 'small', href: (pg_item.href), aria_label: 'Page ' ~ (pg_item.page), get: (pg_item.href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', swap: pg_swap, push_url: true}) }}
+							{% endif %}
+						{% endif %}
+					</li>
+				{% endfor %}
+			</ol>
+			{% if pg.has_next %}
+				{{ ui('action.link', {label: 'Next page', icon: 'page-next', icon_only: true, variant: 'secondary', size: 'small', href: (pg.next_href), aria_label: 'Next page', get: (pg.next_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', swap: pg_swap, rel: 'next', push_url: true}) }}
+				{{ ui('action.link', {label: 'Last page', icon: 'page-last', icon_only: true, variant: 'secondary', size: 'small', href: (pg.last_href), aria_label: 'Last page', get: (pg.last_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', swap: pg_swap, push_url: true}) }}
+			{% else %}
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-next', decorative: true}) }}<span class="visually-hidden">Next page</span></span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-last', decorative: true}) }}<span class="visually-hidden">Last page</span></span>
+			{% endif %}
+		</div>
+		<form class="pagination-jump" method="get" action="{{ pg.base }}"
+	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
+	      hx-swap="{{ pg_swap }}" hx-push-url="true" hx-indicator="closest .pagination-row">
+			{% for filter_key, filter_value in pg.filters %}
+				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
+			{% endfor %}
+			<input type="hidden" name="{{ pg.size_param }}" value="{{ pg.page_size }}">
+			<label for="{{ pg_id }}-jump-page">Show Pg</label>
+			<input id="{{ pg_id }}-jump-page" name="{{ pg.page_param }}" type="number" inputmode="numeric"
+		       min="1" max="{{ pg.total_pages }}" step="1" value="{{ pg.page }}" data-digits="{{ (pg.total_pages ~ '')|length }}">
+			{{ ui('action.button', {label: 'Go', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-open'}) }}
+		</form>
+	{% endif %}
+	{% if pg.has_sizes %}
+		<form class="pagination-page-size" method="get" action="{{ pg.base }}"
+	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
+	      hx-swap="{{ pg_swap }}" hx-push-url="true" hx-indicator="closest .pagination-row">
+			<input type="hidden" name="{{ pg.page_param }}" value="1">
+			{% for filter_key, filter_value in pg.filters %}
+				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
+			{% endfor %}
+			{# The drop-down first, its words after: if the row scrolls, the control is not the part lost. #}
+			<select id="{{ pg_id }}-page-size" name="{{ pg.size_param }}" data-submit-on-change>
+			{% for size in pg.page_sizes %}
+				<option value="{{ size }}" {{ pg.page_size == size ? 'selected' : '' }}>{{ size }}</option>
+			{% endfor %}
+			</select>
+			<label for="{{ pg_id }}-page-size">Rows per pg</label>
+			<noscript>
+				{{ ui('action.button', {label: 'Apply', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-done'}) }}
+			</noscript>
+		</form>
+	{% endif %}
+</nav>

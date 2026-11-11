@@ -9,6 +9,9 @@
             "role": "Project creator and maintainer"
         }
     ],
+    "bin": [
+        "bin/cattophp-assets"
+    ],
     "require": {
         "php": ">=8.5.12 <9.0",
         "ext-mbstring": "*",
@@ -28,6 +31,9 @@
         "twig/twig": "^3.21"
     },
     "require-dev": {
+        "omnipay/common": "^3.5",
+        "php-http/guzzle7-adapter": "^1.1",
+        "php-http/mock-client": "^1.6",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^13.4",
         "symfony/browser-kit": "~8.1.0",
@@ -45,7 +51,10 @@
         }
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
     },
     "scripts": {
         "test": "phpunit",
@@ -55,5 +64,8 @@
             "@test",
             "@analyse"
         ]
+    },
+    "suggest": {
+        "omnipay/common": "For the payments module: payment gateways through Omnipay, their keys in Settings (with the gateway package, such as rrcatto/omnipay-stitch-express)"
     }
 }

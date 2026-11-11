@@ -2,6 +2,95 @@
 
 What each version of CattoPHP brought, newest first.
 
+## 0.2.4 · 11 November 2026
+
+The interface system and themes: the component registry with its 34 components, the page frame, lists, pages that
+change in place and live pages, trees, the icon library, the components' styles and scripts, and the theme system with
+the page renderer; the payments module through Omnipay; and a command that installs a project's themes. The components
+are there for any template that uses them; the theme system and payments are off until a project turns them on (the
+`theme` and `payments` settings). Nothing changes for a project on 0.2.3 that uses neither, and nothing to migrate,
+apart from an email that names its own From address, which now keeps it. A project drawing its pages in a theme copies
+CattoPHP's browser files with
+`vendor/bin/cattophp-assets <web root>` after each install and runs `bin/console cattophp:themes:install` once its code
+is in place.
+
+- Added: `bin/console cattophp:themes:install` (`Theme\InstallThemesCommand`) installs every theme a project ships and
+  publishes its browser files into the web root, as an installation or update does; `--force` replaces an installed release
+  of the same version during development. Registered when the theme system is on.
+- Changed: `Mail\Mailer::send()` keeps a From address the email already names (a reply sent from a project's own
+  mailbox); every other email still comes from the settings' sender.
+- Added: the component registry (`Ui\Components`) and its 34 components at `@CattoPHP/ui/`: layout (surface, section
+  grid, section head, toolbar, breadcrumb, tabs), actions (link, button, group, row actions), forms (grid, field,
+  actions, choice, feature-card choice, tree picker, compact action), data (table, dataset with its pager above and
+  below and its search across every record, figures, card grid and card, lists, key-value list, person), feedback
+  (badge, notice, empty state, progress), overlays (window, accordion section) and the icon. Templates draw them with
+  `ui()`, `ui_template()`, `ui_props()` and `ui_field_attrs()` (`Twig\UiExtension`); a property is data, never a
+  class, an attribute or rendered markup. A project adds its own components (`Ui\ComponentSet`, the service tag
+  `cattophp.ui_component_set`) and the drawings it allows as a feature card's picture (`Ui\DrawingCheck`,
+  `cattophp.ui_drawing`); `ui.icon_sprite` and `ui.public_root` name its icon sprite. An accordion's `workspace` is a
+  word the project's script finds it by (`data-<word>-section`), and a button's `hook` likewise (`data-<hook>`).
+- Added: checks a project runs over its own sources in its tests (`Ui\Contract\`): `TemplateContract` (each
+  component's classes written only by its own template, and a table, a window or a progress bar only by its component;
+  every button and button-link naming an icon; every icon named present in the sprite; a project adds its own classes'
+  owners) and `SourceAudit` (no script writing component markup instead of cloning a prototype; no theme rule setting a
+  component's layout, the project's own functional classes included; Stimulus actions whole).
+- Added: the page frame at `@CattoPHP/page/`: the page head (`head.html.twig`: the page's only h1 with its kicker, lead,
+  picture, badges and actions, set by the page as `ph_*` values), the identity band under it (`identity.html.twig`: who is
+  signed in with their account reference, or the project's greeting and ways in for a reader signed out, from
+  `identity_*` values) and a section's actions (`section-actions.html.twig`). The Twig function `icon_sprite()`.
+- Added: lists: `Ui\Pagination` (a list's page from untrusted input, the approved sizes, the window of numbered pages),
+  `Ui\Pager::payload()` (the pager's data, every link keeping the list's filters and size), `Ui\ListView` (a list as a
+  table or a grid of cards, the choice remembered), and the templates for the view switch, a grid's sort and a sortable
+  column heading at `@CattoPHP/ui/data/`.
+- Added: pages that change in place and live pages: `@CattoPHP/page/in-place-attrs.html.twig` (what a GET form or link
+  carries to fetch and morph the page's main area, the address following), `@CattoPHP/page/live-status.html.twig` (a
+  live page's refresh every 15 or 30 seconds, with Pause) and `Http\LiveRefresh` (the refresh marked as no visit).
+- Added: `Ui\TreeArrangement` and `Ui\TreeMoveRefused`: ordered tree moves with a depth limit (place, move, where a row
+  may go), a moved row taking its whole subtree, never into itself; a refusal is a reason code each tree words itself.
+- Added: `Ui\IconLibrary`, Lucide 1.70.0's line icons (ISC, `resources/icons/` with its licence) with their keywords: a
+  search by words, the icons that fit a name (a project's subjects first: `ui.icon_subjects`, and words its names use that
+  say nothing, `ui.icon_name_stop_words`) and a check that a chosen icon is the library's. The Twig function `lucide()`.
+- Added: the components on the page, `public/css/cattophp.css`: the functional styling of every component, the page head,
+  identity band and page sections, lists with their pager and search, trees, notices, fields and lookups, live status and
+  the Bootstrap 6 safety net, built from the theme's `--cl-*` tokens; loaded after Bootstrap's reboot, grid and utilities
+  and before the project's own stylesheet and its theme. Copied with the script by `bin/cattophp-assets`.
+- Added: the components in the browser, `public/js/cattophp.js`: windows, menus and the narrow-screen navigation,
+  messages that dismiss themselves, confirmations, the tree picker (`window.CattoTreeSelect`, which a project extends),
+  feature cards that send their form, lookups, tables that fit their columns, the pager that fits its row, figures that fit
+  their cards, a row's tooltip, hex colours, live pages that hold back while the reader is busy, forms that act on a change;
+  a project's own script reaches `window.CattoPHP` (`ready`, `within`, `keepScrollerPlace`). `bin/cattophp-assets` (a
+  Composer binary) copies CattoPHP's browser files into a project's web root under `cattophp/`; a project runs it after
+  every install and update (`"post-install-cmd": ["@php vendor/bin/cattophp-assets public"]`).
+- Added: the theme system (`Theme\`, on with the `theme` settings). `ThemeManager`: themes found in their folders (the
+  project's own in its code, `theme.bundled`, the default, `theme.default`, read from there and never copied; installed
+  ones in `theme.installed` as `<slug>-v<version>`, each release immutable), a package checked and staged
+  (`theme.staging`) then installed, activated, previewed by someone who may (`resolve()`) and uninstalled, a child theme
+  laid over its one exact parent, the browser files copied into `theme.public_root`'s `themes/` with fingerprinted
+  addresses, and each change in the activity log. `PackageValidator` (theme package 4.0, template API 2.0: the manifest,
+  a standalone theme's base with its blocks and the page's styles and scripts, a non-empty theme.css, page-family wrappers
+  of the families the project names, `theme.page_families`, safe paths and file types, size limits; the format's name is
+  the project's, `theme.package_format`), `Publisher`, `Templates` (Twig's `@theme`, a child's folders before its
+  parent's, and a family's wrapper or the base), `Palettes` (five-colour palettes, darkest to lightest, each colour's
+  readable foreground, the stylesheet they make). Which theme is active is kept by the project (`ThemeChoice`, the
+  service `theme.choice`; `MemoryThemeChoice` for one run), and an optional index of the installed themes too
+  (`ThemeRegistry`, `theme.registry`).
+- Added: `Theme\PageRenderer`, a project's page drawn in its theme: the theme (with a preview for someone who may), the
+  family's wrapper or the base or a layout of the project's own, the data checked (names a template can use; text,
+  numbers, true or false and lists only), the theme's part of the view model and the project's, a fragment for htmx
+  with the project's values, and the page as served (the project's generator tag first in the head, then laid out by
+  `HtmlLayout`; on a development site `X-Served-Html: as-built` gets it as Twig drew it). The project answers through
+  `Theme\PageProject` (the service `theme.pages`).
+- Added: the payments module (`Payments\`, on with the `payments` settings): a project's payment gateways through Omnipay,
+  each named in `payments.gateways` with its Omnipay gateway, its label and its parameters, each parameter held by a
+  setting (named as in .env; a secret stored encrypted; optional or not), one settings group a gateway
+  (`payment_<name>`), so the Settings page overrides .env with a Reset. `PaymentGateways::gateway()` gives the Omnipay
+  gateway with its parameters and the current request (which a webhook's notification reads); `configured()` and
+  `missing()` say whether it has what it needs. Omnipay (`omnipay/common`) is suggested, not required: a project that
+  takes payments requires it with its gateway package.
+- Added: `Ui\UploadedSvg`, an uploaded SVG checked to be a picture only and made fit for the page (an icon in the
+  theme's colour, its styles and ids kept to itself); `Foundation\AccountReference`, account references with a check
+  character, and the Twig filters `account_reference` and `share` (a percentage as a bar's length).
+
 ## 0.2.3 · 9 November 2026
 
 A served page whose source can be read: every element holding others on lines of its own, indented by level, with

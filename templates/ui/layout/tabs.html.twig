@@ -1,0 +1,1 @@
+<nav class="cl-group-nav" aria-label="{{ props.aria_label }}">{% for item in props.items %}<a class="cl-group-tab{% if item.key == props.current %} is-current{% endif %}" href="{{ item.href }}"{% if item.key == props.current %} aria-current="page"{% endif %}>{{ item.label }}</a>{% endfor %}</nav>

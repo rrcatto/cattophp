@@ -1,0 +1,43 @@
+<form class="dataset-search" method="get" action="{{ ds_action }}" data-server-search>
+{#
+		What else the list shown depends on travels with the search: without it, the server falls
+		back to its default and the list's other controls reset the moment anybody types. The page number is deliberately absent: a new search returns to page
+		one. Nothing here names a list the reader has not been shown.
+
+		Each optional value has a default, because with strict variables a caller that never sets
+		one would turn the whole page into an error rather than a missing hidden field.
+	#}
+	{# ds_hidden: what else the list shown depends on, kept by the search (which of several lists is chosen). ds_include: a
+	   part of the page whose fields go with the search too, kept current by the list itself (another list's page number),
+	   and ds_swap how the results are put in (a page of two lists morphs, innerMorph). ds_morph_skip: the box is inside what
+	   its answer morphs, so the morph leaves it, and what is being typed, alone. #}
+	{% for hidden_name, hidden_value in ds_hidden|default({}) %}<input type="hidden" name="{{ hidden_name }}" value="{{ hidden_value }}">{% endfor %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (ds_label), full_width: false, for: (ds_name) ~ '-search-input'})} %}
+{% block control %}
+
+		<input type="search" id="{{ ds_name }}-search-input" name="{{ ds_name }}_q" value="{{ ds_value }}" placeholder="Type to search" autocomplete="off" maxlength="120"
+		       hx-get="{{ ds_action }}"
+		       hx-trigger="input changed delay:300ms, search"
+		       {% if ds_push_url|default(false) %}hx-push-url="true"{% endif %}
+		       hx-target="#{{ ds_name }}-region"
+		       hx-select="#{{ ds_name }}-results"
+		       hx-swap="{{ ds_swap|default('innerHTML') }}"
+		       hx-include="closest form{% if ds_include|default('') %}, {{ ds_include }}{% endif %}"
+		       hx-sync="this:replace"
+		       hx-indicator="closest .dataset-search"{% if ds_morph_skip|default(false) %} hx-morph-skip{% endif %} {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+	<div class="dataset-search-actions">
+		<span class="dataset-search-status" aria-live="polite" role="status">Searching…</span>
+		<noscript>
+			{{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-search'}) }}
+		</noscript>
+		{% if ds_value %}
+			{{ ui('action.link', {label: 'Clear', variant: 'quiet', size: 'small', href: (ds_action), icon: 'action-clear'}) }}
+		{% endif %}
+	</div>
+	<p class="help">
+		{{ ds_help|default('Searches every matching record, not only the rows on this page.') }}
+	</p>
+</form>

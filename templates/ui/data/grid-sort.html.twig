@@ -1,0 +1,24 @@
+{#
+	The sort of a grid of cards, which has no column headings to click. The same sorts as the table's
+	headings, in a form that keeps the list's search and page size and returns to page one, as a heading does.
+	gs_name: the dataset; gs_headers: its <dataset>_sort_headers; gs_pager: its <dataset>_pagination.
+#}
+{% set gs_sortable = gs_headers|filter(header => header.sortable) %}
+{% if gs_sortable %}
+	{% set gs_current = gs_sortable|filter(header => header.active)|first %}
+	<form class="cl-grid-sort" method="get" action="{{ gs_pager.base }}">
+		{% for name, value in gs_pager.filters %}
+			{% if name not in [gs_name ~ '_sort', gs_name ~ '_dir', gs_name ~ '_page'] and value is not iterable %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endif %}
+		{% endfor %}
+		<input type="hidden" name="{{ gs_name }}_page_size" value="{{ gs_pager.page_size }}">
+		<label class="cl-label" for="{{ gs_name }}-grid-sort">Sort by</label>
+		<select class="cl-select" id="{{ gs_name }}-grid-sort" name="{{ gs_name }}_sort">
+			{% for header in gs_sortable %}<option value="{{ header.key }}"{{ header.active ? ' selected' : '' }}>{{ header.label }}</option>{% endfor %}
+		</select>
+		<select class="cl-select" name="{{ gs_name }}_dir" aria-label="Order">
+			<option value="asc"{{ gs_current and gs_current.direction == 'asc' ? ' selected' : '' }}>Ascending: A to Z, 1 to 9, oldest first</option>
+			<option value="desc"{{ gs_current and gs_current.direction == 'desc' ? ' selected' : '' }}>Descending: Z to A, 9 to 1, newest first</option>
+		</select>
+		{{ ui('action.button', {label: 'Sort', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-sort'}) }}
+	</form>
+{% endif %}

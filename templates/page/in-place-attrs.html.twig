@@ -1,0 +1,5 @@
+{#
+	What a GET form or a link carries to change the page in place, showing new data without loading the whole page: the
+	page's main area (#cl-main) is fetched again and morphed, so focus, scroll and what is typed stay, the address follows
+	and Back works. Without JavaScript the same form loads the page. in_place_action: where it asks.
+#}hx-get="{{ in_place_action }}" hx-target="#cl-main" hx-select="#cl-main" hx-swap="outerMorph" hx-push-url="true" hx-sync="#cl-main:replace"

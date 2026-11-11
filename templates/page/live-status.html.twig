@@ -1,0 +1,19 @@
+{#
+	A page that shows live data refreshes itself in place, with htmx. This is what refreshes it, and what says so, with Pause.
+	It asks for the address in use, so it follows every change of card, search or page, and window.cattoLive holds it back
+	while the reader is reading or typing. The page's script counts the seconds (data-live-seconds) and asks, because
+	htmx's own condition is code it compiles, which the content policy refuses. It is shown only with JavaScript. Its
+	request carries X-Live-Refresh, and the controller marks it as no visit (Http\LiveRefresh::notAVisit).
+	live_seconds: 15 for a list of what is happening now, 30 for figures and for records that a job changes once a minute.
+#}
+<div id="catto-live" class="cl-live-status small" data-live-status hidden hx-morph-skip
+     data-live-seconds="{{ live_seconds }}" hx-get="" hx-trigger="catto-live-refresh"
+     hx-target="#cl-main" hx-select="#cl-main" hx-swap="outerMorph" hx-sync="#cl-main:drop"
+     hx-headers='{"X-Live-Refresh":"1"}' hx-status:4xx="swap:none" hx-status:5xx="swap:none">
+	<span class="cl-live-dot" aria-hidden="true"></span>
+	<span data-live-running>Updates by itself every {{ live_seconds }} seconds.</span>
+	<span data-live-paused hidden>Paused. It stays as it is until you press Resume.</span>
+	<span data-live-when></span>
+	{{ ui('action.button', {label: 'Pause', type: 'button', icon: 'action-pause', id: 'live-pause', variant: 'secondary', size: 'small'}) }}
+	{{ ui('action.button', {label: 'Resume', type: 'button', icon: 'action-play', id: 'live-resume', variant: 'secondary', size: 'small', hidden: true}) }}
+</div>

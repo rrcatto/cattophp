@@ -1,0 +1,65 @@
+{#
+	The identity band under the page head: who is signed in (identity_name, identity_email, identity_image, identity_roles,
+	identity_status) and their account reference at the band's right edge under its label, opening their profile
+	(identity_profile_href) when there is one; for a reader signed out, the site's greeting (identity_welcome), what
+	signing in gives them (identity_invitation) and the ways in (identity_actions: label, variant, href, icon).
+	identity_placement 'navigation' leaves the band to a theme that shows it in its navigation instead.
+#}
+{% if identity_placement|default('page') == 'page' %}
+{% set identity_signed_in = is_authenticated is defined and is_authenticated %}
+<section class="cl-identity cl-identity-head" aria-label="Account identity">
+	<div class="cl-identity-meta">
+		{% if identity_signed_in %}
+			{% if identity_image is defined and identity_image %}
+				<img class="cl-identity-avatar" src="{{ identity_image }}" alt="" width="72" height="72">
+			{% else %}
+				<div class="cl-identity-avatar cl-identity-avatar-empty">
+					{{ identity_name is defined and identity_name ? identity_name|slice(0, 1)|upper : '?' }}
+				</div>
+			{% endif %}
+			<div class="cl-identity-details">
+				<h2 class="cl-identity-name">
+					{{ identity_name is defined ? identity_name : '' }}
+				</h2>
+				<p class="cl-identity-email">
+					{{ identity_email is defined ? identity_email : '' }}
+				</p>
+				<div class="cl-identity-roles cl-mt-2">
+					{% if identity_roles is defined %}
+						{% for role in identity_roles %}
+							{{ ui('feedback.badge', {label: (role), tone: 'info'}) }}
+						{% endfor %}
+					{% endif %}
+					{% if identity_status is defined and identity_status %}
+						{{ ui('feedback.badge', {label: (identity_status), tone: 'success'}) }}
+					{% endif %}
+				</div>
+			</div>
+			{# The account reference at the band's right edge, under a label that says what it is. #}
+			{% if identity_reference|default('') %}
+				<div class="cl-identity-account">
+					<span class="cl-identity-account-label">Account Reference:</span>
+					{% set identity_reference_tag = identity_profile_href|default('') ? 'a' : 'span' %}<{{ identity_reference_tag }} class="cl-identity-reference"{% if identity_profile_href|default('') %} href="{{ identity_profile_href }}" title="Open your profile"{% endif %}>{{ identity_reference|account_reference }}</{{ identity_reference_tag }}>
+				</div>
+			{% endif %}
+		{% else %}
+			<div class="cl-identity-avatar cl-identity-avatar-empty cl-identity-head-anonymous" aria-hidden="true">
+				<svg width="34" height="34" viewBox="0 0 24 24"><use href="{{ icon_sprite() }}#nav-account"></use></svg>
+			</div>
+			<div class="cl-identity-details">
+				<h2 class="cl-identity-name">
+					{{ identity_welcome|default('') }}
+				</h2>
+				<p class="cl-identity-email">
+					{{ identity_invitation|default('') }}
+				</p>
+				<div class="cl-identity-roles cl-mt-2">
+					{% for action in identity_actions|default([]) %}
+						{{ ui('action.link', {label: action.label, variant: action.variant, size: 'small', href: action.href, icon: action.icon}) }}
+					{% endfor %}
+				</div>
+			</div>
+		{% endif %}
+	</div>
+</section>
+{% endif %}

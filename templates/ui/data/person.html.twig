@@ -1,0 +1,9 @@
+{#
+	A person with an account: their name, linked to their profile (href) when the reader may open it. full: the page's own
+	person - the person or account the page is about (an order, a payment, a message) - named once with everything about
+	them, each on its own line under the page's title: the linked name, the account reference and the email address. Every
+	other mention, and every table, is the linked name alone: never this extra detail in a table's rows.
+#}
+{% set name %}<span class="cl-ui-person-name">{{ props.name }}</span>{% endset %}
+{% set linked %}{% if props.href %}<a class="cl-ui-person-account" href="{{ props.href }}">{{ name }}</a>{% else %}{{ name }}{% endif %}{% endset %}
+{% if props.full %}<span class="cl-ui-person cl-ui-person--full"><span class="cl-ui-person-line">{{ linked }}</span>{% if props.reference %}<span class="cl-ui-person-line cl-ui-person-reference">{{ props.reference|account_reference }}</span>{% endif %}{% if props.email %}<span class="cl-ui-person-line"><a class="cl-ui-person-email" href="mailto:{{ props.email }}">{{ props.email }}</a></span>{% endif %}</span>{% else %}<span class="cl-ui-person">{{ linked }}</span>{% endif %}{# Ends at a tag, so text written straight after a person (a full stop) gains no space. #}

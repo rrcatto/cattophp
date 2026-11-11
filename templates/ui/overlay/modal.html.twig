@@ -1,0 +1,8 @@
+<div class="cl-ui-modal" id="{{ props.id }}" role="dialog" aria-modal="false" aria-labelledby="{{ props.id }}-title"{% if props.open %} data-modal-open{% endif %}>
+<div class="cl-ui-modal-card cl-ui-modal-card--{{ props.size }}"><div class="cl-ui-modal-head"><h3 id="{{ props.id }}-title">{{ props.title }}</h3><button class="cl-ui-close" type="button" data-close-modal aria-label="Close">×</button></div>
+{% if props.action %}<form action="{{ props.action }}" method="{{ props.method }}"{% if props.upload %} enctype="multipart/form-data"{% endif %}>{% endif %}
+<div class="cl-ui-modal-body">{% block modal_body %}{% endblock %}</div>
+<div class="cl-ui-modal-foot">{% block modal_actions %}{% endblock %}</div>
+{% if props.action %}</form>{% endif %}
+{% block additional_forms %}{% endblock %}
+</div></div>

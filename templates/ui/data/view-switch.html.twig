@@ -1,0 +1,13 @@
+{#
+	A list's choice of view: its table or its grid of cards, remembered for the reader (Ui\ListView). Plain links, so it
+	works without JavaScript; the view shown now is the filled button and says so to a screen reader.
+	vs: the list's switch (ListView::switcher). With JavaScript the list changes where it is, without a page load: htmx
+	fetches the same address and swaps only the list's own area, its toolbar, results and pagination, the element vs_region
+	names (its list's name and "-view" unless given), as the list's search does. The choice is remembered as before.
+	vs_swap: how, innerHTML unless given; a page of two lists morphs them (innerMorph), so the one not changed stays.
+#}
+{% set vs_area = '#' ~ (vs_region|default(vs.name ~ '-view')) %}
+<div class="cl-view-switch" role="group" aria-label="Show as">
+	{{ ui('action.link', {label: 'List', variant: vs.view == 'list' ? 'primary' : 'secondary', size: 'small', href: vs.list_href, get: vs.list_href, target: vs_area, select: vs_area ~ ' > *', swap: vs_swap|default('innerHTML'), id: vs.name ~ '-show-list', icon: 'action-view-list', aria_label: vs.view == 'list' ? 'List, shown now' : 'Show as a list'}) }}
+	{{ ui('action.link', {label: 'Grid', variant: vs.view == 'grid' ? 'primary' : 'secondary', size: 'small', href: vs.grid_href, get: vs.grid_href, target: vs_area, select: vs_area ~ ' > *', swap: vs_swap|default('innerHTML'), id: vs.name ~ '-show-grid', icon: 'action-view-grid', aria_label: vs.view == 'grid' ? 'Grid, shown now' : 'Show as a grid of cards'}) }}
+</div>

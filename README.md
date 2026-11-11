@@ -24,6 +24,18 @@ Require it from GitHub in the project's `composer.json`:
 "require": {"rrcatto/cattophp": "^0.2"}
 ```
 
+Copy its browser files into the web root after every install and update, in the project's `composer.json`:
+
+```json
+"scripts": {
+    "post-install-cmd": ["@php vendor/bin/cattophp-assets public"],
+    "post-update-cmd": ["@php vendor/bin/cattophp-assets public"]
+}
+```
+
+and load `cattophp/css/cattophp.css` on every page after Bootstrap's reboot, grid and utilities and before the project's
+own stylesheet, and `cattophp/js/cattophp.js` after htmx and before the project's own scripts.
+
 Register the bundle in `config/bundles.php` beside Symfony's framework, security and Twig bundles:
 
 ```php
@@ -52,6 +64,26 @@ cattophp:
         no_store: false                         # true asks browsers to keep no copy of any page
     error_pages:
         skip_paths: [/api/]                     # paths whose errors the project answers itself
+    ui:
+        icon_sprite: /img/icons.svg             # the icon sprite whose symbols the icon component draws
+        public_root: '%kernel.project_dir%/public'  # where the sprite is found for its fingerprint
+    payments:                                   # only for a project that takes payments (omnipay/common)
+        gateways:
+            stitch:
+                omnipay: StitchExpress          # the Omnipay gateway: a short name or a class
+                label: Card payments (Stitch)
+                parameters:
+                    clientId: { name: STITCH_CLIENT_ID, label: Client ID }
+                    clientSecret: { name: STITCH_CLIENT_SECRET, label: Client secret, secret: true }
+    theme:                                      # only for a project with themes
+        default: example                        # the slug of the bundled theme a site starts on
+        bundled: '%kernel.project_dir%/themes'  # the project's own themes, in its code
+        installed: '%kernel.project_dir%/var/themes'
+        staging: '%kernel.project_dir%/var/theme-imports'
+        public_root: '%kernel.project_dir%/public'  # each theme's browser files go into its themes/ folder
+        page_families: [admin]                  # the families a theme may wrap with pages/<family>.html.twig
+        choice: App\Theme\StoredChoice          # where the active theme is kept (CattoPHP\Theme\ThemeChoice)
+        pages: App\Theme\Pages                  # the project's pages, for PageRenderer (CattoPHP\Theme\PageProject)
 ```
 
 Sign-in runs on Symfony's security system. In `config/packages/security.yaml`:
@@ -112,10 +144,37 @@ says production: `new Kernel(RunMode::environment(), RunMode::debug())`.
 - **The served page's layout** (`Http\HtmlLayout`): a whole page laid out so its source can be read, every element
   holding a block on lines of its own, one tab a level, whitespace changed only where a browser draws nothing
   differently; authored HTML is served byte for byte (`html_layout.verbatim_classes`, the Twig filter `authored`).
+- **The components** (`Ui\Components`): cards, tables, fields, windows, notices, badges, figures, feature-card
+  choices, a tree picker, lists with their pager and search, and more, each one template at `@CattoPHP/ui/` with its
+  properties bounded to data (words, numbers, a choice from a fixed list; never a class, an attribute or rendered
+  markup), so no page invents its own. A page draws one with `ui('feedback.notice', {tone: 'success'})`, or embeds one
+  to fill its slots with `ui_template()` and `ui_props()`; `ui_field_attrs()` ties a field's control to its help and
+  error. A project adds components of its own with a `Ui\ComponentSet`, and allows its own drawings as a feature
+  card's picture with a `Ui\DrawingCheck`. An uploaded SVG is checked and made fit for the page by `Ui\UploadedSvg`. The page frame is at `@CattoPHP/page/` (the
+  page head, the identity band and a section's actions), and lists have their page (`Ui\Pagination`), their pager's
+  data (`Ui\Pager`) and their table or grid view (`Ui\ListView`). Pages change in place
+  (`@CattoPHP/page/in-place-attrs.html.twig`) and live pages refresh themselves with Pause
+  (`@CattoPHP/page/live-status.html.twig`, `Http\LiveRefresh`); trees are arranged by `Ui\TreeArrangement`; icons come from
+  `Ui\IconLibrary` (Lucide, ISC; `lucide('name')` in a template), given the project's subjects. A project's tests keep the
+  rules with `Ui\Contract\TemplateContract` (one owner for each component's markup, an icon on every button, every
+  icon in the sprite) and `Ui\Contract\SourceAudit` (scripts and theme stylesheets leave the components to them).
+- **Themes** (`Theme\`, turned on by the `theme` settings): a project's look as a theme package (a manifest, a base
+  template, its stylesheet, optional wrappers for page families, optional five-colour palettes), checked before it is
+  installed (`PackageValidator`), installed side by side by version, activated, previewed and uninstalled
+  (`ThemeManager`), a child theme over its one exact parent, the browser files copied into the web root with fingerprinted
+  addresses. `Theme\PageRenderer` draws a project's page in its theme and serves it laid out; the project tells it about
+  its pages with a `Theme\PageProject` (`theme.pages`), keeps which theme is active with a `Theme\ThemeChoice`
+  (`theme.choice`) and may index the installed themes with a `Theme\ThemeRegistry` (`theme.registry`); `bin/console cattophp:themes:install`
+  installs the themes a project ships and publishes their browser files, once its code is in place.
+- **Payments** (`Payments\`, turned on by the `payments` settings): payment gateways through
+  [Omnipay](https://omnipay.thephpleague.com), each one's keys kept as settings (.env's starting values, the Settings
+  page over them, secrets encrypted); `PaymentGateways::gateway('name')` gives the Omnipay gateway ready to use. The
+  project requires `omnipay/common` and its gateway's package (such as `rrcatto/omnipay-stitch-express`).
 - **Mail** (`Mail\Mailer`): through the configured transport (`MAILER_DSN` and the `MAIL_*` sender settings), a demo
   site's emails marked; `cattophp:test-email`.
-- **Building blocks**: lengths of time (`Foundation\Duration`: `30m`, `1d`, `1h30m`), Base32, the secret cipher and
-  keyed hashes (`Security\`).
+- **Building blocks**: lengths of time (`Foundation\Duration`: `30m`, `1d`, `1h30m`), account references with a check
+  character (`Foundation\AccountReference`, `|account_reference`), Base32, the secret cipher and keyed hashes
+  (`Security\`).
 
 Its pages (`templates/`) are plain; a project draws them in its own look by putting its own at
 `templates/bundles/CattoPHPBundle/` (`error.html.twig`, `sign_in/*.html.twig`).

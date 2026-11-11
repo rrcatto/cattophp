@@ -1,0 +1,34 @@
+{#
+	The page head: the page's only h1, with its kicker, lead and actions, then the identity band. Every value is set by the
+	page before it includes this. ph_hero: a picture (captured SVG markup) the kicker, title, lead and the page's actions
+	sit over; every such picture is the same size (.cl-picture-head); without one the head is text alone. ph_media:
+	captured markup of a picture before the title, such as an organisation's logo; ph_badges: captured markup of badges
+	under the title. Both optional.
+#}
+{% set ph_hero_art = ph_hero|default('')|trim %}
+<section class="cl-page-head {{ ph_compact|default(false) ? 'cl-page-head-compact' : '' }}{{ ph_hero_art ? ' cl-page-head--picture' : '' }}">
+	<div class="cl-page-head-inner">
+		{% if ph_hero_art %}<div class="cl-picture-head"><div class="cl-picture-head-art" aria-hidden="true">{{ ph_hero_art }}</div>{% endif %}
+		{% if ph_media|default('')|trim %}<div class="cl-page-head-media">{{ ph_media }}</div>{% endif %}
+		<div class="cl-page-head-content{{ ph_hero_art ? ' cl-picture-head-text' : '' }}">
+			{% if ph_back_href|default('') %}<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label|default('Back', true) }}</a>{% endif %}
+			{% if ph_kicker|default('') %}<span class="cl-kicker d-block">{{ ph_kicker }}</span>{% endif %}
+			<h1 class="{{ ph_compact|default(false) ? 'h5 mb-0' : 'cl-display-5 fw-bold' }}">{{ ph_title }}</h1>
+			{% if ph_lead|default('') %}<p class="cl-lead mb-0">{{ ph_lead }}</p>{% endif %}
+			{% if ph_badges|default('')|trim %}<div class="cl-page-head-badges">{{ ph_badges }}</div>{% endif %}
+		</div>
+		{#
+			The page's actions: ph_actions is captured markup (a {% set %} block of ui() actions) for a
+			page whose main actions are its own; ph_action_href is the single secondary link a sub-page
+			may have, with its ph_action_label and ph_action_icon (Back and action-back unless given).
+			A section's own actions arrive as ph_actions from its page template.
+		#}
+		{% if ph_actions|default('')|trim %}
+			<div class="cl-page-head-actions">{{ ph_actions }}</div>
+		{% elseif ph_action_href|default('') %}
+			<div class="cl-page-head-actions">{{ ui('action.link', {label: ph_action_label|default('Back', true), variant: 'secondary', href: ph_action_href, icon: ph_action_icon|default('action-back', true)}) }}</div>
+		{% endif %}
+		{% if ph_hero_art %}</div>{% endif %}
+	</div>
+</section>
+{% include '@CattoPHP/page/identity.html.twig' %}

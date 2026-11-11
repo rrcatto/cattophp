@@ -1,0 +1,8 @@
+{% set help %}{% block help_content %}{{ props.help }}{% endblock %}{% endset %}
+{% set props = props|merge({help: help|trim is not empty}) %}
+<div class="cl-ui-field{% if props.full_width %} cl-ui-field--full{% elseif props.span %} cl-ui-field--{{ props.span }}{% endif %}">
+{% if props.label %}{% if props.for %}<label for="{{ props.for }}">{{ props.label }}{% if props.required %}<span class="cl-ui-required" aria-hidden="true"> *</span>{% endif %}</label>{% else %}<span class="cl-ui-field-label">{{ props.label }}{% if props.required %}<span class="cl-ui-required" aria-hidden="true"> *</span>{% endif %}</span>{% endif %}{% endif %}
+{% block control %}{% endblock %}
+{% if help|trim %}<div class="cl-ui-field-help"{% if props.for %} id="{{ props.for }}-help"{% endif %}>{{ help }}</div>{% endif %}
+{% if props.error %}<div class="cl-ui-field-error" role="alert"{% if props.for %} id="{{ props.for }}-error"{% endif %}>{{ props.error }}</div>{% endif %}
+</div>
