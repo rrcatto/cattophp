@@ -6,6 +6,7 @@ namespace CattoPHP\Activity;
 
 use DateTimeImmutable;
 use CattoPHP\Http\RequestReference;
+use CattoPHP\Security\Redactor;
 use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -13,17 +14,14 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 
 /**
  * The activity log: every change, who made it, from which address and when, with the request's reference. A secret is
- * never written into it: a detail whose name says it is a password, key, token or other secret is kept as ••••, and
- * the password in a mail transport's address too.
+ * never written into it (Security\Redactor): a detail whose name says it is a password, key, token or other secret is
+ * kept as ••••, and so is a secret written in text, such as the password in a mail transport's address.
  *
  * An action is named `area.what_happened` in small letters, such as `settings.changed` or `sign_in.signed_in`.
  */
 final class ActivityLog
 {
-    public const MASK = '••••';
-
-    /** Detail names whose values are never kept. */
-    private const SECRET_NAMES = '/password|passphrase|secret|token|api_?key|private_?key|signing_?key|^dsn$|_dsn$|cookie|authori[sz]ation|one_time_code|recovery_code/i';
+    public const MASK = Redactor::MASK;
 
     public function __construct(
         private readonly ActivityStore $store,
@@ -91,21 +89,6 @@ final class ActivityLog
      */
     public static function clean(array $details): array
     {
-        $clean = [];
-        foreach ($details as $name => $value) {
-            // Nothing, and a yes or no (such as secret_changed), cannot give a secret away.
-            if (is_string($name) && preg_match(self::SECRET_NAMES, $name) === 1 && $value !== null && $value !== '' && !is_bool($value)) {
-                $clean[$name] = self::MASK;
-            } elseif (is_array($value)) {
-                $clean[$name] = self::clean($value);
-            } elseif (is_string($value)) {
-                // A transport's address can carry a password: smtp://user:password@host.
-                $clean[$name] = (string) preg_replace('#^([a-z][a-z0-9+.-]*://[^:/@\s]*):[^@/\s]+@#i', '$1:' . self::MASK . '@', $value);
-            } else {
-                $clean[$name] = $value;
-            }
-        }
-
-        return $clean;
+        return Redactor::data($details);
     }
 }

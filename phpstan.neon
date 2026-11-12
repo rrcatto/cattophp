@@ -4,4 +4,7 @@ parameters:
     # The tests are analysed too: the code that proves the package works is held to the same standard.
     - src
     - tests
+  # Symfony's service(), param() and tagged_iterator() are functions inside a class file no autoloader names.
+  scanFiles:
+    - vendor/symfony/dependency-injection/Loader/Configurator/ContainerConfigurator.php
   tmpDir: var/phpstan

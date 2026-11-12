@@ -17,10 +17,10 @@ final class SchemaRunnerTest extends DatabaseTestCase
 {
     public function testEveryStepIsAppliedOnceInTheOrderItWasWritten(): void
     {
-        self::assertSame(['202611091000-settings', '202611091001-activity', '202611091002-access', '202611091003-sign-in', '202611091004-activity-lookups', '202611091005-access-boundary', '202611091006-links', '202611091007-sessions'], $this->runner()->applied());
+        self::assertSame(['202611091000-settings', '202611091001-activity', '202611091002-access', '202611091003-sign-in', '202611091004-activity-lookups', '202611091005-access-boundary', '202611091006-links', '202611091007-sessions', '202611120900-scheduled-jobs', '202611121400-setup-steps', '202611121600-site-protection', '202611121800-telegram', '202611122000-search-pages', '202611122100-api-tokens', '202611122200-signup-attempts', '202611122201-identity-checks', '202611122300-inbox', '202611122310-cattomail', '202611122320-mailing-lists', '202611122330-mailing-campaigns', '202611122340-mailing-forwards'], $this->runner()->applied());
         self::assertSame([], $this->runner()->pending());
         self::assertSame([], $this->runner()->migrate(), 'a second run applies nothing');
-        foreach (['cattophp_settings', 'cattophp_activity', 'cattophp_roles', 'cattophp_role_permissions', 'cattophp_account_roles', 'cattophp_links', 'cattophp_sessions', 'cattophp_two_step'] as $table) {
+        foreach (['cattophp_settings', 'cattophp_activity', 'cattophp_roles', 'cattophp_role_permissions', 'cattophp_account_roles', 'cattophp_links', 'cattophp_sessions', 'cattophp_two_step', 'cattophp_scheduled_jobs', 'cattophp_setup_steps', 'cattophp_site_requests', 'cattophp_site_flags', 'cattophp_site_lockouts', 'cattophp_site_refused_emails', 'cattophp_telegram_state', 'cattophp_telegram_messages', 'cattophp_telegram_accounts', 'cattophp_search_pages', 'cattophp_api_tokens'] as $table) {
             self::assertNotNull($this->connection->fetchOne('SELECT to_regclass(?)', [$table]), $table);
         }
         self::assertSame('Administrator', $this->connection->fetchOne("SELECT name FROM cattophp_roles WHERE key = 'ADMIN'"));
@@ -62,12 +62,12 @@ final class SchemaRunnerTest extends DatabaseTestCase
         $tester = new CommandTester(new MigrateCommand($this->runner()));
 
         $tester->execute(['--dry-run' => true]);
-        self::assertStringContainsString('8 steps would be applied', $tester->getDisplay());
+        self::assertStringContainsString('21 steps would be applied', $tester->getDisplay());
         self::assertStringContainsString('202611091002-access  Roles and permissions', $tester->getDisplay());
         self::assertSame([], $this->runner()->applied(), 'a dry run applies nothing');
 
         $tester->execute([]);
-        self::assertStringContainsString('Done: 8 steps applied.', $tester->getDisplay());
+        self::assertStringContainsString('Done: 21 steps applied.', $tester->getDisplay());
         $tester->execute([]);
         self::assertStringContainsString('Nothing to apply', $tester->getDisplay());
     }

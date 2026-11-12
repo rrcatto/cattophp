@@ -9,9 +9,11 @@ use CattoPHP\Installation\Installation;
 use CattoPHP\Mail\Mailer;
 use CattoPHP\Runtime\SiteMode;
 use CattoPHP\Settings\Settings;
+use CattoPHP\Api\ApiTokenAuthenticator;
 use CattoPHP\SignIn\SignInAuthenticator;
 use CattoPHP\SignIn\SignInEntryPoint;
 use CattoPHP\SignIn\SignInUserProvider;
+use CattoPHP\Tests\Support\ExampleSetupSteps;
 use CattoPHP\Tests\Support\RecordingLogger;
 use CattoPHP\Tests\Support\RecordingTransport;
 use Doctrine\DBAL\Connection;
@@ -39,8 +41,15 @@ final class TestKernel extends Kernel
      * @param array<string,string> $starting starting values in place of .env's
      * @param bool $ownSessions a project that runs its own PHP sessions, with Symfony's off and CattoPHP's sign-in pages off
      * @param array{bundled:string,installed:string,staging:string,public_root:string,pages_folder:string}|null $theme a project with themes, its folders and its pages' templates
+     * @param bool $scheduler a project with background work: the scheduler on, its old command name kept, one task of its own
+     * @param bool $setup a project with a setup checklist: its own steps
+     * @param bool $protection a public site with site protection, its task late among the scheduled ones
+     * @param bool $telegram a project with a Telegram bot, its owner's choices
+     * @param bool $search a public site with search engines and AI: its public pages, sitemap sources and llms.txt
+     * @param bool $documents a project that draws documents and PDFs
+     * @param bool $api a project with an API: its firewall, a scope and two routes
      */
-    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null)
+    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null, private readonly bool $scheduler = false, private readonly bool $setup = false, private readonly bool $protection = false, private readonly bool $telegram = false, private readonly bool $search = false, private readonly bool $documents = false, private readonly bool $api = false, private readonly bool $signup = false, private readonly bool $identity = false, private readonly bool $inbox = false, private readonly bool $mailing = false)
     {
         parent::__construct('test', false);
     }
@@ -57,7 +66,7 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme]));
+        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme, $this->scheduler, $this->setup, $this->protection, $this->telegram, $this->search, $this->documents, $this->api]));
     }
 
     public function getLogDir(): string
@@ -75,21 +84,29 @@ final class TestKernel extends Kernel
             'php_errors' => ['log' => true],
             'router' => ['utf8' => true],
             'session' => $this->ownSessions ? ['enabled' => false] : ['storage_factory_id' => 'session.storage.factory.mock_file'],
-        ]);
+        ] + ($this->telegram || $this->signup || $this->identity || $this->mailing ? ['http_client' => ['enabled' => true]] : [])
+            // A project sending news usually has Symfony's mailer too, whose transport nothing of mailing's may take by mistake.
+            + ($this->mailing ? ['mailer' => ['dsn' => 'null://null']] : []));
         $container->extension('twig', ['strict_variables' => true] + ($this->theme !== null ? ['paths' => [$this->theme['pages_folder'] => 'platform']] : []));
         if ($this->ownSessions) {
             $container->extension('security', ['providers' => ['none' => ['memory' => null]], 'firewalls' => ['main' => ['security' => false]]]);
         } else {
             $container->extension('security', [
             'providers' => ['cattophp' => ['id' => SignInUserProvider::class]],
-            'firewalls' => ['main' => [
+            'firewalls' => ($this->api ? ['api' => [
+                'pattern' => '^/api/',
+                'stateless' => true,
+                'provider' => 'cattophp',
+                'custom_authenticators' => [ApiTokenAuthenticator::class],
+                'entry_point' => ApiTokenAuthenticator::class,
+            ]] : []) + ['main' => [
                 'lazy' => true,
                 'provider' => 'cattophp',
                 'custom_authenticators' => [SignInAuthenticator::class],
                 'entry_point' => SignInEntryPoint::class,
             ]],
             'access_control' => [
-                ['path' => '^/(sign-in|open)', 'roles' => 'PUBLIC_ACCESS'],
+                ['path' => '^/(sign-in|open|api)', 'roles' => 'PUBLIC_ACCESS'],
                 ['path' => '^/', 'roles' => 'ROLE_USER'],
             ],
             ]);
@@ -110,13 +127,39 @@ final class TestKernel extends Kernel
         ] + ($this->theme !== null ? ['theme' => [
             'default' => 'plain', 'bundled' => $this->theme['bundled'], 'installed' => $this->theme['installed'], 'staging' => $this->theme['staging'],
             'public_root' => $this->theme['public_root'], 'package_format' => 'cattophp-theme', 'page_families' => ['admin'], 'pages' => ExamplePages::class,
-        ]] : []));
+        ]] : []) + ($this->scheduler ? ['scheduler' => ['enabled' => true, 'command_alias' => 'schedule:run', 'log_archive' => ['enabled' => true, 'folder' => $this->folder . '/logs']]] : [])
+            + ($this->setup ? ['setup' => ['enabled' => true]] : [])
+            + ($this->protection ? ['protection' => ['enabled' => true, 'firewall_folder' => $this->folder . '/server-firewall', 'secret_paths' => ['/open/'], 'task_priority' => -30]] : [])
+            + ($this->telegram ? ['telegram' => ['enabled' => true, 'choices' => ['on_sale'], 'task_priority' => -40]] : [])
+            + ($this->search ? ['search' => ['enabled' => true, 'private_paths' => [['why' => 'Signed-in pages.', 'paths' => ['/account/', '/admin/']]], 'share_pictures' => $this->folder . '/share-pictures', 'llms_txt' => ExampleSitemapGuides::class]] : [])
+            + ($this->documents ? ['documents' => ['enabled' => true, 'font_cache' => $this->folder . '/dompdf-fonts']] : [])
+            + ($this->api ? ['api' => ['enabled' => true, 'token_prefix' => 'example_', 'scopes' => ['example:read' => 'Read the example.'], 'accounts' => ExampleApiAccounts::class]] : [])
+            + ($this->signup ? ['network' => ['lists_folder' => $this->folder . '/network-lists'], 'signup' => ['enabled' => true, 'task_priority' => 5]] : [])
+            + ($this->identity ? ['identity' => ['enabled' => true, 'return_path' => '/account/verification/return', 'account_detail' => 'user_id', 'minimum_age' => 18]] : [])
+            + ($this->inbox ? ['inbox' => ['enabled' => true, 'files_folder' => $this->folder . '/inbox-files', 'task_priority' => -60]] : [])
+            + ($this->mailing ? ['mailing' => ['enabled' => true, 'project' => 'example']] : []));
 
         $services = $container->services()->defaults()->autowire()->autoconfigure();
         $services->set(PagesController::class)->public()->tag('controller.service_arguments');
         $services->set(ProjectExtension::class);
+        if ($this->api) {
+            $services->set(ExampleApiAccounts::class);
+            $services->set(ExampleApiController::class)->public()->tag('controller.service_arguments');
+        }
+        if ($this->search) {
+            $services->set(ExampleSitemapPages::class);
+            $services->set(ExampleSitemapGuides::class);
+        }
+        if ($this->scheduler) {
+            // Found by autoconfiguration, as a project's own tasks are.
+            $services->set(ExampleKernelTask::class);
+        }
         if ($this->theme !== null) {
             $services->set(ExamplePages::class);
+        }
+        if ($this->setup) {
+            // Found by autoconfiguration, as a project's own steps are.
+            $services->set(ExampleSetupSteps::class)->public();
         }
         $services->set(RecordingTransport::class)->public();
         $services->set('logger', RecordingLogger::class)->public();
@@ -141,5 +184,10 @@ final class TestKernel extends Kernel
         $routes->add('broken', '/open/broken')->controller([PagesController::class, 'broken']);
         $routes->add('refused', '/open/refused')->controller([PagesController::class, 'refused'])->methods(['POST']);
         $routes->add('form', '/open/form')->controller([PagesController::class, 'form'])->methods(['GET']);
+        if ($this->api) {
+            $routes->add('api_me', '/api/me')->controller([ExampleApiController::class, 'me'])->methods(['GET']);
+            $routes->add('api_missing', '/api/missing')->controller([ExampleApiController::class, 'missing'])->methods(['GET']);
+            $routes->add('api_invalid', '/api/invalid')->controller([ExampleApiController::class, 'invalid'])->methods(['GET']);
+        }
     }
 }

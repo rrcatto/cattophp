@@ -113,12 +113,14 @@ final class HtmlLayout
 
     /**
      * Whether PHP's memory limit leaves room to lay out a page of this size: running out of memory cannot be caught, and the
-     * page must never be lost to its layout, so a page without the room is served as it came.
+     * page must never be lost to its layout, so a page without the room is served as it came. The limit applies to the
+     * memory PHP has taken from the system, which stays taken after a large piece of work frees what it used, so that is
+     * what is measured (memory_get_usage(true)), never only what is in use.
      */
     private function roomFor(int $length): bool
     {
         if ($this->memoryLimit !== null) {
-            return memory_get_usage() + $length * self::MEMORY_PER_BYTE < $this->memoryLimit;
+            return memory_get_usage(true) + $length * self::MEMORY_PER_BYTE < $this->memoryLimit;
         }
         $limit = trim((string) ini_get('memory_limit'));
         if ($limit === '' || $limit === '-1') {
@@ -132,7 +134,7 @@ final class HtmlLayout
             default => 1,
         };
 
-        return memory_get_usage() + $length * self::MEMORY_PER_BYTE < $bytes;
+        return memory_get_usage(true) + $length * self::MEMORY_PER_BYTE < $bytes;
     }
 
     private function unmarked(string $html): string

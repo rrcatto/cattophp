@@ -2,7 +2,193 @@
 
 What each version of CattoPHP brought, newest first.
 
-## Unreleased
+## 0.3.0 · 12 November 2026
+
+The modules: everything a project may need beyond the foundations, each switched on in `config/packages/cattophp.yaml`
+when the project wants it and costing nothing when it does not. The scheduler with the log archive, the setup checklist,
+site protection, Telegram, search engines and AI, documents and PDFs, an API with signed webhooks, the network lookup,
+the sign-up check, identity verification, the Inbox, mailing (sending through a mail server or catto-mail, lists and
+consent, campaigns and the sender, the links in a copy, Forward to a friend, the figures), and countries with the South
+Africa pack. A project now says which modules it needs: it starts only when they have what they need, told plainly what
+is missing, and `cattophp:migrate` makes the tables of the modules it switches on (`cattophp:modules` lists them).
+Nothing changes for a project that switches none on; one with a database runs `cattophp:migrate` after updating.
+
+- **The scheduler** (`CattoPHP\Scheduler`, switched on by `cattophp.scheduler`): a project's background work as tasks, each
+  a service implementing `ScheduledTask` (its key, name, what it does, how often or at what time of day, when it counts
+  as stopped, and `run()`, which says what it did or throws). `cattophp:schedule:run` runs what is due, once (a cron line
+  every minute) or once a minute with `--watch` (a worker), and `--job` runs named tasks now; `scheduler.command_alias`
+  gives it the name a project's cron line or worker already uses. Each task's last start, finish, success, failure,
+  summary and error and how often it ran are kept (`cattophp_scheduled_jobs`, a new schema step, or a file without a
+  database); one task failing never stops the rest. `TaskStatus` gives each task's last runs in words and whether it has
+  stopped, for a project's own pages. A time of day is the site's: a task due at midnight runs once just after it, or
+  when a scheduler stopped then starts again.
+- **The log archive** (`scheduler.log_archive`, with the folder the logs are in): just after midnight every log there
+  that holds anything moves into `archive/<name>-<day>.log.gz` and starts afresh with its permissions, and archives older
+  than `LOG_ARCHIVES_KEPT_FOR` (two weeks unless `.env` or Settings says, at least a day) are deleted.
+- **The setup checklist** (`CattoPHP\Setup`, switched on by `cattophp.setup`, with the database): the steps a new
+  installation needs, in order, each supplied by a project's `SetupStepProvider` service as a `SetupStep` (its group,
+  title, what it is for, where it stands, the page where it is done, and an optional button of the project's own). A
+  step is checked automatically, needs you, or both: the site finds it done, or a person marks it done or skips it for
+  now and can open it again. `SetupChecklist` gives each step with whether it is done and can be marked, the progress
+  and the next step (a skipped one is passed over); a mark is kept with when, by whom and an optional note
+  (`cattophp_setup_steps`, a new schema step) and in the activity log. What a step says it found, and a note, are shown
+  with their secrets hidden.
+- **`Security\Redactor`**: hides secrets in values (a value whose name says it is a password, key, token or other
+  secret) and in text (the password in an address such as `smtp://user:password@host`, a secret given by name such as
+  `password=…`, a bearer token, a private key). The activity log cleans every detail with it, so a secret written in a
+  detail's text is now hidden as well as one named as a secret.
+- **Site protection** (`CattoPHP\Protection`, switched on by `cattophp.protection`, with the database): the Site Log
+  (every request written as it ends: who, the browser, the country and network, the page with its secrets masked, the
+  answer, where the visitor came from, what a form guard found; `RequestRecorder`, `PathMask`, `Arrival`), flagged
+  addresses (`Flags`), time-outs and lockouts of an address (an IPv6 one as its /64), a range or a network owner
+  (`Lockouts`, `LockoutTarget`, `LockoutService`: lock out, lift, mark not a problem, never your own address or the Never
+  lock out list), the lockout gate before anything else (`LockoutGate`, a request listener or called before a project's
+  own session), the rules every minute as the scheduled task `site_protection` (`ProtectionRules`: eight rules, time-outs
+  that double and turn into a lockout, administrators, signed-in people, private addresses and proved search engines
+  spared; `SearchEngineProof`), the form guard on public forms (`FormGuard`, `BotCheck`'s signals and a refused list of
+  email addresses and domains, `RefusedEmails`), the two-file link to a firewall on the server (`ServerLink`), the
+  `SITE_*` settings (`ProtectionSettings`, `ProtectionSettingGroup`) and retention (`ProtectionRetention`). A project gives
+  an address's country and network through `NetworkLookup` and who is signed in through `VisitorAccounts`. Four tables in
+  a new schema step: `cattophp_site_requests`, `cattophp_site_flags`, `cattophp_site_lockouts`,
+  `cattophp_site_refused_emails`, a person as their account id.
+- **Telegram** (`CattoPHP\Telegram`, switched on by `cattophp.telegram`, with the database and symfony/http-client): a
+  bot connected by its key (encrypted, never shown back) and the owner's username, found by the chat they write from
+  (`TelegramBot`, `TelegramSetup`: connect, test, the project's own choices, disconnect); messages to the owner kept in
+  the transaction of what they are about and sent within a minute by the scheduled task `owner_messages`, a fault never
+  harming what they are about (`OwnerMessages`, `OwnerMessageSender`); messages to a person sent at once, a sign-in
+  message held until the page has answered, each kept in the Telegram log without its secrets (`TelegramMessenger`,
+  `TelegramDeliveryListener`, `TelegramLog`); people's Telegram accounts connected by a link that works once and the
+  bot's /start (`TelegramAccounts`, `TelegramConnections`); what people send the bot read from a saved offset, one
+  reader at a time (`TelegramInbox`). The Bot API client scrubs the key from anything it says (`TelegramClient`,
+  `TelegramFailed`). Three tables in a new schema step: `cattophp_telegram_state`, `cattophp_telegram_messages`,
+  `cattophp_telegram_accounts`, a person as their account id.
+- **Search engines and AI** (`CattoPHP\Search`, switched on by `cattophp.search`, with the database): what AI crawlers may
+  do and the Google Search Console and Bing Webmaster Tools codes as settings (`SearchSettings`, `SearchSettingGroup`:
+  `SEARCH_AI_CRAWLERS`, `SEARCH_GOOGLE_CODE`, `SEARCH_BING_CODE`; a code taken bare or from its whole meta tag), the
+  dated list of AI crawlers with what each company says it is for (`AiCrawlers`), `robots.txt` with the project's private
+  paths and a group for each AI crawler (`RobotsTxt`), the sitemap from the project's `SitemapSource` services in priority
+  order, an index past 50,000 addresses and kept an hour, none on a demo site (`Sitemap`), `/llms.txt` from the project's
+  `LlmsTxtContent` (`LlmsTxt`), share pictures drawn from SVG at 1200 by 630 and stored by their cover's hash
+  (`SharePictures`, with `Foundation\SvgRaster` for rsvg-convert), structured data any site has and its rules
+  (`StructuredData`: Organization, WebSite, FAQPage, BreadcrumbList, ItemList, a rating, an organisation named elsewhere,
+  a workload in ISO 8601), plain words and excerpts (`PlainText`), and every public page's head (`PageHead`: its
+  description, canonical address, Open Graph and X's card with the site's own picture through `DefaultSharePicture`, a
+  search's results not indexed, ", page N"), over the project's public pages (`PublicPageProvider`, `PublicPage`,
+  `PublicPages`) and an administrator's own title and description for each (`PageOverrides`, `cattophp_search_pages`, a
+  new schema step).
+- **Documents and PDFs** (`CattoPHP\Document`, switched on by `cattophp.documents`, with dompdf/dompdf): a template
+  language that is not a programming language (`{{ group.name }}`, `{{#each}}`, `{{#if}}…{{else}}`; `TemplateParser`),
+  checked against the placeholders a document type allows with every problem said at once, a close name suggested
+  (`TemplateValidator`, `PlaceholderSet`, `PlaceholderDefinition`, `CollectionDefinition`, `PlaceholderKind`), the HTML
+  and CSS a template may hold (`HtmlPolicy`, `CssPolicy`: nothing executable or fetched, pictures embedded), each value
+  written by its kind and escaped, money in the installation's locale and dates in its time zone (`ValueFormatter`),
+  page settings from a controlled list (`PageSettings`), one renderer for previews, documents and PDFs that refuses data
+  that does not fit (`DocumentRenderer`, `DocumentDataException`, `TemplateValidationException`), a project's stored
+  pictures embedded as they are drawn (`DocumentImages`), the rendered document with the template version that made it
+  (`RenderedDocument`), and PDFs through Dompdf with the project's fonts, a page of the site set out for print, and where
+  chosen boxes were laid out (`PdfRenderer`). dompdf/dompdf is a development requirement and a suggestion.
+- **An API** (`CattoPHP\Api`, switched on by `cattophp.api`, with the database): tokens issued to an account with a name,
+  the project's scopes and an optional lifetime, shown once and kept only as their SHA-256, listed and revoked, each use
+  noted (`ApiTokens`, `cattophp_api_tokens`, a new schema step); whether an account may use the API (`ApiAccounts`); the
+  identity a request acts for with its roles, permissions and scopes (`ApiIdentity`) and the scope and permission checks
+  for code that is not a route (`ApiAccess`); the Bearer authenticator that is also the API firewall's entry point
+  (`ApiTokenAuthenticator`, `ApiUser`), the scope voter beside the permission voter (`ApiScopeVoter`), and one JSON error
+  document for refusals and for exceptions under the API's path (`ApiProblem`, `ApiExceptionListener`).
+- **Signed webhooks** (`CattoPHP\Webhooks\WebhookSignature`): the header a sender makes ("t=<time>,v1=<HMAC-SHA256 of
+  time.body>") and the receiver checks, within five minutes, with secrets that can be rotated.
+- **The network lookup** (`CattoPHP\Network`, configured by `cattophp.network`): what an address says about a visitor,
+  looked up on the server unless a project names a web service: its country and place through Geocoder PHP (`GeoIp`:
+  its GeoIP2 provider over a MaxMind country or city database, or another Geocoder provider named by `network.geocoder`,
+  such as a chain that falls back from one to the next), its network from the GeoLite2 ASN database, and whether the published lists name it a Tor exit, a VPN network or a hosting network,
+  or an email domain a throwaway one (`ReputationLists`, fetched into a folder, never at a visitor's request), together
+  `GeoIpNetworkLookup`, which can be made before a project's container. `NetworkLookup`, `NetworkFacts` and
+  `NoNetworkLookup` move here from `Protection` (site protection's `protection.network_lookup` is now `network.lookup`),
+  and the facts say each list's answer beside the one kind the Site Log shows. geocoder-php/geoip2-provider is a
+  development requirement and a suggestion.
+- **The sign-up check** (`CattoPHP\Signup`, switched on by `cattophp.signup`, with the database): each registration
+  judged when its form is sent (the address's country and network, the email domain, the browser, the time the form was
+  open by a signed stamp, the browser's time zone, a hidden field, earlier sign-ups from the address), scored and banded
+  with each signal in words (`SignupRisk`, `RiskAssessment`), a throwaway address refused, and recorded with its outcome
+  (`SignupChecks`, `SignupAttempts`, `cattophp_signup_attempts`, a new schema step); the allowed and blocked countries as
+  settings (`SignupCountries`, `SignupSettingGroup`); whether a domain receives mail (`MailDomainCheck`); and the daily
+  task that fetches the lists (`SignupListsTask`).
+- **Identity verification** (`CattoPHP\Identity`, switched on by `cattophp.identity`, with the database): a check on
+  Didit's hosted page started and its result taken by webhook or on the person's return (`DiditClient`, `DiditSignature`
+  with the signatures of a rotated secret, `IdentityDecision`), at most three declined tries until an administrator allows
+  another, revocation with a reason, every event in the activity log without the document number or date of birth, a live
+  site never taking a sandbox result (`IdentityVerification`, `IdentitySettings`); the checks, the webhook events handled
+  and the tries allowed again kept (`IdentityChecks`, three tables in a new schema step); what Didit is told of an account
+  (`IdentityAccounts`) and what a project does when one is approved (`IdentityApproved`, only from `identity.minimum_age`).
+- **The Inbox** (`CattoPHP\Inbox`, switched on by `cattophp.inbox`, with the database): a contact form's message kept as a
+  conversation with its reference (MSG-000043, the prefix configurable) and judged by the spam check when it arrives (the
+  fixed signs, `SpamSigns`, and a Bayesian word filter, `SpamFilter`, whose say grows with what it has learnt), then filed
+  in the Inbox or in Spam without the sender being told; Mark as spam and Not spam teaching the filter, blocked senders,
+  the Trash with Restore and Delete forever, drafts, the daily clean-up after the keeping settings (`Inbox`,
+  `InboxStore`, six tables in a new schema step); replies in plain text or HTML with signatures, files and the account's
+  own documents, threaded by Message-ID and the reference in the subject (`InboxReplies`, `InboxHtml`, with
+  `InboxDocuments` and `ReplySender` for a project's documents and mail); answers read from a mailbox over IMAP every
+  minute and filed into their conversations (`InboxMailbox`, `ImapMailbox`, `MimeMessage`, the `inbox_mailbox` task);
+  and the Inbox settings (`InboxSettings`, `InboxSettingGroup`, INBOX_*).
+- **Countries and the South Africa pack** (`Country\Countries`, `SouthAfrica\IdNumber`, `SouthAfrica\Provinces`): every
+  ISO 3166-1 country with its name and a drop-down list with a project's own countries first; South African ID numbers
+  checked as well formed, masked and fingerprinted (HMAC-SHA256 of `sa-id:` and the digits with the project's key, the
+  form cattolms keeps); the nine provinces. Taken from cattolms.
+- **Mailing, part 4: the figures** (`Mailing\MailingFigures`): for a period, the copies handed on and what became of them,
+  by kind and by campaign (of the kinds a project counts), forwards, the people who joined or left a list, the most
+  clicked links and the copies in each hour, day, week or month; for an overview, subscribers and who joined lately, the
+  lists with someone on them by kind, campaigns sent lately, bounces and complaints since a moment, the lists most joined
+  and the campaigns scheduled.
+- **Mailing, part 3, second half: the links in a copy and Forward to a friend** (`Mailing\CopyLinks`, `Forwards`): the
+  opening picture and tracked links (recorded only as the project's rules say, `SendingRules::$trackOpens`/`$trackClicks`),
+  a sent copy found by its token, whether a copy has stopped its list; a copy forwarded to at most five friends, ten a day
+  per person, never to the person's own address, an address never emailed or the same friend twice, the friend's copy
+  drawn by the project (`CampaignProject::drawForFriend`) and sent through the site's mail, `mailing.forwarded` in the
+  activity log, and the friend's "Never email me". Table `cattophp_mailing_forwards` (schema step
+  `202611122340-mailing-forwards`).
+- **Mailing, part 3, first half: campaigns, copies and the sender** (`Mailing\Campaigns`, `Copies`, `Links`, `CopyOutcomes`,
+  `CampaignSender`, `CampaignProject`, `DrawnCopy`, `SendingRules`, `CattoMail\CopyEvents`): campaigns with their kind,
+  words, content in the project's form, lists, status and figures; each person's copy with its token, reasons, status,
+  opens and clicks; the links in a campaign and who clicked them; the sender (audience taken when a campaign starts, the
+  sending hours, the hourly limit and gentle first days, copies skipped when they should not go, a pause above the bounce
+  or complaint rates unless overridden, a refusal pausing with why, a busy transport waiting, catto-mail's outcomes read
+  back); what becomes of a copy (forward only; a hard bounce or a complaint never emailed again, a complaint stopping
+  every list, an unsubscribe link stopping the lists that brought the copy or all); catto-mail's events applied to copies
+  by CattoPHP itself. Tables `cattophp_mailing_campaigns`, `cattophp_mailing_copies`, `cattophp_mailing_links`,
+  `cattophp_mailing_link_clicks` (schema step `202611122330-mailing-campaigns`, with a trigger making an address never
+  emailed forget a deleted copy).
+- **Mailing, part 2: lists and consent** (`Mailing\MailingLists`, `Subscriptions`, `Consents`, `Suppressions`): a list for
+  each kind and subject a project offers to follow, made at the first yes (a no to a list nobody joined makes none), and an
+  administrator's own lists (a name, words, shown or not, a join link, open or closed, a sender name and reply-to); each
+  person's answer (subscribed, unsubscribed, or pending for a list confirmed by link) with where it was given, and every
+  change kept; joining, stopping one list or every list, recorded in the activity log as `mailing.subscribed`,
+  `mailing.unsubscribed` and `mailing.unsubscribed_all`; the addresses never emailed (a hard bounce, a complaint, by hand)
+  with why, the copy that caused it and who added it. Tables `cattophp_mailing_lists`, `cattophp_mailing_subscriptions`,
+  `cattophp_mailing_subscription_events`, `cattophp_mailing_suppressions` (schema step `202611122320-mailing-lists`).
+- **Mailing, part 1: sending** (`Mailing\`, `Mailing\CattoMail\`, the `mailing` module): Settings > Mailing (`MAILING_*`,
+  `CATTOMAIL_*`, the secrets encrypted, each checked), a mail server transport whose copies carry List-Unsubscribe,
+  List-Unsubscribe-Post, List-Id and Feedback-ID (a project may say where made-up addresses are delivered,
+  `RecipientAddresses`), a catto-mail transport (a send job per list, copies 500 at a time with their references,
+  idempotency keys, outcomes read back), catto-mail's client (busy answers asked again, a used-up quota with when it
+  resets, refusals with catto-mail's words, status and problem type), its connection (PKCE connect, the sending domain,
+  check, disconnect, forget, test) and its webhook (`CattoMailWebhook::answer()`; each event kept once in
+  `cattophp_cattomail_events` and given to the project's `CattoMailEventHandler` services). Tables
+  `cattophp_cattomail_connection` and `cattophp_cattomail_events` (schema step `202611122310-cattomail`). Taken from
+  cattolms, decided with ctnlist's catto-mail code beside it.
+- **Choosing modules** (`Module\Modules`, `Module\Module`): every optional module declares in one place what it is, whether
+  it keeps records in the database, the modules it needs beside it and those it works better with, the packages it needs,
+  and the schema steps that make its tables. When a project starts, what its modules need is checked and every problem is
+  said at once with what to do; `cattophp:migrate` makes only the foundations' tables and those of the modules switched on
+  (a module switched on later gets its tables then; one switched off keeps its data); `cattophp:modules` lists every
+  module, whether it is on, what it needs and its tables. Each module is proved to start alone with its own tables
+  (`ModulesKernelTest`). Site protection now needs the scheduler switched on.
+- **A form's time stamp** (`Http\FormStamp`): when a public form was opened, signed with the application key, and the
+  seconds it was open when it is sent; the sign-up check and the contact form share it.
+- The code check names the file of Symfony's container functions (`scanFiles`), which no autoloader names.
+- Fixed: a page's layout measured the memory in use to decide whether it had room, but PHP's limit applies to the memory
+  taken from the system, which stays taken after a large piece of work; it measures that now (`HtmlLayout`), so a large
+  page is served as it came rather than running out of memory. The test suite runs with 512M.
+- Updated: doctrine/dbal 4.5.1 in the development lock (a patch release; nothing CattoPHP uses changed).
+- A list search's help line stays under its field when a project lays the search out as a column.
 
 ## 0.2.5 · 12 November 2026
 
