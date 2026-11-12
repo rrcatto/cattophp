@@ -5,6 +5,8 @@
 	htmx's own condition is code it compiles, which the content policy refuses. It is shown only with JavaScript. Its
 	request carries X-Live-Refresh, and the controller marks it as no visit (Http\LiveRefresh::notAVisit).
 	live_seconds: 15 for a list of what is happening now, 30 for figures and for records that a job changes once a minute.
+	live_held: what it says while it holds still because the reader has opened something marked data-live-hold (such as a
+	row opened to read what an address did, which a refresh would otherwise close); optional.
 #}
 <div id="catto-live" class="cl-live-status small" data-live-status hidden hx-morph-skip
      data-live-seconds="{{ live_seconds }}" hx-get="" hx-trigger="catto-live-refresh"
@@ -12,6 +14,7 @@
      hx-headers='{"X-Live-Refresh":"1"}' hx-status:4xx="swap:none" hx-status:5xx="swap:none">
 	<span class="cl-live-dot" aria-hidden="true"></span>
 	<span data-live-running>Updates by itself every {{ live_seconds }} seconds.</span>
+	{% if live_held|default('') %}<span data-live-held hidden>{{ live_held }}</span>{% endif %}
 	<span data-live-paused hidden>Paused. It stays as it is until you press Resume.</span>
 	<span data-live-when></span>
 	{{ ui('action.button', {label: 'Pause', type: 'button', icon: 'action-pause', id: 'live-pause', variant: 'secondary', size: 'small'}) }}

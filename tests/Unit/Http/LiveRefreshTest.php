@@ -31,6 +31,9 @@ final class LiveRefreshTest extends TestCase
         self::assertStringContainsString('Updates by itself every 15 seconds.', $html);
         self::assertSame(1, $xpath->query('//button[@id="live-pause"]')->length);
         self::assertSame(1, $xpath->query('//button[@id="live-resume" and @hidden]')->length);
+        self::assertSame(0, $xpath->query('//*[@data-live-held]')->length, 'Nothing to hold for, nothing said.');
+        $held = UiHarness::xpath(UiHarness::source("{% include '@CattoPHP/page/live-status.html.twig' %}", ['live_seconds' => 15, 'live_held' => 'Holding still while you read that row.']));
+        self::assertSame('Holding still while you read that row.', $held->query('//span[@data-live-held and @hidden]')->item(0)?->textContent);
         $form = UiHarness::source("<form method=\"get\" action=\"/people\" {% include '@CattoPHP/page/in-place-attrs.html.twig' %}></form>", ['in_place_action' => '/people']);
         self::assertStringContainsString('hx-get="/people" hx-target="#cl-main" hx-select="#cl-main" hx-swap="outerMorph" hx-push-url="true" hx-sync="#cl-main:replace"', $form);
     }

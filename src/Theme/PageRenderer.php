@@ -39,6 +39,31 @@ final class PageRenderer
     public function render(string $page, array $data = []): string
     {
         self::assertName($page, 'page template');
+
+        return $this->draw($page, $this->templates->pageTemplate($page), $data);
+    }
+
+    /**
+     * A page whose template is not one of the project's pages, such as CattoPHP's sign-in and error pages or a project's
+     * replacement of them under `templates/bundles/CattoPHPBundle/`: drawn the same way as the page named $page (its
+     * family, the project's model, the theme), so the template may extend `layout` and wear the theme's frame. A template
+     * that extends nothing is served as it is, with the generator tag.
+     *
+     * @param array<string,mixed> $data
+     */
+    public function renderTemplate(string $page, string $template, array $data = []): string
+    {
+        self::assertName($page, 'page template');
+        if (preg_match('#^@[A-Za-z][A-Za-z0-9]*/[a-zA-Z0-9_/-]+\.html\.twig$#', $template) !== 1) {
+            throw new RuntimeException('Invalid template.');
+        }
+
+        return $this->draw($page, $template, $data);
+    }
+
+    /** @param array<string,mixed> $data */
+    private function draw(string $page, string $template, array $data): string
+    {
         self::assertData($data);
 
         [$themeKey, $previewActive] = $this->resolveTheme($data);
@@ -50,7 +75,7 @@ final class PageRenderer
         // While the page is drawn, |authored marks the project's authored HTML for the layout (HtmlLayout::asWritten).
         $this->layout?->begin();
         try {
-            $html = $this->twig->render($this->templates->pageTemplate($page), $context);
+            $html = $this->twig->render($template, $context);
         } finally {
             $this->layout?->end();
         }

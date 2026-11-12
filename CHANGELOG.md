@@ -2,6 +2,32 @@
 
 What each version of CattoPHP brought, newest first.
 
+## Unreleased
+
+## 0.2.5 · 12 November 2026
+
+For a project drawing its pages in a theme: links that change the page in place and say whether what they open is open,
+a live line that holds still while something is open to read, tables that may keep their natural widths, cards named by
+their headings, and CattoPHP's own sign-in and error pages drawn in the project's theme. A list search's help line sits
+under its field. Nothing changes for a project that uses none of these, and nothing to migrate: a project with its own
+replacements of the sign-in or error pages that extend a base of their own keeps them as they are.
+
+- Added: `action.link` can change the page in place (`in_place: true`: the in-place attributes a GET form carries, aimed at the
+  link's own address) and say whether what it opens is open (`expanded`, as `action.button` does).
+- Added: the live line holds still while the reader has something open to read: anything marked `data-live-hold` in the page.
+  It then says so in the page's own words (`live_held`, optional), and it is drawn again after a swap settles and on
+  Back and Forward.
+- Added: `data.table`'s `fit` (true unless set): `fit: false` keeps a table's natural column widths, scrolling sideways
+  in its box on a narrow screen, where the script would otherwise share the width out among its columns.
+- Added: `PageRenderer::renderTemplate()`, which draws a template that is not one of the project's pages in the theme,
+  as the page it is named as. CattoPHP's sign-in pages and its own error page (`TwigErrorPageDrawer`) use it when the
+  project draws its pages with the page renderer (`theme.pages`), so a project's replacements of them under
+  `templates/bundles/CattoPHPBundle/` may extend `layout`. Should the theme fail, the error page is drawn alone.
+- Fixed: a list search's help line sits right under its field, with space below it before the list's own controls (it
+  sat nearer the controls below, so it read as their label).
+- Added: a card named by its heading, for screen readers: `layout.surface`'s `labelledby` (its `aria-labelledby`) and
+  `layout.section-head`'s `heading_id` (its heading's id), each an element's id or nothing.
+
 ## 0.2.4 · 11 November 2026
 
 The interface system and themes: the component registry with its 34 components, the page frame, lists, pages that

@@ -46,6 +46,26 @@ final class ComponentTemplatesTest extends TestCase
         self::assertStringContainsString('#action-add', UiHarness::source("{{ ui('action.link', {label: 'Create', href: '/create', icon: 'action-add'}) }}"));
     }
 
+    /** A table is fitted to the page by the script unless it asks to keep its natural widths and scroll sideways. */
+    public function testATableCanKeepItsNaturalWidths(): void
+    {
+        self::assertStringNotContainsString('data-column-fit', UiHarness::render('data.table'));
+        self::assertStringContainsString('<div class="cl-ui-table" data-density="normal" data-column-fit="off">', UiHarness::render('data.table', ['fit' => false]));
+    }
+
+    /** A link that changes the page in place carries what a GET form does, aimed at its own address; one that opens something says whether it is open. */
+    public function testALinkCanChangeThePageInPlaceAndSayWhetherItOpensSomething(): void
+    {
+        $html = UiHarness::render('action.link', ['label' => 'Next', 'href' => '/items?page=2', 'in_place' => true]);
+        self::assertStringContainsString(' hx-get="/items?page=2" hx-target="#cl-main" hx-select="#cl-main" hx-swap="outerMorph" hx-push-url="true" hx-sync="#cl-main:replace"', $html);
+        self::assertStringContainsString('href="/items?page=2"', $html, 'Without JavaScript it is an ordinary link.');
+        $plain = UiHarness::render('action.link', ['label' => 'Next', 'href' => '/items?page=2']);
+        self::assertStringNotContainsString('hx-', $plain);
+        self::assertStringNotContainsString('aria-expanded', $plain);
+        self::assertStringContainsString('aria-expanded="true"', UiHarness::render('action.link', ['label' => 'Close', 'href' => '/items', 'expanded' => true]));
+        self::assertStringContainsString('aria-expanded="false"', UiHarness::render('action.link', ['label' => 'Open', 'href' => '/items?open=1', 'expanded' => false]));
+    }
+
     public function testFiguresEscapeTheirWordsAndShowOnlyWhatTheyAreGiven(): void
     {
         $html = UiHarness::render('data.stat-card', ['value' => 24, 'label' => '<Items>']);

@@ -287,6 +287,8 @@ final class CattoPHPBundle extends AbstractBundle
         // The theme system, for a project with themes: their packages checked, installed, published, chosen and previewed,
         // and Twig's @theme pointed at the theme a request is drawn in.
         $theme = $config['theme'];
+        // CattoPHP's own pages (sign-in, and the error page when CattoPHP draws it) wear the theme when the project draws its pages with it.
+        $themedPages = $theme['enabled'] && $theme['pages'] !== null;
         if ($theme['enabled']) {
             $services->set(PackageValidator::class)->args([$theme['package_format'], $theme['page_families']]);
             $services->set(Publisher::class);
@@ -317,7 +319,7 @@ final class CattoPHPBundle extends AbstractBundle
             ->tag('kernel.event_listener', ['event' => KernelEvents::RESPONSE, 'method' => 'onResponse', 'priority' => -32]);
         if ($errors['enabled']) {
             if ($errors['drawer'] === TwigErrorPageDrawer::class) {
-                $services->set(TwigErrorPageDrawer::class)->args([service('twig')]);
+                $services->set(TwigErrorPageDrawer::class)->args([service('twig'), $themedPages ? service(PageRenderer::class) : null]);
             }
             $services->set(ErrorPageListener::class)
                 ->args([service($errors['drawer']), service('logger'), param('kernel.debug'), $errors['skip_paths']])
@@ -341,6 +343,7 @@ final class CattoPHPBundle extends AbstractBundle
                     service(SignInLinks::class), service(SignInAccounts::class), service(SignInRules::class), service(SignInFlow::class),
                     service(TwoStep::class), service(FormToken::class), service('security.helper'), service(Installation::class),
                     service(ActivityLog::class), service('twig'), service('router'), service('logger'), service('clock'), $signIn['after'],
+                    $themedPages ? service(PageRenderer::class) : null,
                 ])
                 ->public()
                 ->tag('controller.service_arguments');

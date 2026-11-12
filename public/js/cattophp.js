@@ -438,7 +438,8 @@
        of what is left gets all it needs, and the columns that need more share the rest equally, so a cell is cut short
        only when the table truly cannot hold everything. When everything fits, the spare width goes to each column in
        proportion to what it holds. The widths are kept as percentages of the table, and worked out again when the
-       window changes size, a page turns or a closed section opens. Without JavaScript the server's percentages stand. */
+       window changes size, a page turns or a closed section opens. Without JavaScript the server's percentages stand.
+       A table drawn with fit: false (data-column-fit="off") keeps its natural widths and scrolls sideways in its box. */
     // The one-line columns share space as above; a column whose text wraps (cell-text, such as a long title) loses
     // nothing by being narrower, so it gives way: it keeps a floor of 10rem and takes whatever the others leave.
     const waterFill = (needs, indexes, available, widths) => {
@@ -471,6 +472,7 @@
     const fitTableColumns = root => {
       const scope = root instanceof Element ? root : document;
       within(scope, '.cl-ui-table').forEach(wrapper => {
+        if (wrapper.dataset.columnFit === 'off') return;
         const table = wrapper.querySelector(':scope > table');
         const head = table && table.tHead && table.tHead.rows[0];
         if (!head || !wrapper.clientWidth) return;
@@ -711,7 +713,8 @@
 
 /* A page that shows live data refreshes itself in place (@CattoPHP/page/live-status.html.twig).
    It holds back while the reader is busy, so a refresh never takes what they are looking at: typing, text selected, a menu
-   open, a later page whose rows would otherwise move, or a tab out of sight. Pause holds it for this tab. */
+   open, something they opened to read (data-live-hold, which the line names with its live_held words), a later page whose
+   rows would otherwise move, or a tab out of sight. Pause holds it for this tab. */
 (function () {
     var KEY = 'cattophp:live-paused';
     var paused = false;
@@ -730,16 +733,18 @@
         var selection = window.getSelection ? window.getSelection() : null;
         return !!selection && !selection.isCollapsed && selection.toString().trim() !== '';
     }
+    function holding() { return !!document.querySelector('[data-live-hold]'); }
     window.cattoLive = {
         mayRefresh: function () {
-            return !paused && document.visibilityState === 'visible' && !typing() && !selecting() && !onALaterPage()
+            return !paused && document.visibilityState === 'visible' && !typing() && !selecting() && !onALaterPage() && !holding()
                 && !document.querySelector('.cl-main details[open], dialog[open], [aria-modal="true"]:not([hidden])');
         }
     };
     function show(selector, shown) { document.querySelectorAll(selector).forEach(function (element) { element.hidden = !shown; }); }
     function draw() {
         show('[data-live-status]', true);
-        show('[data-live-running]', !paused);
+        show('[data-live-running]', !paused && !holding());
+        show('[data-live-held]', !paused && holding());
         show('[data-live-paused]', paused);
         show('#live-pause', !paused);
         show('#live-resume', paused);
@@ -759,6 +764,9 @@
         else if (event.target.closest('#live-resume')) { hold(false); var pause = document.getElementById('live-pause'); if (pause) pause.focus(); }
     });
     document.addEventListener('htmx:after:swap', function () { draw(); stamp(); });
+    document.addEventListener('htmx:after:settle', draw);
+    // Back and Forward bring back a page that may hold something open, or no longer does.
+    window.addEventListener('popstate', function () { setTimeout(draw, 0); });
     function start() { draw(); stamp(); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true}); else start();
 })();

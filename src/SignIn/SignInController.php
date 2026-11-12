@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use CattoPHP\Theme\PageRenderer;
 use Twig\Environment;
 
 /**
@@ -44,6 +45,7 @@ final class SignInController
         private readonly LoggerInterface $logger,
         private readonly ClockInterface $clock,
         private readonly string $after = '/',
+        private readonly ?PageRenderer $pages = null,
     ) {
     }
 
@@ -217,10 +219,15 @@ final class SignInController
         return $this->page('@CattoPHP/sign_in/start.html.twig', ['title' => 'Sign in', 'note' => $note, 'return' => $return ?? '']);
     }
 
-    /** @param array<string,mixed> $context */
+    /**
+     * A project with themes draws the page in its theme (the page named sign-in, whose template may extend `layout`);
+     * any other draws the template alone.
+     *
+     * @param array<string,mixed> $context
+     */
     private function page(string $template, array $context): Response
     {
-        return new Response($this->twig->render($template, $context));
+        return new Response($this->pages !== null ? $this->pages->renderTemplate('sign-in', $template, $context) : $this->twig->render($template, $context));
     }
 
     private function redirect(string $to): RedirectResponse

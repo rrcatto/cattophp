@@ -42,8 +42,12 @@ final class PageRendererTest extends TestCase
         file_put_contents($this->site->root . '/pages/pages/bare.html.twig', 'no head here');
         file_put_contents($this->site->root . '/pages/frame.html.twig', '<!doctype html><html><head><title>Frame</title></head><body><article>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}</article></body></html>');
         file_put_contents($this->site->root . '/pages/partials/count.html.twig', '<span>{{ site }}: {{ count }}</span>');
+        mkdir($this->site->root . '/own/sign_in', 0775, true);
+        file_put_contents($this->site->root . '/own/sign_in/start.html.twig', "{% extends layout %}{% block page_body %}<h1>{{ title }}</h1>{% endblock %}");
+        file_put_contents($this->site->root . '/own/alone.html.twig', '<!doctype html><html><head><title>Alone</title></head><body><p>{{ title }}</p></body></html>');
         $loader = new FilesystemLoader();
         $loader->setPaths([$this->site->root . '/pages'], Templates::PLATFORM_NAMESPACE);
+        $loader->setPaths([$this->site->root . '/own'], 'Own');
         $this->twig = new Environment($loader, ['strict_variables' => true, 'autoescape' => 'html']);
         $this->templates = new Templates($loader);
         $this->themes = $this->site->manager();
@@ -143,6 +147,27 @@ final class PageRendererTest extends TestCase
         $this->expectExceptionMessage($message);
         /** @var array<string,mixed> $data */
         $this->renderer()->render($page, $data);
+    }
+
+    /** CattoPHP's own pages (sign-in, the error page) wear the theme as the page they are named as; one that extends nothing is served alone. */
+    public function testATemplateThatIsNotAProjectPageIsDrawnInTheThemeToo(): void
+    {
+        $html = $this->renderer()->renderTemplate('sign-in', '@Own/sign_in/start.html.twig', ['title' => 'Sign in']);
+        self::assertStringContainsString('<meta name="generator" content="Example 1.2.0">', $html);
+        self::assertStringContainsString('<link rel="stylesheet" href="/themes/plain-v1.2.0/css/theme.css', $html, 'The theme\'s frame is drawn around it.');
+        self::assertStringContainsString('<h1>Sign in</h1>', $html);
+        self::assertStringContainsString('class="family-content"', $html, 'The project\'s model is drawn for the page it is named as.');
+        $alone = $this->renderer()->renderTemplate('error', '@Own/alone.html.twig', ['title' => 'Not found']);
+        self::assertStringContainsString('<meta name="generator" content="Example 1.2.0">', $alone);
+        self::assertStringContainsString('<p>Not found</p>', $alone);
+        foreach (['Own/sign_in/start.html.twig', '@Own/../pages/home.html.twig', '@Own/sign_in/start.twig'] as $refused) {
+            try {
+                $this->renderer()->renderTemplate('sign-in', $refused, ['title' => 'x']);
+                self::fail('A template name was accepted: ' . $refused);
+            } catch (RuntimeException $error) {
+                self::assertSame('Invalid template.', $error->getMessage());
+            }
+        }
     }
 
     public function testAFragmentNameIsChecked(): void

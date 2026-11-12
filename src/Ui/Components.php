@@ -26,14 +26,14 @@ final class Components
 
     /** Each component's template under `@CattoPHP/ui/` and its properties' defaults (null: required). */
     public const COMPONENTS = [
-        'layout.surface' => ['template' => 'layout/surface', 'defaults' => ['variant' => 'standard', 'section_spacing' => false, 'id' => '', 'sticky' => false, 'tone' => 'neutral']],
+        'layout.surface' => ['template' => 'layout/surface', 'defaults' => ['variant' => 'standard', 'section_spacing' => false, 'id' => '', 'sticky' => false, 'tone' => 'neutral', 'labelledby' => '']],
         // columns 'main-side': a main column and a narrower side column.
         'layout.section-grid' => ['template' => 'layout/section-grid', 'defaults' => ['columns' => 'auto', 'section_spacing' => true]],
-        'layout.section-head' => ['template' => 'layout/section-head', 'defaults' => ['eyebrow' => '', 'heading' => null, 'summary' => '', 'heading_level' => 2]],
+        'layout.section-head' => ['template' => 'layout/section-head', 'defaults' => ['eyebrow' => '', 'heading' => null, 'summary' => '', 'heading_level' => 2, 'heading_id' => '']],
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
         'layout.tabs' => ['template' => 'layout/tabs', 'defaults' => ['items' => null, 'current' => '', 'aria_label' => null]],
-        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'close_disclosure' => false, 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'swap' => 'innerHTML', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
+        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'close_disclosure' => false, 'in_place' => false, 'expanded' => null, 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'swap' => 'innerHTML', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
         // hook: a word the project's own script finds the button by, data-<hook> (such as a picker's "add one" switch).
         'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'icon_only' => false, 'get' => '', 'target' => '', 'select' => '', 'swap' => 'innerHTML', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'form_action' => '', 'form_target' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'hook' => '']],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
@@ -53,7 +53,7 @@ final class Components
         // form (field mode): the choice belongs to a form elsewhere on the page (a row edited in place).
         'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit', 'form' => '']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
-        'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
+        'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '', 'fit' => true]],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
         'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto', 'density' => 'normal'], 'props' => ['columns' => ['auto', 1, 2, 3, 4, 5]]],
         // A list shown as cards: the grid holds whole rows of cards, 4 or 5 to a row at full width, fewer on a narrow
@@ -242,6 +242,12 @@ final class Components
                 throw new InvalidArgumentException('Invalid semantic UI value: ' . $component . '.workspace');
             }
             $enums['summary_tone'] = ['', 'success', 'danger', 'neutral'];
+        }
+        // A card named by its heading (aria-labelledby on the card, the id on its heading): each an element's id or nothing.
+        foreach (['layout.surface' => 'labelledby', 'layout.section-head' => 'heading_id'] as $owner => $key) {
+            if ($component === $owner && (!is_string($values[$key]) || ($values[$key] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values[$key]) !== 1))) {
+                throw new InvalidArgumentException('Invalid semantic UI value: ' . $component . '.' . $key);
+            }
         }
         if ($component === 'action.button' && (!is_string($values['hook']) || preg_match(self::WORD, $values['hook']) !== 1)) {
             throw new InvalidArgumentException('Invalid semantic UI value: ' . $component . '.hook');

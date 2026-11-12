@@ -186,7 +186,10 @@ summary{display:list-item;cursor:pointer}
 .lookup-hint{margin:.25rem 0 0;font-size:.85rem}
 .cl-ui-modal-card--wide{max-width:60rem;width:100%}
 .cl-ui-modal-foot:empty{display:none}
-.dataset-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem}
+.dataset-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.35rem .75rem;margin-bottom:1.25rem}
+.dataset-search .help{flex:0 0 100%;margin:0}
+/* Where the field takes the whole width, the search's status and Clear go after the help line, which stays right under the field. */
+@media(max-width:900px){.dataset-search .help{order:1}.dataset-search-actions{order:2}}
 .dataset-search .cl-ui-field{flex:1 1 20rem;min-width:0;margin:0}
 .dataset-search input[type=search]{width:100%}
 .dataset-search-actions{display:flex;gap:.5rem;align-items:center}

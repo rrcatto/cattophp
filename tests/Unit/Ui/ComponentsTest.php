@@ -105,6 +105,22 @@ final class ComponentsTest extends TestCase
         }
     }
 
+    public function testACardIsNamedByItsHeading(): void
+    {
+        $html = UiHarness::source("{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'rules-title'})} %}{% block surface_body %}{{ ui('layout.section-head', {heading: 'Rules', heading_id: 'rules-title'}) }}{% endblock %}{% endembed %}");
+        self::assertStringContainsString('aria-labelledby="rules-title"', $html);
+        self::assertStringContainsString('<h2 id="rules-title">Rules</h2>', $html);
+        self::assertStringNotContainsString('aria-labelledby', UiHarness::render('layout.surface'), 'Without one, the card names nothing.');
+        foreach (['layout.surface' => ['labelledby' => 'Rules Title'], 'layout.section-head' => ['heading' => 'Rules', 'heading_id' => '"><b>']] as $name => $properties) {
+            try {
+                UiHarness::components()->properties($name, $properties);
+                self::fail('Not an element id: ' . $name);
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString('Invalid semantic UI value', $exception->getMessage());
+            }
+        }
+    }
+
     public function testTabItemsAreBounded(): void
     {
         foreach ([[], [['key' => 'a', 'label' => 'A']], [['key' => 'a', 'label' => 'A', 'href' => '/', 'class' => 'x']], [['key' => '', 'label' => 'A', 'href' => '/']]] as $items) {
