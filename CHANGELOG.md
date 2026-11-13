@@ -2,6 +2,544 @@
 
 What each version of CattoPHP brought, newest first.
 
+## 1.0.0 · 13 November 2026
+
+### Upgrading from 0.3
+
+What a project on 0.3.0 does or needs to know. Run `composer update rrcatto/cattophp`, then `bin/console cattophp:migrate`
+(`--dry-run` lists what it would apply).
+
+**Breaking changes**
+
+- The extension interfaces no longer carry a `TAG` constant (`SettingsProvider`, `PermissionProvider`, `SchemaStep`,
+  `ComponentSet`, `DrawingCheck`, `ActionWords`, `DetailWords`, `SubjectLinks`, `ForgetsAccounts`, `ScheduledTask`,
+  `SetupStepProvider`, `CattoMailEventHandler` and `SitemapSource`), nor `PublicPageProvider` its `PAGES_TAG`: one class
+  implementing two of them could not load ("inherits both ... ::TAG ..., which is ambiguous"), and static analysis did
+  not say so. Every tag is a constant of `CattoPHP\ServiceTags`, one for each extension point, each with what it finds
+  (`ServiceTags::SCHEDULED_TASK`, `SETTINGS`, `PERMISSIONS`, `SCHEMA_STEP`, `COMPONENT_SET`, `DRAWING_CHECK`,
+  `ACTION_WORDS`, `DETAIL_WORDS`, `SUBJECT_LINKS`, `FORGETS_ACCOUNTS`, `SETUP_STEPS`, `CATTOMAIL_EVENT_HANDLER`,
+  `SITEMAP_SOURCES`, `PUBLIC_PAGES`), and `ServiceTags::EXTENSION_POINTS` maps each interface to its tag. The tags' names
+  are unchanged (`cattophp.scheduled_task` and the rest), so a project that tags by the name in YAML changes nothing; one
+  that wrote `ScheduledTask::TAG` (or another interface's) in PHP writes `ServiceTags::SCHEDULED_TASK`. A class may now
+  implement several extension interfaces, such as a `DetailWords` and a `SubjectLinks` for the same records.
+- `Search\PageHead`'s constructor no longer takes `EnvironmentValues` (the third argument): the language comes from
+  `Installation::language()`. A project that builds `PageHead` itself drops that argument; with the bundle's own service
+  nothing changes.
+- Interfaces that gained methods, which a project's own implementation must add:
+  - `Activity\ActivityStore`: `count()`, `actions()` and `forgetAccount(string $accountId, string $name, array $words = []): int`,
+    and `recent()` takes a last `int $offset = 0`;
+  - `Access\RoleStore::forgetAccount(string $accountId): int`, `revokeUnlessLast(string $accountId, string $roleKey): bool` (the
+    role taken away unless the account is its last holder, as one locked step) and `lockHolders(string $roleKey): array`
+    (the holders, locked until the transaction around the call ends);
+  - `Scheduler\RunStore::tried(string $key, DateTimeImmutable $at, bool $ok, string $summary): void` (a trial run, kept apart),
+    and each record of `all()` gains `last_trial_at` (?string), `last_trial_ok` (?bool) and `last_trial_summary` (string);
+  - `Links\LinkStore::forgetAccount(string $accountId, ?string $email): int`;
+  - `Sessions\SessionStore::forgetAccount(string $accountId): int`;
+  - `Settings\SettingsStore::forgetAccount(string $accountId): int`;
+  - `Setup\SetupMarkStore::forget(string $account): int`;
+  - `Security\TwoStep\TwoStepStore::forget(string $accountId): bool` now returns whether there was a key (it returned
+    nothing).
+- `forget()` returns how many records it changed, where it returned nothing: `Mailing\Campaigns`, `Copies`, `Forwards`,
+  `MailingLists`, `Subscriptions` and `Suppressions`. New `forget()` or `forgetAccount()` on `Protection\SiteLog`,
+  `Flags`, `Lockouts`, `RefusedEmails`, `Telegram\TelegramAccounts`, `TelegramLog`, `TelegramState`, `Api\ApiTokens`,
+  `Signup\SignupAttempts`, `Identity\IdentityChecks`, `Search\PageOverrides` and `Inbox\InboxStore`.
+- Renamed: `disconnect()` is `dropConnection()` on `Telegram\TelegramSetup`, `TelegramConnections`, `TelegramAccounts`,
+  `Mailing\CattoMail\CattoMailConnection` and `CattoMailClient`. The Telegram bot's saved flag `disconnected` is
+  `connection_dropped` (also the key of `TelegramSetup::view()`); a `disconnected` already saved is not read, so a bot
+  dropped before shows as not dropped until it is dropped again.
+- Renamed activity actions, for a project's own filters, reports or `ActionWords`: `telegram.disconnected` is
+  `telegram.connection_dropped` and `mailing.cattomail_disconnected` is `mailing.cattomail_connection_dropped`. Entries
+  already in the log keep the old names.
+- Constructors that gained arguments: `Document\ValueFormatter` (optional `Installation` third), `Identity\IdentitySettings`
+  (optional `Settings` last), `Scheduler\ScheduleRunCommand` (environment and `PhpTimeZone`), `SignIn\SignInController`
+  (optional `SignInSessions`, then optional `Http\AfterResponse` last) and `SignIn\SignInUserProvider` (optional
+  `SignInSessions`), `Admin\ActivityController` (optional `$links`, the project's `SubjectLinks`, last),
+  `Account\AccountRecords` (optional `Installation` last), `Account\Records\MailingRecords` (optional `CattoMailEvents`
+  last) and `Scheduler\Scheduler` (`bool $development = false` last: a project that makes the scheduler itself passes true
+  only on a development site, or a run as if at another moment is refused). `Scheduler\Scheduler::run()` takes `$stopping` and `$at`;
+  `SignIn\SignInLink` takes a `joining` address; `Identity\IdentityConnection` takes `ServiceConnections`. The bundle's own
+  services are wired already; only a project that makes these itself changes anything.
+- `Identity\IdentitySettings` reads Didit's keys through Settings, which gives `.env`'s value until a different one is
+  saved. A project with its own settings group named `identity` renames it.
+- The default locale is `en_GB` where it was `en_ZA` (`Installation::LOCALE`, `StructuredData::language()`), and the
+  locale is read through Settings, never from the process's environment. A project that wants another gives it under
+  `defaults` or in `.env` (`APP_LOCALE=en_ZA`).
+- A project's own class implementing `SchemaStep` is now tagged by autoconfiguration and applied by `cattophp:migrate`
+  with CattoPHP's. One that is already run by another tool leaves the interface off or has the tool stop running it.
+- `Http\TwigErrorPageDrawer` draws `@CattoPHP/error.html.twig` in the theme's frame; a project's own error template
+  keeps working, and one written for its theme (filling `page_body`) is still drawn if the theme itself fails.
+- `Redactor` keeps a whole number under a name that counts (a plural, `_count` or `_left`) instead of masking it.
+- `cattophp.css` no longer holds an application's classes (flash cards and their player, Share this page, the checkout's
+  steps and promo code, the question editor's options, a content tree's section names, a category tree's rows), nor the
+  rule that forces a table cell's blocks onto one line. A project that used them keeps them in its own stylesheet.
+- `Ui\Components` compares an item's keys as a set, in any order, and a refusal names the item and the key. A
+  `form.tree-select` option's `icon` is checked as a feature card's is (an SVG picture free of scripts and outside links)
+  and anything else refused.
+- `cattophp:schedule:run --job … --now …` is a trial, kept apart from the task's runs (`RunStore::tried()`): it no longer
+  changes the task's last start or success or how often it ran. It is refused unless the kernel is in debug and its
+  environment is neither `production` nor Symfony's `prod`, and whenever `APP_ENV` says production; `--now` given empty
+  is refused instead of running the task for real. A project's checks that tried a task on a kernel not in debug boot
+  one in debug. `Scheduler\TaskStatus::tasks()` gains `last_trial`, `trial_summary` and `trial_failed`.
+- `Settings::get()` gives a choice that `.env` writes in another case as the choice's own key (`AUTH_TWO_STEP=everyone` is
+  `EVERYONE`, `APP_SITE_MODE=LIVE` is `live`) and a time zone as PHP lists it (`africa/johannesburg` is
+  `Africa/Johannesburg`); `checked()` takes a choice in any case and gives its key, and keeps a value in force that is no
+  choice when it is sent back unchanged.
+- Administration > Settings: each Reset is a form of its own after the group's form (`form#setting-<name>-reset`,
+  `form#settings-<group>-reset`), its button beside its field naming it with `form=` and asking to be confirmed; a
+  project's checks that pressed `button[formaction=".../reset/NAME"]` submit that form.
+- Sign-in links are asked for once the response has gone (`Http\AfterResponse` on `kernel.terminate`): a project's tests
+  through Symfony's KernelBrowser see the email as before; one that handles a request without terminating the kernel
+  calls `AfterResponse::run()`.
+- `Http\TypedForm` never keeps a field whose name `Security\Redactor` takes for a secret's (a token, an API key, a private
+  or signing key, a DSN, a cookie, an authorisation, beside a password, a secret and a code).
+- Forgetting an account changes more than before (see the Fixed entries): an address a module keeps becomes
+  `AccountRecords::FORGOTTEN_EMAIL`, a person's chat in the Telegram log is left empty, and so on.
+- Without a database: one two-step file (`sign_in.two_step_file` without `{account}`) says whose key it holds (`account`,
+  a hash of the account's id) from its next change; the file activity log is changed under a lock file of its own,
+  `activity.log.lock` beside it.
+
+**New schema steps** (`cattophp:migrate` applies them, only for the modules named):
+
+- `202611130300-scheduled-job-trials` (scheduler): `cattophp_scheduled_jobs` gains `last_trial_at`, `last_trial_ok` and
+  `last_trial_summary`, each task's last trial kept apart from its runs.
+- `202611130100-identity-connection` (identity): `cattophp_identity_connection`, which `202611130200-connections` then
+  moves into `cattophp_connections` as `didit` and drops.
+- `202611130200-connections` (identity or payments, once when both are on): `cattophp_connections`.
+
+**New settings** (Settings, with `.env` giving the starting value and Reset going back to it):
+
+- `APP_LOCALE`, "Language and region", default `en_GB`, in the installation group beside `APP_TIMEZONE`.
+- `DIDIT_API_KEY` (secret), `DIDIT_WORKFLOW_ID` and `DIDIT_WEBHOOK_SECRET` (secret) are now settings of the group
+  `identity`, "Identity verification" (identity module): the secrets are stored encrypted, and saved values override
+  `.env`. `Settings::clear()` saves one empty on purpose, so a dropped connection stays dropped.
+- `APP_TIMEZONE` now also sets PHP's own time zone (see below).
+
+**New optional configuration**
+
+- `cattophp.sign_in.sessions` (default `false`): keep each sign-in among those a person can see and end. Leave it off
+  where the project keeps its sign-ins itself.
+- A project's own `SchemaStep`, `ActionWords`, `DetailWords`, `SubjectLinks` and `ForgetsAccounts` services are found by
+  autoconfiguration; nothing is to be tagged by hand.
+- `cattophp:schedule:run --job <key> --now "<moment>"` (development sites only).
+- `cattophp:icons:search <words>` (`--limit`, 30 unless given): the icon library's icons that match the words, by name
+  and by Lucide's tags, best first, each with its tags; it exits 1 when none match.
+
+**New routes files** a project may import (each is optional):
+
+- `@CattoPHPBundle/config/routes/admin.php`: Administration's Settings, Roles and Activity log (`/admin/settings`,
+  `/admin/roles`, `/admin/activity`, route names `cattophp_admin_*`), for a project with Symfony's session and sign-in.
+- `@CattoPHPBundle/config/routes/account.php`: a person's Sign-in and security (`/account/security`, route names
+  `cattophp_account_*`), for a project whose people sign in through CattoPHP's pages.
+
+**Packages:** none new, and none dropped. `composer.json` requires what 0.3.0 did (`bacon/bacon-qr-code` BSD-2-Clause,
+`doctrine/dbal` MIT, `twig/twig` BSD-3-Clause, `psr/*` MIT and the Symfony 8.1 components MIT) and suggests the same
+optional ones for the modules that use them (`dompdf/dompdf` LGPL-2.1, `omnipay/common` MIT, `symfony/http-client` MIT,
+`geocoder-php/geoip2-provider` MIT); it gains only `archive.exclude`. The icon library is Lucide 1.72.0 (ISC), with none
+removed.
+
+**What a person sees**
+
+- The stock pages (signing in, the error page) extend `@CattoPHP/page/stock.html.twig`, so in a project with themes they
+  wear the theme with CattoPHP's components; sign-in pages are a section head, a field and an action each, and a
+  notice for a note.
+- Sign-in and security (`account.php`) lists where a person is signed in as cards (with `sign_in.sessions`), and a form
+  refused shows why beside each field where a page draws them (`typed_errors_for`).
+- Times follow the installation's time zone everywhere: PHP's own zone is set from `APP_TIMEZONE` as every request and
+  command starts, so scheduled tasks, document dates and sending hours that ran in PHP's default zone now run in it.
+- `<html lang>` of the plain frame follows `APP_LOCALE`, and amounts in documents follow it (`en_GB` by default).
+- The activity log reads in words and a deleted account shows as "A deleted account". What an entry is about links to
+  its record where the project's `Activity\SubjectLinks` gives an address.
+- A list's search box (`data.dataset`'s `search`) looks like the form's fields (`.cl-input`) wherever the theme paints
+  neither, as in the starter's theme; a theme or project that paints its fields by type, or the box itself, keeps its
+  look, since CattoPHP's rule counts for nothing against it.
+- A feature-card choice (`form.picture-choice`) refused shows why beside it, as a field does (`error`).
+- Administration's New role page and a role's page space their permissions as a form's fields: the choices are inside
+  the form's `form.grid` (`columns: 1`), so the first no longer sits against the field above it, and the role's name and
+  key fields are one to a row.
+
+**On a project's servers:** run `cattophp:migrate` after updating (needed only with the scheduler, identity or payments
+module).
+Restart a long-running `cattophp:schedule:run --watch` worker, which now stops on SIGTERM and SIGINT. Nothing else:
+no new `.env` keys are required.
+
+- Fixed (review of the code since 0.3.0, 1): the Settings page put another value in place of one whose spelling matched
+  no option when its group was saved for any other reason: `.env`'s `AUTH_TWO_STEP=everyone` (two-step required of
+  everyone) was saved as CHOICE, `AUTH_SIGNIN=everyone` as ADMIN, `APP_SITE_MODE=LIVE` as demo, and a time zone not in
+  the list (`Asia/Calcutta`) as the first, because no option was selected and the browser sends the first. A choice in
+  force is selected whatever its case (`Settings` reads `.env`'s choice as the choice's own key, as its readers always
+  have), and a value in force that is no option comes first, selected, said to be so ("staging (as .env gives it, not
+  one of these)"; an older time zone name "(as .env gives it)"), and is kept when it is sent back unchanged.
+- Fixed (2): Enter in any field of a settings group reset a saved setting (an encrypted secret among them) and threw
+  away what was typed, since each Reset was the form's first submit button. Each Reset, and Reset every setting here, is
+  a form of its own after the group's, its button beside its field naming it with `form=`, and asks to be confirmed
+  ("Put Name back to .env's value? What is saved here goes."); the Save form's one submit button is Save.
+- Fixed (3): two administrators forgetting each other at once, or taking the Administrator role from each other, could
+  both be allowed and leave none, the last-administrator check being made before anything was locked.
+  `AccountRecords::forget()` counts with the role's holders locked until its transaction ends (`RoleStore::lockHolders()`)
+  and joins a transaction already open, so it belongs inside the project's own deleting transaction, before its row
+  goes; `Roles::revoke()` of ADMIN takes it away as one locked step (`RoleStore::revokeUnlessLast()`).
+- Fixed (4): forgetting counted administrators by the role alone, though signing in counts the project's flag too
+  (`SignInAccount::administrator`, as `SignInRules::isAdministrator()`): a flagged administrator could delete their own
+  account and the last of them be forgotten, while a holder of the role was refused as the last beside one. It counts
+  both, among the role's holders the project still finds (a role row of an account deleted since counts for nothing) and
+  the account of the installation's administrator's address.
+- Fixed (5): Sign-in and security took codes without limit, so someone at a browser left signed in could guess the code
+  to turn two-step off or make new recovery codes. Each wrong code there is in the activity log (`two_step.wrong_code`,
+  with what it was for, "Wrong code typed on Sign-in and security"), counted for the account across its browsers
+  (`Http\Throttle`), and the fifth in 15 minutes (`SecurityController::WRONG_CODES_ALLOWED`, `WRONG_CODES_WINDOW`) ends
+  that sign-in, as signing out does, the sign-in page saying "Too many wrong codes were typed on Sign-in and security, so
+  you were signed out. Sign in again to carry on." (`SecurityController::SIGNED_OUT`). Two-step stays on.
+- Fixed (6): activity entries that named a forgotten account only in what they said kept naming it: an identity check's
+  (by the system, its id under `account`, Didit's session, a reason), Telegram's (`account_id`, the username), a setting
+  someone else saved holding its address in a list, a value in a list or deeper down, and every entry kept its network
+  address. Forgetting now changes every entry that names the account anywhere: its id where it is a detail's whole value
+  (under a key naming an account, `ActivityEntry::ACCOUNT_KEY`, at any depth, or anywhere for an id that is not a bare
+  number), and each word naming it wherever it stands in a detail's words, whatever its case, never inside a longer word
+  or address (`ActivityEntry::wordPatterns()`); such entries keep no network address. The words are its address and
+  name, and what each module knows it by, given through `ForgetsAccounts` as `words` (Telegram's username with and
+  without its @, its identity checks' sessions); a project gives its own the same way (an earlier address). The
+  database finds the entries that may name it and changes each as `ActivityEntry::forgetting()` says.
+- Fixed (7): what the modules keep kept naming a forgotten account: its mailing copies their address (and their
+  personal content, and links that still opened them), its Inbox messages their sender's name, address, account
+  reference and network address, the Telegram log the chat and the username of messages sent to its chat or username
+  without its account, and catto-mail's events its address. A copy now has the address
+  `AccountRecords::FORGOTTEN_EMAIL` (`deleted-account@forgotten.invalid`, in its transport's words too), no content of
+  its own and a new token nobody holds; a message to the site from its account or its address has no account or
+  reference, an empty name, the forgotten address and no network address or browser, and so do its received messages; a
+  Telegram message to its account, chat or username names nobody, a person's chat left empty (null is the owner's own);
+  catto-mail's events give the forgotten address. `TelegramLog::forget()` takes the chat and username,
+  `InboxStore::forgetAccount()` the address, `CattoMailEvents::forget($email)` is new, and `MailingRecords` takes the
+  events.
+- Fixed (8): `--now` counted as the task's real run (its last start, success and how often it ran), so a daily task
+  tried at 09:00 skipped its real run, an interval task was put back, and `TaskStatus` hid an outage; the changelog said
+  the opposite. A trial is kept apart (above, and schema step `202611130300-scheduled-job-trials`).
+- Fixed (9): `APP_TIMEZONE` named by an older name PHP still knows (`Asia/Calcutta`, which worked in 0.3.0, `Etc/UTC`,
+  `Etc/GMT-2`, `US/Eastern`, `GB`, `Europe/Kiev`) was taken for no time zone, so times were in UTC. Every name PHP knows
+  counts, in any case (`Installation::timeZoneName()`), for the installation, PHP's own time zone and the Settings page.
+- Fixed (10): `--now`'s guard was the kernel's environment alone, so Symfony's `prod`, or a command wired without it,
+  let it run in production, `Scheduler::run()` had none, and `--now=""` ran the task for real. The scheduler itself
+  refuses a trial unless the bundle says this is a development site (the kernel in debug, not production or prod) and
+  whenever the process's `APP_ENV` says production; `--now` given empty is refused.
+- Fixed (11): without a database, rewriting the file activity log truncated it before writing it again, so a write that
+  failed (a full disk) lost the whole log, and forgetting an account deleted its two-step key before anything else, so a
+  failure part of the way left a half-forgotten account signing in without it. The log is rewritten to a file beside it
+  that takes its place only once written whole (`FileActivityStore`, removing old entries too), every change made under
+  `activity.log.lock`; the two-step key is forgotten last, and `forget()` run again carries on where it stopped.
+- Fixed (12): `IdentitySettings::value()` took any error for "no identity group" and gave `.env`'s Didit key, so a saved
+  key that could no longer be read (APP_KEY changed) or a database fault brought back a dropped connection or a replaced
+  secret. It falls back to `.env` only where Settings has no such setting; anything else is an error.
+- Fixed (13): saving a group with a saved secret that could no longer be read, left blank, was an error page; the group
+  could be saved only by typing the secret again. Left blank, it is kept as it is, still said to be unreadable.
+- Fixed (14): an account of the installation's administrator's address that the project did not flag could join, use
+  its link and then be refused signing in, every link after that too, with sign-in limited to administrators.
+  `SignInRules::maySignIn()` lets the administrator's address sign in, as `mayJoin()` lets it join.
+- Fixed (15): with one two-step file (`sign_in.two_step_file` without `{account}`), forgetting any account deleted the
+  one person's key, and setting one up for another account replaced it. The file says whose key it holds (`account`, a
+  hash of the id); another account finds none there, forgetting another leaves it, and setting one up for another is
+  refused with how to keep one per account. A file kept before it said whose is the person's, and forgotten for nobody.
+- Fixed (16): setting two-step up on Sign-in and security did not check it was still off, so a key left in the session
+  could replace the key there was without a current code. It says "Two-step sign-in is already on." instead.
+- Fixed (17): a refused form kept a field named like a token, an API key or a DSN to draw it again where the controller
+  did not name it a secret; `TypedForm` keeps no field whose name `Security\Redactor` takes for a secret's.
+- Fixed (18): a sign-in email was sent while the page waited, only for an address with an account or one that may join,
+  so how long the page took told which addresses exist. The link is asked for once the answer has gone, for every
+  address alike (`Http\AfterResponse`, run on `kernel.terminate`, the request put back on the stack so the activity log
+  still has where it came from; a piece that fails is written to the log and the rest run).
+- Fixed: a `form.tree-select` option's `icon`, drawn inline, was not checked (an older gap from 0.3.0): it is refused
+  unless it is an SVG picture free of scripts and outside links, naming the option.
+- Added: `Http\FieldsRefused`, a form refused for what is wrong with its fields, each with why in plain words by the
+  field's name: what a service throws when it checks a whole form and finds one thing or several wrong
+  (`throw new FieldsRefused(['name' => 'Type the tool\'s name.', 'category' => 'Choose its category.'])`). An
+  `InvalidArgumentException`, not final, so a project may extend it; `errors()` gives the map (`''` for the form as a
+  whole, which no field shows), `error($name)` one field's why or null, and its message is every reason in one sentence
+  unless one is given as the second argument (`new FieldsRefused($errors, 'See why beside each field.')`); a reason
+  with no words is dropped. `TypedForm::keep($request, errors: $refused)` and `TypedForm::kept()` take it as they take
+  a map, keeping each field's why for its own field (the `''` one is not kept), and so does `Http\StockPages::refused()`.
+  `Settings\SettingsRefused` is one now (it extends it), unchanged otherwise.
+- Added: `form.picture-choice`'s `error`, why the choice was refused, drawn as `form.field` draws one
+  (`<div class="cl-ui-field-error" role="alert">`) under the legend and the help, above the cards; the fieldset is
+  `aria-describedby` the help and the error and every radio or checkbox `aria-invalid="true"`. The ids are `<id>-help`
+  and `<id>-error`, or, without `id`, the field's name made an id (`condition-error`, `slide[build]` as
+  `slide-build-error`, a list of ticks by its `list`); ticks named by their values (`multiple` without `list`) need an
+  `id` for it, and say so. Without an error the markup is byte for byte as before. `.cl-ui-picture-choice>.cl-ui-field-error`
+  keeps it half a line from the cards.
+- Added: `Activity\SubjectLinks` (tag `cattophp.subject_links`, by autoconfiguration): `href(string $type, string $id):
+  ?string`, the address of the record an activity entry is about, or null for none (a type it does not know, a record
+  deleted since). The Activity log page links "About" to it, escaped, only when it is a path on the site (one leading
+  `/`) or an `http`/`https` address; anything else, and null, leaves it in words as before. It is asked for every
+  entry about something, CattoPHP's own subjects (account, setting, role) too, and the first service with an address
+  gives it. `Admin\ActivityController` takes the services as an optional last argument, `$links`.
+- Fixed: a list's search box (`data.dataset`'s `search`, `.dataset-search input[type=search]`) was drawn with the
+  browser's own border beside the form's `.cl-input` fields wherever the theme painted only `.cl-input`, as the
+  starter's does. `cattophp.css` gives it `.cl-input`'s border, corners, padding, colours, focus ring and placeholder
+  inside `:where()`, so the rule counts for nothing against any other: a theme or project that paints its fields by
+  type (`input[type=search]`) or the box itself keeps its look. CattoLMS's search boxes measured the same before and
+  after, every computed style and box, at 1440 and 390.
+- Changed: an item's keys are compared as a set, in any order: a feature card's (`form.picture-choice`: `value`,
+  `label`, one of `image`, `icon` or `drawing`, then `note` and `disabled` if wanted), a tab's (`layout.tabs`: `key`,
+  `label`, `href`) and a tree option's (`form.tree-select`: `value`, `label`, `depth`, `path`, then `icon` and `children`
+  if wanted). A refusal says which item and which key: "option 2 has colour, which it does not take", "option 1 lacks
+  label", "option 1 has image and icon, where it takes one of them". `value, label, note, icon` was refused before.
+- Added: `cattophp:schedule:run --job <key> --now "<moment>"` runs the named tasks as if it were that moment, on a
+  development site only: a date and time in the site's time zone (`2026-12-01 09:00`; a date alone is its midnight) or a
+  moment counted from the scheduler's clock (`+3 days`, `tomorrow 09:00`). The task's `run()` is given that moment, and
+  the trial is kept apart from the task's runs (`RunStore::tried()`: when, at the real time, whether it worked, and what
+  it said, starting "As at 2026-12-01 09:00: "), which it leaves as they were, so the schedule is not moved and an
+  outage is not hidden; `TaskStatus::tasks()` shows it apart (`last_trial`, `trial_summary`, `trial_failed`). Refused,
+  each in a plain sentence: anywhere but a development site ("A task is run as if it were another moment only on a
+  development site, and this site's APP_ENV is production. Try it on a development site.", `Scheduler::TRIALS_REFUSED`:
+  the kernel not in debug, its environment production or Symfony's prod, or `APP_ENV` production, in `Scheduler::run()`
+  itself too, `Scheduler::trialRefused()`), without `--job`, with `--watch`, given empty, and a moment that is not one.
+  `Scheduler::run()` takes `$at` (named tasks only), `Scheduler::moment()` reads a typed moment, and `Scheduler::zone()`
+  is the zone it reads times of day in; `ScheduleRunCommand` is given the kernel's environment, and the bundle tells
+  the scheduler whether this is a development site (`$development`: the kernel in debug, not in production).
+- Added: PHP's own time zone follows the installation's (`APP_TIMEZONE`, a setting): `Installation\PhpTimeZone` sets it
+  as every request starts (`kernel.request`, priority 8192, before the lockout gate), as every console command starts
+  (`console.command`), and before each run of `cattophp:schedule:run`, once a minute under `--watch`, so a time zone
+  changed on the Settings page applies without a restart. It was PHP's own default, so a task due at 03:15 ran at 03:15
+  in PHP's zone, and a document's dates, the mailing's sending hours and the Telegram and catto-mail times were in it
+  too. A time zone PHP does not know, or a setting that cannot be read, leaves PHP's zone as it was:
+  `Installation::chosenTimeZone()` (null then) beside `timeZone()` (UTC then, as before). A project that sets the zone
+  itself as it starts reads the same setting, so the two agree.
+- Added: the activity log's details in words, `Activity\ActivityDetails` (a service, `lines($action, $details)`,
+  `label()`, `value()`, `sentence()`): a key turned into words (`due_at` is "Due at", a value `needs_repair` is "Needs
+  repair"), an ISO 8601 date in words ("1 December 2026") and an ISO 8601 time in the installation's time zone and in
+  words ("7 November 2026 at 07:01"), true and false as yes and no, a list of words on one line, anything else as JSON,
+  a long value cut short. A project words its own with `Activity\DetailWords` (tag `cattophp.detail_words`, by
+  autoconfiguration; `label(string $action, string $key): ?string`, `value(string $action, string $key, mixed $value):
+  ?string`, null for the log's own wording), beside `ActionWords`, which is unchanged. The Activity log page uses it
+  (it showed `due at: 2026-11-07T07:01:56+02:00`), and names a project's own subject by its type in words ("Loan
+  sd4jr2uh", was "loan sd4jr2uh"). `Admin\ActivityController` takes an optional `ActivityDetails`.
+- Added: why each field of a refused form was refused waits with what was typed, for the form that sent it:
+  `TypedForm::keep($request, $secret, $errors)` (`errors` by the field's name), `TypedForm::errors($request, $action)` and
+  the Twig function `typed_errors_for(action)`, taken and forgotten with the values; `form.field`'s `error` draws it
+  under its field with `aria-describedby` and `aria-invalid` on the control (as it always could). A form refused without
+  errors is kept exactly as before.
+- Added: `data.table`'s `stack` (false unless given): below 768 pixels each row is a card of label and value, the label
+  from each cell's `data-label` (the template writes it beside the column heading it repeats), the value wrapped where
+  the table cut it short, an empty cell left out and the caption beneath; the head row is hidden from sight only and the
+  label's alternative text is empty, so a screen reader still reads the table it is; no script. `data-stack="narrow"` on
+  the table's box; a stacked table is fitted (`fitTableColumns`) only when it is a table again. A table without `stack`
+  is drawn byte for byte as before. CattoPHP's Activity log, Roles and a role's holders use it; the Activity log's What,
+  About and Details wrap (`cell-text`).
+- Added: `Foundation\ReadableCode`: `make(int $length = 8)`, a code of lower-case letters and digits without the ones
+  that look alike (no 0 or o, no 1, l or i; `ALPHABET`, 31 characters, `CHARACTER` for a pattern), from `random_int`, 4
+  to 64 characters; `read(string $typed, ?int $length = 8)` takes one back as typed (capitals, spaces and hyphens) or
+  null. Not unique: a project keeps a unique index and makes another when one is taken.
+- Added: Administration's Settings, Roles and Activity log pages (`Admin\SettingsController`, `RolesController`,
+  `ActivityController`, the page model `Admin\SettingsPage`, the names of the people they mention `Admin\AccountNames`),
+  in the routes file a project imports, `config/routes/admin.php` (`/admin/settings`, `/admin/roles`, `/admin/activity`,
+  route names `cattophp_admin_*`), behind CattoPHP's own permissions (PLATFORM.SETTINGS.VIEW and SYSTEM.SETTINGS.MANAGE,
+  PLATFORM.ROLE.VIEW and SYSTEM.ROLE.MANAGE, PLATFORM.ACTIVITY.VIEW), templates at `@CattoPHP/admin/`. Settings: every
+  group of the catalogue, each setting saying where its value comes from (saved here, when and by whom, overriding
+  .env; .env; its default) and what Reset goes back to, a Reset to .env beside each one saved and for the group (each a
+  form of its own after the group's, asking to be confirmed, so Enter in a field saves and never resets), one Save a
+  group, a choice in force shown selected whatever its case and a value that is no option shown selected as it stands, a saved secret as asterisks in its placeholder (left as they are, the field sends nothing and the secret is
+  kept; typed out, they are no new secret either) with "Saved, encrypted and never shown. Leave the asterisks to keep
+  it, or type a new one.", a refused form back as typed with why beside each field and never a secret, and someone who
+  may only look told why there are no buttons. Roles: every role, what it allows as feature cards, who holds it, given
+  by an email address, taken away, made and deleted. Activity log: newest first, a page at a time, filtered by any action
+  it holds, each in words, refreshing itself every 15 seconds.
+- Added: a person's Sign-in and security page, `Account\SecurityController` (`config/routes/account.php`,
+  `/account/security`, route names `cattophp_account_*`, templates at `@CattoPHP/account/`): two-step sign-in by their own
+  choice wherever it is not required of them (AUTH_TWO_STEP CHOICE, or ADMINS for anyone but an administrator): set it up
+  with the QR code, turn it off with a current code or a recovery code, new recovery codes with a current code; and, with
+  `sign_in.sessions`, where they are signed in with End and End all others.
+- Added: `sign_in.sessions` (off unless a project switches it on) and `SignIn\SignInSessions`: each sign-in through
+  CattoPHP's sign-in pages kept among CattoPHP's sign-ins (`cattophp_sessions`, by the hash of a token in the visitor's
+  session, where from as a keyed fingerprint, the browser, when it began, was last seen and runs out), checked on every
+  request by `SignInUserProvider` (one ended, or run out, signs that browser out at its next page), ended at signing out,
+  and listed on the account page. A project that keeps its sign-ins itself through the store leaves it off, so nothing
+  is kept twice. Activity: `sign_in.session_ended`, `sign_in.sessions_ended`.
+- Added: joining, `SignIn\JoiningAccounts`, beside `SignInAccounts` for a project where people join by signing in for
+  the first time: an address with no account that may join (`SignInRules::mayJoin()`: `APP_ADMIN_EMAIL` always, anyone
+  with `AUTH_SIGNIN=EVERYONE`, else the listed addresses) is sent a link like anyone (`SignInLinks::createJoining()`,
+  purpose `sign_in_join`, the address alone), and `join()` makes the account only when the link is used; nothing else is
+  kept before then, the activity log records `sign_in.joining_link_sent` naming nobody (never a made-up subject), and the
+  sign-in page says the same to every address. `cattophp:sign-in-link` gives a joining address a link too. `SignInLink`
+  gains a `joining` address; `SignInRules` gains `twoStepRequired()` and `isAdministratorAddress()`.
+- Changed: the stock pages (signing in and the error page) extend `@CattoPHP/page/stock.html.twig`, so in a project with
+  themes they wear the theme, with CattoPHP's page head and the components, where they drew CattoPHP's plain frame unless
+  the project replaced all six; without themes they extend `cattophp.layout` as before. A project's own replacements
+  keep working unchanged. The plain frame `@CattoPHP/layout.html.twig` draws block page_body inside block body.
+- Fixed: the error page's last resort, drawn when the theme itself fails, is given `layout` (the plain frame), so a
+  project's own error template written for its theme (extending `layout`, filling page_body) still arrives
+  (`TwigErrorPageDrawer::PLAIN_FRAME`).
+- Added: `Http\StockPages`, what CattoPHP's own pages do alike: drawn in the project's look, what the reader's last form
+  did said at the top (Symfony's flash bag under CattoPHP's own names, `cattophp_done`, `cattophp_refused`,
+  `cattophp_info`, so a project's messages never show twice), the token and permission checks, done, refused (the form
+  kept as typed, never a secret, why each field was refused) and expired.
+- Added: `data-two-step-key` on the element holding the two-step key's text, on the sign-in code page and the account
+  page alike, so a project's checks find it in any theme.
+- Added: `Activity\ActionWords`, a tagged interface for what the log's actions mean in words, with CattoPHP's own
+  (`FoundationActionWords`); a project adds its own by implementing it.
+- Changed: `ActivityStore::recent()` takes an offset, and `count()` and `actions()` (every action present) are added to
+  the stores and to `ActivityLog`, so a page lists the log a page at a time and filters it by what it holds. A file's log
+  is read back from its newest 2 MB, as before.
+- Fixed: `TwoStep::setUp()`, a recovery code used and new recovery codes are recorded as the person's own doing, never
+  the system's (at sign-in nobody is signed in yet): the actor given, else whoever is signed in as that account, else the
+  account by its id. Each takes an optional `Actor`, which the sign-in pages give by the account's name.
+- Fixed: `Redactor` masked the recovery codes' count (`recovery_codes => 8`): a whole number under a name that counts (a
+  plural, or one ending `_count` or `_left`) is kept; a code is masked as before, even a number.
+- Changed: `TypedForm::keep($request, $secret)` is told the form's other secret fields by name (as the Settings page does
+  with each setting that is a secret, whatever it is called), which are never kept.
+- Changed: `APP_LOCALE` is a setting of the installation group, beside the time zone, read through Settings
+  (`Installation::locale()`, `en_GB` unless it says otherwise): `Document\ValueFormatter` (given the installation) and
+  `Search\PageHead::language()` read it there, never from the process's environment, and a locale that is not one is
+  `en_GB` (it was `en_ZA`; `Search\StructuredData::language()` falls back to `en-GB` the same way). `ValueFormatter`'s
+  constructor takes the `Installation` as a third, optional argument. `PageHead`'s constructor no longer takes `EnvironmentValues`. A project whose own locale is
+  another gives it under `defaults`.
+- Fixed: a notice's icon sits beside its words: `.cl-ui-notice` lays out from the start (it spread icon and words to
+  opposite ends), with a dismissable notice's close button kept at the far end (`.cl-ui-notice>.cl-ui-close`).
+- Changed: `cattophp.css` no longer forces a table cell's block onto one line with the first (`.cl-ui-table td>div`,
+  `td>p`, `td>span.muted`, `td>.small` inline, a dot before a muted one): a project that wants it keeps the rule itself.
+- Changed: `cattophp.css` holds no application's classes: the flash cards and their player, Share this page, the
+  checkout's steps and promo code, the question editor's options, a content tree's section names and a category tree's
+  rows are an application's own, in its stylesheet.
+- Changed: the schema runner, `SchemaStep` and `cattophp:migrate` say what they do: a project's own steps (its classes
+  implementing `SchemaStep`, tagged by autoconfiguration) are applied with CattoPHP's, in the order of their ids.
+- Fixed: `cattophp:schedule:run` stops when told to: it implements Symfony's `SignalableCommandInterface` for SIGTERM and
+  SIGINT, finishes the task under way, starts no other (`Scheduler::run()` takes a `$stopping` check) and ends at once,
+  waiting or not, so a container whose first process it is stops in a moment. It listens only where PHP can catch signals
+  (`ScheduleRunCommand::signalsSupported()`: the constants defined and `pcntl_signal` allowed, as Symfony's console asks).
+- Changed: the README's configuration example names every key (`defaults`, `permissions_policy`, `html_layout`, the
+  icon subjects, `error_pages.drawer`, the network lookup and ASN database, each `task_priority` and `http_client`,
+  protection's `visitors`, `gate_listener`, `forms` and `list_only_forms`, `mailing.campaign_project` and the rest), says
+  that `APP_ENV` comes from the process's environment (a server's or container's value over `.env`), that a permission
+  has two to four parts and one starting `SYSTEM.` is for administrators alone, and no longer calls mailing a first part.
+
+- Updated: the icon library is Lucide 1.72.0 (ISC, as before; `resources/icons/lucide.json` built from the `lucide-static`
+  1.72.0 package in the same form, which rebuilds 1.70.0's file byte for byte): 34 more icons (2,356), none removed, so
+  no icon a project has stored is lost; 19 redrawn (the question mark of the help and question icons, and `route`) and
+  the search words of 404 brought up to date.
+- Fixed: the Inbox's mailbox showed as connected when Check the connection had just failed, and before it had ever been
+  tried. `InboxMailbox::check()` signs in and records the outcome as the minute's read does, `detailsSaved($before)`
+  takes the state back to not checked when the mailbox's details change, and `status()` gives `state`: `none`,
+  `unchecked`, `connected` or `failed` (with when it was last tried and what went wrong). The minute's read reads only
+  a connected mailbox: details never checked, or a mailbox that refused, are not tried again every minute (a mail
+  server's protection bans an address that keeps failing to sign in) until Check the connection works.
+- Changed: Didit's keys (`DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET`) are a settings group,
+  `Identity\IdentitySettingGroup`: `.env` gives their starting values and Settings overrides them with a Reset, the
+  secrets encrypted (they came from `.env` alone). `IdentitySettings` reads them through Settings.
+- Added: `Identity\IdentityConnection`, the connection to Didit as a settings page controls it: `check()` asks Didit for
+  the application's workflows (`DiditClient::workflows()`, `GET /v3/workflows/`, a pure read) and records whether the
+  key and the workflow were accepted; `status()` (`none`, `unchecked`, `connected`, `failed`, with the workflow's name);
+  `keysSaved($before)`; `registerWebhook()` (`DiditClient::registerWebhook()`, `POST /v3/webhook/destinations/`, keeping
+  the signing secret Didit gives); `drop()` and `resetToEnv()`. Schema step `202611130100-identity-connection`.
+- Added: `Settings::clear()`, an empty value saved on purpose, so a dropped connection stays dropped where `.env` holds
+  keys, until new ones are saved or `reset()`.
+- Added: one table for every connection to an outside service, `cattophp_connections` (schema step
+  `202611130200-connections`, given to identity verification and to payments, either of which may be switched on alone,
+  and once when both are; Didit's row moves in from `cattophp_identity_connection` as `didit`, and that table is
+  dropped). `Settings\ServiceConnections` keeps each connection's last real try by its name: when, whether it worked,
+  what went wrong, what it learnt, and a keyed fingerprint of the details it was made with, so details changed since, on
+  the Settings page or in `.env`, are not checked yet. Its states are `none`, `unchecked`, `failed` and `connected`.
+  Kept by `Settings\DbalConnectionStore`, or `MemoryConnectionStore` without a database.
+- Changed: `Identity\IdentityConnection` keeps where it stands among the connections (`didit`) instead of in a table of
+  its own, and its constructor takes `ServiceConnections` in place of the database connection. A key changed after the
+  check, even in `.env`, is not checked yet without `keysSaved()`.
+- Added: `Payments\GatewayConnections`, a payment gateway's connection as a settings page controls it: `check($gateway,
+  $ask)` is refused while a key the gateway needs has no value, then asks the provider through the project's own
+  question (Omnipay has none every gateway answers), which answers null when the keys are accepted, else the provider's
+  words, and records the outcome; `status()`, `connected()`, `drop()` (every key forgotten, `.env`'s too) and
+  `resetToEnv()`.
+- Changed: `Modules::schemaSteps()` gives a step two modules share once.
+- Changed: "Drop connection" is the words for ending a connection: Telegram's refusals for an account connected
+  elsewhere say "Drop its connection there first" and "Drop that connection first" (they said Disconnect).
+
+- Changed: a dropped connection is named so (Drop connection, never Disconnect): the activity
+  entries `telegram.connection_dropped` (was `telegram.disconnected`) and `mailing.cattomail_connection_dropped` (was
+  `mailing.cattomail_disconnected`), and the Telegram bot's flag and `TelegramSetup::view()`'s key `connection_dropped`
+  (was `disconnected`; `TelegramBot` saves it as `connection_dropped`, so a `disconnected` already saved is no longer read),
+  and the methods `dropConnection()` on `TelegramSetup`, `TelegramConnections`, `TelegramAccounts`, `CattoMailConnection`
+  and `CattoMailClient` (were `disconnect()`).
+
+- Fixed: an installed CattoPHP holds only the package's own files. `.gitattributes` (`export-ignore`, which GitHub's
+  release zips follow and so does a Composer path repository's mirror) and `archive.exclude` in `composer.json` (for
+  `composer archive`) leave out everything but `bin/`, `config/`, `public/`, `resources/`, `src/`, `templates/`,
+  `composer.json`, `README.md`, `CHANGELOG.md`, the guide and `LICENSE`; the tests, `phpunit.xml.dist`, `phpstan.neon`,
+  `.gitignore` and `.gitattributes` stay in the repository. A project taking CattoPHP from a folder got all of it, 204
+  MB with CattoPHP's own `vendor/` and `var/`; it gets 4 MB.
+- Added: `Http\StockPages::PAGES`, the names CattoPHP's own pages are drawn as, each with where, which a project's
+  `Theme\PageProject` is given (`family()`, `prepare()`, `model()`) and puts in one of its families (README, "Its own
+  pages"): `sign-in` (every step of signing in, `SignIn\SignInController`, `@CattoPHP/sign_in/`), `error` (every error
+  page, `Http\TwigErrorPageDrawer`), `admin-settings`, `admin-roles`, `admin-role-new`, `admin-role` and
+  `admin-activity` (Administration's pages, `Admin\`), and `account-security`, `account-two-step` and
+  `account-recovery-codes` (Sign-in and security, `Account\SecurityController`).
+- Changed: Sign-in and security lists where the person is signed in as cards (`data.card-grid` of `data.card`): the
+  browser as the card's title with "This browser" beside it, when it began, was last seen and runs out, and End or "Sign
+  out to end it" at its foot; three to a row on a wide screen and one on a phone, every word in full. The table cut its
+  Browser column short, so the badge never showed at 1440, and cut every column at 390.
+- Added: `data.card` takes `picture: 'none'`, for a record a picture would not help (a sign-in): its words keep to the
+  start, where a card with a round or square picture centres them.
+- Fixed: two forms in one card touched (Make new recovery codes sat on the label of the field to turn two-step sign-in
+  off), and so did Cannot scan it? and the field after it. `.cl-card-form` (several forms in one card: the next starts
+  the space below the last one's actions that the actions keep above their rule) and `.cl-disclosure` (a details element
+  in a card's flow, the space between two fields below it), on Sign-in and security's two forms and on Cannot scan it?
+  on the two-step set-up page and the sign-in code page. A page asks for them by the class, so no other page's forms
+  move.
+- Fixed: the plain frame (`@CattoPHP/layout.html.twig`) says the pages are in the installation's language, `<html lang>`
+  from `APP_LOCALE` (`en_ZA` as `en-ZA`), where it always said `en-GB`. `Installation::language()` gives the locale as
+  BCP 47, the region in capitals (`cattophp.installation.language` in a template); `Search\PageHead::language()` gives
+  it too.
+- Added: forgetting an account, the one call a project makes when it deletes one, inside the transaction that deletes
+  its own row and before that row goes (a transaction already open is joined): `Account\AccountRecords::forget($account,
+  $by)`. Its roles, two-step key and recovery codes, links (the joining link
+  made for its address among them), sign-ins and each module's records that are its alone go; the records that stay stop
+  naming it: the activity log keeps every entry, by "A deleted account" (`AccountRecords::FORGOTTEN`) and nobody's id
+  where it did something, about nobody where it was the subject, and anything in what any entry says that names it said
+  so too; a setting it saved, and whatever a module keeps of who did what, no longer say who; an address a module keeps
+  becomes `AccountRecords::FORGOTTEN_EMAIL` (`deleted-account@forgotten.invalid`), a name or username empty and a network
+  address gone (see the Fixed entries for each). Each module switched on
+  forgets its own through its stores' forget methods (`Account\Records\`: the setup checklist's marks; site protection's
+  Site Log, flags, lockouts and refused addresses; Telegram's connected accounts, messages and bot values; API tokens;
+  sign-up attempts; identity checks and retries; the Inbox's messages, replies, lessons and blocked senders; mailing's
+  answers, forwards, copies, lists, campaigns and addresses never emailed; search engines' page words), as a database
+  trigger might. A project forgets its own records the same way, with a service implementing
+  `Account\ForgetsAccounts` (found by autoconfiguration). In one transaction where the records are in the database. It
+  refuses the last administrator and an administrator's own account at their own hand, as taking the Administrator role
+  away refuses (`AccessRefused`), counting administrators by the role and by the project's flag
+  (`SignInAccount::administrator`) among the role's holders it still finds and the installation's administrator's
+  account, the holders locked until the transaction ends, unless told `lastAdministrator: true`, for an account made only
+  to be removed again (a check's own administrator on a database that had none). It returns how many records of each kind went and stopped
+  naming it, and records `account.forgotten` naming nobody it forgot. The project's accounts reach it by a closure, so
+  the project's own accounts service may take it.
+- Changed, for forgetting an account: `ActivityStore`, `RoleStore`, `LinkStore`, `SessionStore` and `SettingsStore` gain
+  `forgetAccount()`, and `Setup\SetupMarkStore` gains `forget()`; `TwoStepStore::forget()` says whether there was a key
+  (it said nothing) and never reads it, so a key in a form the site cannot read is forgotten all the same. The modules'
+  stores gain `forget()` (`Protection\SiteLog`, `Flags`, `Lockouts`, `RefusedEmails`, `Telegram\TelegramAccounts`,
+  `TelegramLog`, `TelegramState`, `Api\ApiTokens`, `Signup\SignupAttempts`, `Identity\IdentityChecks`,
+  `Search\PageOverrides`) or `forgetAccount()` (`Inbox\InboxStore`), and the mailing parts' `forget()` say how many
+  (they said nothing). A project with its own implementation of one of these interfaces adds the method. `ActivityEntry`
+  gains `forgetting()` and `detailsForgetting()`.
+- Changed: the Activity log page names an entry with nobody's id by the name it keeps, so an account forgotten is "A
+  deleted account", where every such entry said "The system", and an entry about an account forgotten is about "A
+  deleted account". `account.forgotten` has its words.
+- Changed (third trial, 3): every service tag is a constant of `CattoPHP\ServiceTags`, and no extension interface
+  declares a constant, so one class may implement several (a trial project's one class wording its details and linking
+  its subjects would not load: "inherits both CattoPHP\Activity\DetailWords::TAG and CattoPHP\Activity\SubjectLinks::TAG,
+  which is ambiguous"). `ExtensionPointsKernelTest` loads one class implementing all fourteen and finds it under every
+  tag, and fails if an extension interface gains a constant. Of two interfaces, only `ScheduledTask::label()` and
+  `DetailWords::label($action, $key)` share a method name: a class that is both answers both with one method.
+- Added (third trial, 11): `cattophp:icons:search <words>` (`Ui\IconSearchCommand`), so an icon's name is found, not
+  guessed (a trial project guessed `ladder`, which Lucide lacks): each icon that matches every word, by its name or its
+  tags, best first, with its tags beside it (`drill  power, bit, head, hole, diy, toolbox, build, construction`;
+  `borrow` finds `hand-coins` by its tag), as `IconLibrary::search()` ranks them; `--limit` (30); exit 1 and plain words
+  when nothing matches. `IconLibrary::tags($name)` gives an icon's tags.
+- Added (the plan's tooling, never built until now): `Ui\Contract\AddressContract`, the contract "no row numbers in
+  addresses", for a project's contract tests: `AddressContract::rowNumbers(RouteCollection $routes, array $allowed = [])`
+  refuses, in words, every route parameter that takes a database row number (named `id` or ending in `_id`, or held to
+  digits alone, `\d+`, `[0-9]{1,9}`), over every route the router holds (the project's and the ones it imports);
+  parameters from `_` (`_format`) and Symfony's own routes (named from `_`) are left alone. A route that must keep one
+  for now is allowed by `"<route name> <parameter>" => 'why'`; an allowance without a reason, or one no route needs any
+  longer, is refused too, so the list only shrinks. `isRowNumber($parameter, $requirement)` and
+  `onlyDigits($requirement)` are its rule (ported from cattolms's `RowIdRouteContractTest`). CattoPHP's own routes pass
+  (`AddressContractKernelTest`: a role by its key, a sign-in link by its token).
+- Fixed: the New role page and a role's page drew their permission choices after the form's `form.grid`, where nothing
+  spaces a choice from the field above it (`.cl-ui-field+.cl-ui-picture-choice--cards` holds only for a choice right
+  after a field): the first sat flush against the description's help. The choices are inside the grid, `columns: 1`, the
+  pattern the guide gives for a form that mixes fields and feature cards. No rule of `cattophp.css` changed.
+
 ## 0.3.0 · 12 November 2026
 
 The modules: everything a project may need beyond the foundations, each switched on in `config/packages/cattophp.yaml`

@@ -13,4 +13,7 @@ interface SetupMarkStore
     public function save(string $key, SetupMark $mark): void;
 
     public function remove(string $key): void;
+
+    /** An account being deleted: the steps it marked stay marked, by nobody named now. Returns how many. */
+    public function forget(string $account): int;
 }

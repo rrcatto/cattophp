@@ -134,4 +134,10 @@ class SiteLog
     {
         return (int) $this->connection->executeStatement('DELETE FROM cattophp_site_requests WHERE at < :before', ['before' => $before->format(DATE_ATOM)]);
     }
+
+    /** An account being deleted: its requests stay in the Site Log, signed in as nobody now. Returns how many. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_site_requests SET account_id = NULL WHERE account_id = :account', ['account' => $account]);
+    }
 }

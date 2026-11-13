@@ -56,4 +56,10 @@ interface LinkStore
 
     /** Removes the links that ran out or were used before a moment. Returns how many went. */
     public function forgetOld(DateTimeImmutable $before): int;
+
+    /**
+     * An account being deleted: every link of its own goes, used or not, and every link made for its address before it
+     * had an account (a joining link holds the address alone). Returns how many went.
+     */
+    public function forgetAccount(string $accountId, ?string $email): int;
 }

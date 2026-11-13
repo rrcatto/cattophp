@@ -108,6 +108,21 @@ final class FileSessionStore implements SessionStore
         });
     }
 
+    public function forgetAccount(string $accountId): int
+    {
+        return $this->change(static function (array &$file) use ($accountId): int {
+            $gone = 0;
+            foreach ($file['sessions'] as $id => $row) {
+                if ($row['account'] === $accountId) {
+                    unset($file['sessions'][$id]);
+                    ++$gone;
+                }
+            }
+
+            return $gone;
+        });
+    }
+
     public function forgetOld(DateTimeImmutable $before): int
     {
         return $this->change(static function (array &$file) use ($before): int {

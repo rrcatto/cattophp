@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoPHP\Tests\Unit\SignIn;
 
 use CattoPHP\Links\FileLinkStore;
+use CattoPHP\SignIn\JoiningAccounts;
 use CattoPHP\SignIn\SignInAccount;
 use CattoPHP\SignIn\SignInAccounts;
 use CattoPHP\SignIn\SignInLinks;
@@ -120,6 +121,59 @@ final class SignInLinksTest extends TestCase
         self::assertSame(SignInLinks::SENT, $everyone->signInLinks($this->folder, $accounts)->request('learner@example.org', '203.0.113.5'));
     }
 
+    public function testAnAddressThatMayJoinIsSentALinkAndItsAccountIsMadeOnlyWhenTheLinkIsUsed(): void
+    {
+        $accounts = new class implements SignInAccounts, JoiningAccounts {
+            /** @var array<string,SignInAccount> */
+            public array $made = [];
+
+            public function forEmail(string $email): ?SignInAccount
+            {
+                return $this->made[$email] ?? null;
+            }
+
+            public function forId(string $id): ?SignInAccount
+            {
+                foreach ($this->made as $account) {
+                    if ($account->id === $id) return $account;
+                }
+
+                return null;
+            }
+
+            public function join(string $email): SignInAccount
+            {
+                return $this->made[$email] ??= new SignInAccount((string) (count($this->made) + 10), $email, 'New Person');
+            }
+        };
+        $site = new Foundations(['AUTH_SIGNIN' => 'ADMIN', 'AUTH_SIGNIN_ALLOWED_EMAILS' => 'listed@example.org']);
+        $links = $site->signInLinks($this->folder, $accounts);
+
+        self::assertSame(SignInLinks::NO_ACCOUNT, $links->request('stranger@example.org', '203.0.113.5'), 'Only an address that may join.');
+        self::assertSame(SignInLinks::SENT, $links->request('Listed@Example.org', '203.0.113.5', '/welcome'));
+        self::assertSame([], $accounts->made, 'Nothing made yet.');
+        $entry = $site->activity->recent(1)[0];
+        self::assertSame(['sign_in.joining_link_sent', null, null], [$entry->action, $entry->subjectType, $entry->subjectId], 'Nobody named, no made-up account.');
+        self::assertSame(1, preg_match('#/sign-in/link/([0-9a-f]{64})#', (string) $site->transport->last()->getTextBody(), $found));
+        $token = $found[1] ?? '';
+
+        $usable = $links->usable($token);
+        self::assertNotNull($usable);
+        self::assertSame(['', 'listed@example.org'], [$usable->accountId, $usable->joining], 'Looking makes nothing.');
+        self::assertSame([], $accounts->made);
+        $claimed = $links->claim($token);
+        self::assertSame(['10', '/welcome'], [$claimed?->accountId, $claimed?->returnPath], 'Used: the account is made now.');
+        self::assertNull($links->claim($token), 'Once.');
+        self::assertCount(1, $accounts->made);
+
+        // An address that may no longer join by the time its link is used gets nothing.
+        $late = $links->createJoining('late@example.org');
+        self::assertNull($links->claim($late));
+        self::assertCount(1, $accounts->made);
+        self::assertSame(SignInLinks::SENT, $links->request('owner@example.com', '203.0.113.5'), 'The installation\'s administrator may always join.');
+        self::assertFalse($site->signInLinks($this->folder)->joinable(), 'A project without joining: an unknown address is no account.');
+    }
+
     public function testAnAddressMaySignInAsTheSettingsSay(): void
     {
         $limited = new SignInRules((new Foundations(['AUTH_SIGNIN' => 'ADMIN', 'AUTH_SIGNIN_ALLOWED_EMAILS' => "Listed@Example.org, not-an-address;\nother@example.org listed@example.org"]))->settings);
@@ -132,6 +186,21 @@ final class SignInLinksTest extends TestCase
         self::assertFalse($open->limited());
         self::assertTrue($open->mayUse('stranger@example.org', false));
         self::assertTrue((new SignInRules((new Foundations(['AUTH_SIGNIN' => 'nonsense']))->settings))->limited(), 'anything but EVERYONE is limited, the safe one');
+    }
+
+    /**
+     * Review finding 14: the installation's administrator's address, which may always join, may always sign in too, though
+     * the project makes its account without flagging it an administrator: otherwise the account is made, the link used and
+     * signing in refused, every link after it too.
+     */
+    public function testTheAdministratorsAddressMaySignInAsItMayJoin(): void
+    {
+        $rules = new SignInRules((new Foundations(['AUTH_SIGNIN' => 'ADMIN', 'APP_ADMIN_EMAIL' => 'Owner@Example.com']))->settings);
+        $joined = new SignInAccount('9', 'owner@example.com', 'Olive Owner');
+
+        self::assertTrue($rules->mayJoin('owner@example.com'));
+        self::assertTrue($rules->maySignIn($joined), 'Not flagged, but the administrator\'s address.');
+        self::assertFalse($rules->maySignIn(new SignInAccount('10', 'anna@example.com', 'Anna Example')), 'Anyone else not listed: still not.');
     }
 
     public function testTwoStepIsRequiredAsTheSettingSays(): void

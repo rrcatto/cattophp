@@ -172,6 +172,85 @@ final class PictureChoiceTest extends TestCase
         }
     }
 
+    /**
+     * An option's keys are a set: written in any order (value, label, note, icon, as a guide lists them, or value, label,
+     * icon, note) they draw the same card, and a refusal names the key that is wrong.
+     */
+    public function testAnOptionsKeysMayComeInAnyOrderAndARefusalNamesTheKey(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>';
+        $orders = [
+            [['value' => 'worn', 'label' => 'Worn', 'icon' => $icon, 'note' => 'Still works.'], ['value' => 'new', 'label' => 'New', 'icon' => $icon]],
+            [['note' => 'Still works.', 'icon' => $icon, 'label' => 'Worn', 'value' => 'worn'], ['label' => 'New', 'value' => 'new', 'icon' => $icon]],
+            [['value' => 'worn', 'label' => 'Worn', 'note' => 'Still works.', 'icon' => $icon], ['icon' => $icon, 'value' => 'new', 'label' => 'New']],
+        ];
+        $drawn = array_map(static fn (array $items): string => UiHarness::render('form.picture-choice', ['name' => 'condition', 'legend' => 'Condition', 'selected' => 'worn', 'items' => $items]), $orders);
+        self::assertSame($drawn[0], $drawn[1], 'Any order draws the same cards.');
+        self::assertSame($drawn[0], $drawn[2]);
+        self::assertStringContainsString('Still works.', $drawn[0]);
+        self::assertSame(1, self::xpath(UiHarness::render('form.picture-choice', ['name' => 'look', 'legend' => 'Look', 'items' => [['disabled' => true, 'image' => '/a.png', 'value' => 'a', 'label' => 'A']]]))->query('//input[@disabled]')->length);
+
+        $ui = UiHarness::components();
+        foreach ([
+            'option 2 has colour, which it does not take' => [['value' => 'a', 'label' => 'A', 'icon' => $icon], ['value' => 'b', 'label' => 'B', 'icon' => $icon, 'colour' => 'red']],
+            'option 1 lacks label' => [['value' => 'a', 'icon' => $icon, 'note' => 'No label']],
+            'option 1 has image and icon, where it takes one of them' => [['value' => 'a', 'label' => 'A', 'image' => '/a.png', 'icon' => $icon]],
+            'option 1 has none of image, icon or drawing' => [['value' => 'a', 'label' => 'A', 'note' => 'Nothing to show']],
+            'option 1 has an image that is not a path on this site' => [['value' => 'a', 'label' => 'A', 'image' => 'https://example.com/a.png']],
+        ] as $said => $items) {
+            try {
+                $ui->properties('form.picture-choice', ['name' => 'look', 'legend' => 'Look', 'items' => $items]);
+                self::fail('Accepted: ' . $said);
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString('in any order: ' . $said . '.', $refused->getMessage());
+            }
+        }
+    }
+
+    /**
+     * A refused choice shows why as form.field does (cl-ui-field-error, role alert) under its legend and help, the fieldset
+     * described by both and every control aria-invalid; its ids come from id, else the field's name. Without an error the
+     * markup is exactly as it was.
+     */
+    public function testARefusedChoiceShowsWhyBesideItAsAFieldDoes(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>';
+        $items = [
+            ['value' => 'good', 'label' => 'Good', 'icon' => $icon, 'note' => 'Ready to lend.'],
+            ['value' => 'worn', 'label' => 'Worn', 'icon' => $icon],
+            ['value' => 'needs_repair', 'label' => 'Needs repair', 'icon' => $icon, 'disabled' => true],
+        ];
+        $plain = ['name' => 'condition', 'legend' => 'Condition', 'items' => $items, 'selected' => 'good', 'help' => 'How it is now.'];
+        $before = UiHarness::render('form.picture-choice', $plain);
+        self::assertSame($before, UiHarness::render('form.picture-choice', $plain + ['error' => '']), 'No error: the markup as it always was.');
+        self::assertStringNotContainsString('aria-', str_replace('aria-hidden="true"', '', $before));
+
+        $xpath = self::xpath(UiHarness::render('form.picture-choice', $plain + ['error' => 'Choose the condition it is in <now>.']));
+        self::assertSame(1, $xpath->query('//fieldset[@aria-describedby="condition-help condition-error"]')->length, 'Described by its help and its error.');
+        self::assertSame(1, $xpath->query('//fieldset/div[@class="cl-ui-field-help" and @id="condition-help"]/following-sibling::div[1][@class="cl-ui-field-error" and @role="alert" and @id="condition-error"]/following-sibling::div[1][@class="cl-ui-picture-choice-grid"]')->length, 'Under the legend and help, above the cards.');
+        self::assertSame('Choose the condition it is in <now>.', trim((string) $xpath->query('//*[@id="condition-error"]')->item(0)?->textContent), 'Escaped words.');
+        self::assertSame(3, $xpath->query('//input[@type="radio" and @aria-invalid="true"]')->length, 'Every control is marked.');
+
+        $own = self::xpath(UiHarness::render('form.picture-choice', ['name' => 'slide[build]', 'legend' => 'Build', 'items' => $items, 'error' => 'Choose one.']));
+        self::assertSame(1, $own->query('//fieldset[not(@id) and @aria-describedby="slide-build-error"]/div[@id="slide-build-error"]')->length, 'Without help or an id: named after the field.');
+        $ticks = self::xpath(UiHarness::render('form.picture-choice', ['multiple' => true, 'list' => 'topics', 'legend' => 'Topics', 'selected' => [], 'items' => $items, 'id' => 'topic-choice', 'error' => 'Tick at least one.']));
+        self::assertSame(1, $ticks->query('//fieldset[@id="topic-choice" and @aria-describedby="topic-choice-error"]')->length, 'An id given names it.');
+        self::assertSame(3, $ticks->query('//input[@type="checkbox" and @name="topics[]" and @aria-invalid="true"]')->length);
+
+        $ui = UiHarness::components();
+        foreach ([
+            ['multiple' => true, 'selected' => [], 'items' => [['value' => 'news', 'label' => 'News', 'icon' => $icon]], 'error' => 'Tick one.'],
+            ['name' => 'condition', 'error' => ['not words']],
+        ] as $broken) {
+            try {
+                $ui->properties('form.picture-choice', $broken + ['name' => '', 'legend' => 'Topics', 'items' => $items]);
+                self::fail('Accepted ' . json_encode($broken));
+            } catch (\InvalidArgumentException $refused) {
+                self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage());
+            }
+        }
+    }
+
     /** Words that need markup go in a block when the component is embedded: a card's links, a price with its was price. */
     public function testACardsTitleAndNoteCanHoldMarkupWhenEmbedded(): void
     {

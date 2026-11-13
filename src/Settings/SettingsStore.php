@@ -19,4 +19,7 @@ interface SettingsStore
 
     /** Whether overrides can be saved at all: false for an installation that keeps its settings in .env alone. */
     public function isWritable(): bool;
+
+    /** An account being deleted: what it saved is kept, no longer saying who saved it. Returns how many settings. */
+    public function forgetAccount(string $accountId): int;
 }

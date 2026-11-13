@@ -1,0 +1,23 @@
+{# A new role: its key, its name, what it is for and what it allows. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{{ ui('action.link', {label: 'Every role', href: path('cattophp_admin_roles'), icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'new-role-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The role', heading_id: 'new-role-heading', summary: 'Tick what someone holding it may do. A permission marked administrators alone stays with the Administrator role.'}) }}
+<form method="post" action="{{ path('cattophp_admin_role_make') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Key', for: 'role-key', required: true, help: '2 to 40 capital letters, digits and underscores, starting with a letter, such as EDITOR. It cannot be changed here later.'})} %}{% block control %}<input class="cl-input" id="role-key" type="text" name="key" value="{{ typed.key }}" maxlength="40" required pattern="[A-Za-z][A-Za-z0-9_]{1,39}" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'role-name', required: true, help: 'What people read, up to 80 characters.'})} %}{% block control %}<input class="cl-input" id="role-name" type="text" name="name" value="{{ typed.name }}" maxlength="80" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'role-description', full_width: true, help: 'One or two sentences, optional.'})} %}{% block control %}<textarea class="cl-input" id="role-description" name="description" rows="2" maxlength="500" {{ ui_field_attrs(props) }}>{{ typed.description }}</textarea>{% endblock %}{% endembed %}
+{# The permissions inside the form's grid, so each choice takes the grid's gap like a field. #}
+{% for group in permission_groups %}
+{{ ui('form.picture-choice', {legend: group.group, id: group.id, items: group.items, multiple: true, list: 'permissions', selected: group.selected}) }}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the role', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

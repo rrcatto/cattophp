@@ -12,8 +12,6 @@ namespace CattoPHP\Ui;
  */
 interface DrawingCheck
 {
-    public const TAG = 'cattophp.ui_drawing';
-
     /** Whether the markup is one of the project's own drawings, with nothing in it that runs. */
     public function allows(string $drawing): bool;
 }

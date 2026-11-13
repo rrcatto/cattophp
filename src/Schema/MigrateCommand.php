@@ -10,8 +10,11 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-/** `bin/console cattophp:migrate`: applies CattoPHP's schema steps; `--dry-run` only lists what it would apply. */
-#[AsCommand(name: 'cattophp:migrate', description: 'Applies the schema steps of the records CattoPHP keeps')]
+/**
+ * `bin/console cattophp:migrate`: applies the schema steps not applied yet, CattoPHP's and the project's own (its classes
+ * implementing SchemaStep), in the order of their ids; `--dry-run` only lists what it would apply.
+ */
+#[AsCommand(name: 'cattophp:migrate', description: 'Applies the schema steps not yet applied: CattoPHP\'s and the project\'s own')]
 final class MigrateCommand extends Command
 {
     public function __construct(private readonly SchemaRunner $runner)

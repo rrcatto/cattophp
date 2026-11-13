@@ -131,6 +131,15 @@ final class ComponentsTest extends TestCase
                 self::assertStringContainsString('ab', $exception->getMessage());
             }
         }
+        // A tab's keys are a set: in any order they draw the same tabs, and a refusal names the key that is wrong.
+        $tabs = static fn (array $items): string => UiHarness::render('layout.tabs', ['items' => $items, 'current' => 'b', 'aria_label' => 'Tabs']);
+        self::assertSame($tabs([['key' => 'a', 'label' => 'A', 'href' => '/a'], ['key' => 'b', 'label' => 'B', 'href' => '/b']]), $tabs([['href' => '/a', 'label' => 'A', 'key' => 'a'], ['label' => 'B', 'key' => 'b', 'href' => '/b']]));
+        try {
+            UiHarness::components()->properties('layout.tabs', ['items' => [['key' => 'a', 'label' => 'A', 'href' => '/a'], ['href' => '/b', 'label' => 'B', 'class' => 'x']], 'current' => 'a', 'aria_label' => 'Tabs']);
+            self::fail('Accepted a tab without a key.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('in any order: tab 2 lacks key and has class, which it does not take.', $exception->getMessage());
+        }
     }
 
     public function testAFieldsControlCarriesOnlyItsRelationshipsToHelpAndError(): void

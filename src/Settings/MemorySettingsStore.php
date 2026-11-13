@@ -40,6 +40,19 @@ final class MemorySettingsStore implements SettingsStore
         return $had;
     }
 
+    public function forgetAccount(string $accountId): int
+    {
+        $changed = 0;
+        foreach ($this->stored as $name => $setting) {
+            if ($setting->updatedBy === $accountId) {
+                $this->stored[$name] = new StoredSetting($setting->value, $setting->secret, $setting->updatedAt, null);
+                ++$changed;
+            }
+        }
+
+        return $changed;
+    }
+
     public function isWritable(): bool
     {
         return $this->writable;

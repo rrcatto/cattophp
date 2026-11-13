@@ -1,20 +1,25 @@
-{% extends cattophp.layout %}
-{% block body %}
-<main class="cl-sign-in">
-<h1>{{ title }}</h1>
+{#
+	The one-time code after the link: set up with the QR code the first time (nothing is kept until a right code proves the
+	phone holds the key), then the code from the app, or a recovery code where the installation gives them.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section cl-sign-in">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'code-heading'})} %}{% block surface_body %}
 {% if set_up %}
-<p>Type the code your authenticator app shows now{% if recovery_codes %}, or one of your recovery codes{% endif %}.</p>
+{{ ui('layout.section-head', {heading: 'The code from your phone', heading_id: 'code-heading', summary: 'Type the code your authenticator app shows now' ~ (recovery_codes ? ', or one of your recovery codes.' : '.')}) }}
 {% else %}
-<p>This sign-in asks for a code from your phone as well as your email. In the authenticator app on your phone, add an account and scan this QR code.</p>
+{{ ui('layout.section-head', {heading: 'Scan this with your phone', heading_id: 'code-heading', summary: 'This sign-in asks for a code from your phone as well as your email. In the authenticator app on your phone, add an account and scan this QR code.'}) }}
 <div class="cl-two-step-qr">{{ qr_code|raw }}</div>
-<details><summary>Cannot scan it? Type a key instead</summary><p class="cl-two-step-key">{{ secret }}</p></details>
+<details class="cl-disclosure"><summary>Cannot scan it? Type a key instead</summary><p class="cl-two-step-key" data-two-step-key>{{ secret }}</p></details>
 <p>Then type the 6 digits the app shows, to prove it holds the key. Until then nothing is kept.</p>
 {% endif %}
-{% if note %}<p class="cl-sign-in-note" role="status"><strong>{{ note }}</strong></p>{% endif %}
+{% if note %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p class="cl-sign-in-note">{{ note }}</p>{% endblock %}{% endembed %}{% endif %}
 <form method="post" action="{{ path('cattophp_sign_in_code_check') }}">
 <input type="hidden" name="_token" value="{{ form_token() }}">
-<label>{% if set_up and recovery_codes %}The code{% else %}The 6 digits it shows now{% endif %} <input type="text" name="code" required autocomplete="one-time-code" maxlength="12" spellcheck="false"></label>
-<button type="submit">Sign in</button>
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: set_up and recovery_codes ? 'The code' : 'The 6 digits it shows now', for: 'sign-in-code', required: true})} %}{% block control %}<input class="cl-input cl-input-code" id="sign-in-code" type="text" name="code" required autocomplete="one-time-code" maxlength="12" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Sign in', type: 'submit', icon: 'action-open', variant: 'primary'}) }}{% endblock %}{% endembed %}
 </form>
-</main>
+{% endblock %}{% endembed %}
+</section>
 {% endblock %}

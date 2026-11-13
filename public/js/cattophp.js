@@ -439,7 +439,8 @@
        only when the table truly cannot hold everything. When everything fits, the spare width goes to each column in
        proportion to what it holds. The widths are kept as percentages of the table, and worked out again when the
        window changes size, a page turns or a closed section opens. Without JavaScript the server's percentages stand.
-       A table drawn with fit: false (data-column-fit="off") keeps its natural widths and scrolls sideways in its box. */
+       A table drawn with fit: false (data-column-fit="off") keeps its natural widths and scrolls sideways in its box, and one
+       drawn with stack: true (data-stack="narrow") is cards on a narrow screen, fitted only when it is a table again. */
     // The one-line columns share space as above; a column whose text wraps (cell-text, such as a long title) loses
     // nothing by being narrower, so it gives way: it keeps a floor of 10rem and takes whatever the others leave.
     const waterFill = (needs, indexes, available, widths) => {
@@ -476,6 +477,9 @@
         const table = wrapper.querySelector(':scope > table');
         const head = table && table.tHead && table.tHead.rows[0];
         if (!head || !wrapper.clientWidth) return;
+        // A table drawn with stack: true is cards on a narrow screen (its rows are blocks): it has no columns to share out
+        // until the screen is wide enough again, when it is fitted then.
+        if (wrapper.dataset.stack && getComputedStyle(table).display !== 'table') return;
         const columns = [...head.cells];
         // A header or row cell spanning columns cannot be measured one column at a time.
         if (columns.some(cell => cell.colSpan > 1) || [...table.tBodies].some(body => [...body.rows].some(row => [...row.cells].some(cell => cell.colSpan > 1)))) return;

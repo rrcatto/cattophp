@@ -13,6 +13,8 @@ use CattoPHP\Api\ApiTokenAuthenticator;
 use CattoPHP\SignIn\SignInAuthenticator;
 use CattoPHP\SignIn\SignInEntryPoint;
 use CattoPHP\SignIn\SignInUserProvider;
+use CattoPHP\ServiceTags;
+use CattoPHP\Tests\Support\EveryExtension;
 use CattoPHP\Tests\Support\ExampleSetupSteps;
 use CattoPHP\Tests\Support\RecordingLogger;
 use CattoPHP\Tests\Support\RecordingTransport;
@@ -23,6 +25,9 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
@@ -48,10 +53,17 @@ final class TestKernel extends Kernel
      * @param bool $search a public site with search engines and AI: its public pages, sitemap sources and llms.txt
      * @param bool $documents a project that draws documents and PDFs
      * @param bool $api a project with an API: its firewall, a scope and two routes
+     * @param bool $stockPages CattoPHP's Administration pages and Sign-in and security, their route files imported
+     * @param bool $accounts the project's own accounts (ExampleAccounts), where people join by signing in, in place of the owner alone
+     * @param bool $signIns the sign-ins a person can see and end kept (sign_in.sessions)
+     * @param bool $projectStep a schema step of the project's own
+     * @param bool $debug the kernel in debug, as a development site's is (RunMode::debug()); the tests' kernel is not
+     * @param bool $everyExtension one class of the project's implementing every extension interface (EveryExtension), its
+     *                             tags kept as the parameter test.every_extension_tags
      */
-    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null, private readonly bool $scheduler = false, private readonly bool $setup = false, private readonly bool $protection = false, private readonly bool $telegram = false, private readonly bool $search = false, private readonly bool $documents = false, private readonly bool $api = false, private readonly bool $signup = false, private readonly bool $identity = false, private readonly bool $inbox = false, private readonly bool $mailing = false)
+    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null, private readonly bool $scheduler = false, private readonly bool $setup = false, private readonly bool $protection = false, private readonly bool $telegram = false, private readonly bool $search = false, private readonly bool $documents = false, private readonly bool $api = false, private readonly bool $signup = false, private readonly bool $identity = false, private readonly bool $inbox = false, private readonly bool $mailing = false, private readonly bool $stockPages = false, private readonly bool $accounts = false, private readonly bool $signIns = false, private readonly bool $projectStep = false, bool $debug = false, private readonly bool $everyExtension = false)
     {
-        parent::__construct('test', false);
+        parent::__construct('test', $debug);
     }
 
     public function registerBundles(): iterable
@@ -66,7 +78,7 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme, $this->scheduler, $this->setup, $this->protection, $this->telegram, $this->search, $this->documents, $this->api]));
+        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme, $this->scheduler, $this->setup, $this->protection, $this->telegram, $this->search, $this->documents, $this->api, $this->signup, $this->identity, $this->inbox, $this->mailing, $this->stockPages, $this->accounts, $this->signIns, $this->projectStep, $this->debug, $this->everyExtension]));
     }
 
     public function getLogDir(): string
@@ -121,7 +133,7 @@ final class TestKernel extends Kernel
                 'MAIL_FROM_ADDRESS' => 'site@example.com',
                 'APP_SITE_MODE' => 'live',
             ],
-            'sign_in' => $this->ownSessions ? ['enabled' => false] : ['after' => '/'],
+            'sign_in' => $this->ownSessions ? ['enabled' => false] : ['after' => '/'] + ($this->accounts ? ['accounts' => ExampleAccounts::class] : []) + ($this->signIns ? ['sessions' => true] : []),
             // A directive with a hyphen, as a project writes it in YAML.
             'security_headers' => ['policy' => ['img-src' => "'self'"]],
         ] + ($this->theme !== null ? ['theme' => [
@@ -150,6 +162,11 @@ final class TestKernel extends Kernel
             $services->set(ExampleSitemapPages::class);
             $services->set(ExampleSitemapGuides::class);
         }
+        if ($this->stockPages) {
+            // Found by autoconfiguration, as a project's own words and links are.
+            $services->set(ExampleDetailWords::class);
+            $services->set(ExampleSubjectLinks::class);
+        }
         if ($this->scheduler) {
             // Found by autoconfiguration, as a project's own tasks are.
             $services->set(ExampleKernelTask::class);
@@ -157,9 +174,20 @@ final class TestKernel extends Kernel
         if ($this->theme !== null) {
             $services->set(ExamplePages::class);
         }
+        if ($this->accounts) {
+            $services->set(ExampleAccounts::class)->public();
+        }
+        if ($this->projectStep) {
+            // Found by autoconfiguration, as a project's own steps are.
+            $services->set(ExampleSchemaStep::class);
+        }
         if ($this->setup) {
             // Found by autoconfiguration, as a project's own steps are.
             $services->set(ExampleSetupSteps::class)->public();
+        }
+        if ($this->everyExtension) {
+            // Found by autoconfiguration under every tag at once.
+            $services->set(EveryExtension::class)->public();
         }
         $services->set(RecordingTransport::class)->public();
         $services->set('logger', RecordingLogger::class)->public();
@@ -174,10 +202,28 @@ final class TestKernel extends Kernel
         }
     }
 
+    protected function build(ContainerBuilder $container): void
+    {
+        if ($this->everyExtension) {
+            // The tags autoconfiguration gave the one class, read once every pass that adds tags has run.
+            $container->addCompilerPass(new class implements CompilerPassInterface {
+                public function process(ContainerBuilder $container): void
+                {
+                    $tags = array_keys($container->getDefinition(EveryExtension::class)->getTags());
+                    $container->setParameter('test.every_extension_tags', array_values(array_intersect($tags, ServiceTags::EXTENSION_POINTS)));
+                }
+            }, PassConfig::TYPE_BEFORE_REMOVING);
+        }
+    }
+
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
         if (!$this->ownSessions) {
             $routes->import(dirname(__DIR__, 3) . '/config/routes/sign_in.php');
+        }
+        if ($this->stockPages) {
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/admin.php');
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/account.php');
         }
         $routes->add('home', '/')->controller([PagesController::class, 'home']);
         $routes->add('settings_page', '/settings')->controller([PagesController::class, 'settings']);

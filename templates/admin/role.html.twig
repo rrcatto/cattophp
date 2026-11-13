@@ -1,0 +1,63 @@
+{#
+	One role: what it allows, as feature cards to tick, and who holds it, with Take away and a form to give it to someone by
+	their email address. The Administrator role holds every permission and is never changed or deleted.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{{ ui('action.link', {label: 'Every role', href: path('cattophp_admin_roles'), icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'allows-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'What it allows', heading_id: 'allows-heading', summary: role.administrator ? 'Every permission there is, now and as new ones are added.' : (may_change ? 'Tick what someone holding this role may do. A permission marked administrators alone stays with the Administrator role.' : 'What someone holding this role may do. Changing it needs a role that allows changing roles.')}) }}
+{{ ui('data.key-value-list', {items: [{label: 'Key', value: role.key}, {label: 'Name', value: role.name}]}) }}
+{% if not role.administrator %}
+<form method="post" action="{{ path('cattophp_admin_role_save', {key: role.key}) }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'role-name', required: true, help: 'What people read, up to 80 characters.'})} %}{% block control %}<input class="cl-input" id="role-name" type="text" name="name" value="{{ role.name }}" maxlength="80" required{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'role-description', full_width: true, help: 'One or two sentences, optional.'})} %}{% block control %}<textarea class="cl-input" id="role-description" name="description" rows="2" maxlength="500"{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>{{ role.description }}</textarea>{% endblock %}{% endembed %}
+{# The permissions inside the form's grid, so each choice takes the grid's gap like a field. #}
+{% for group in permission_groups %}
+{{ ui('form.picture-choice', {legend: group.group, id: group.id, items: group.items, multiple: true, list: 'permissions', selected: group.selected}) }}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% if may_change %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the role', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}{% endembed %}
+{% endif %}
+</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="holders">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'holders-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Who holds it', heading_id: 'holders-heading', summary: holders ? 'Taking it away takes away what it allows at their next page.' : 'Nobody holds it yet.'}) }}
+{% if holders %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Who holds the role ' ~ role.name, stack: true})} %}
+{% block header %}<tr><th scope="col">Name</th><th scope="col">Email address</th><th scope="col">Take it away</th></tr>{% endblock %}
+{% block body %}
+{% for holder in holders %}
+<tr><td data-label="Name">{{ holder.name }}{% if holder.you %} (you){% endif %}</td><td data-label="Email address">{{ holder.email }}</td>{% set may_take = may_change and not (holder.you and role.administrator) %}<td{% if may_take %} data-label="Take it away"{% endif %}>{% if may_take %}<form method="post" action="{{ path('cattophp_admin_role_take', {key: role.key}) }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="account" value="{{ holder.id }}">{{ ui('action.button', {label: 'Take away', type: 'submit', icon: 'action-revoke', size: 'small'}) }}</form>{% endif %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endif %}
+{% if may_give %}
+<form method="post" action="{{ path('cattophp_admin_role_give', {key: role.key}) }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Give it to', for: 'give-email', required: true, help: 'The email address of someone with an account here.'})} %}{% block control %}<input class="cl-input" id="give-email" type="email" name="email" value="{{ give_email }}" maxlength="254" required autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Give the role', type: 'submit', icon: 'action-grant', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% if may_change and not role.administrator %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'delete-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Delete this role', heading_id: 'delete-heading', summary: 'Everyone holding it loses what it allows. This cannot be undone.'}) }}
+<form method="post" action="{{ path('cattophp_admin_role_delete', {key: role.key}) }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{{ ui('action.button', {label: 'Delete the role', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: 'Delete the role ' ~ role.name ~ '? Everyone holding it loses what it allows.'}) }}
+</form>
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

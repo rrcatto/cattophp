@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CattoPHP\SignIn;
 
 use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Http\AfterResponse;
 use CattoPHP\Http\BotCheck;
 use CattoPHP\Http\FormToken;
 use CattoPHP\Installation\Installation;
@@ -25,8 +27,11 @@ use Twig\Environment;
 
 /**
  * Signing in: an emailed link, then, where the account needs it, a one-time code (set up with a QR code the first
- * time). Every address sees the same pages, so nobody learns which ones have accounts. The pages are
- * `@CattoPHP/sign_in/*.html.twig`, which a project replaces with its own under `templates/bundles/CattoPHPBundle/`.
+ * time). Every address sees the same pages, so nobody learns which ones have accounts, and the link is asked for once the
+ * answer has gone (Http\AfterResponse), so neither does how long the page takes. The pages are
+ * `@CattoPHP/sign_in/*.html.twig`, drawn in the project's theme where it has one (they extend `@CattoPHP/page/stock.html.twig`),
+ * which a project may replace with its own under `templates/bundles/CattoPHPBundle/`. Where the project keeps sign-ins a
+ * person can see and end (`sign_in.sessions`), each one is kept as it finishes and ended at signing out.
  */
 final class SignInController
 {
@@ -46,6 +51,8 @@ final class SignInController
         private readonly ClockInterface $clock,
         private readonly string $after = '/',
         private readonly ?PageRenderer $pages = null,
+        private readonly ?SignInSessions $sessions = null,
+        private readonly ?AfterResponse $afterResponse = null,
     ) {
     }
 
@@ -71,11 +78,22 @@ final class SignInController
 
             return $this->redirect($this->urls->generate('cattophp_sign_in_sent'));
         }
-        try {
-            $this->links->request($email, (string) $request->getClientIp(), $request->request->get('return') === null ? null : (string) $request->request->get('return'));
-        } catch (MailNotSent $failure) {
-            // The page says the same whatever happened: what went wrong is in the log.
-            $this->logger->error('A sign-in email could not be sent: {message}', ['message' => $failure->getMessage()]);
+        $networkAddress = (string) $request->getClientIp();
+        $return = $request->request->get('return') === null ? null : (string) $request->request->get('return');
+        $ask = function () use ($email, $networkAddress, $return): void {
+            try {
+                $this->links->request($email, $networkAddress, $return);
+            } catch (MailNotSent $failure) {
+                // The page says the same whatever happened: what went wrong is in the log.
+                $this->logger->error('A sign-in email could not be sent: {message}', ['message' => $failure->getMessage()]);
+            }
+        };
+        // Once the answer has gone, for every address alike, so how long the page takes never tells whether an address
+        // has an account, may join or neither (a project that makes this controller itself without AfterResponse asks now).
+        if ($this->afterResponse !== null) {
+            $this->afterResponse->later($ask);
+        } else {
+            $ask();
         }
 
         return $this->redirect($this->urls->generate('cattophp_sign_in_sent'));
@@ -147,14 +165,14 @@ final class SignInController
         $typed = (string) $request->request->get('code', '');
         $codes = [];
         if ($this->twoStep->isSetUp($account->id)) {
-            $right = $this->twoStep->check($account->id, $typed);
+            $right = $this->twoStep->check($account->id, $typed, new Actor($account->id, $account->name));
         } else {
-            $made = $this->twoStep->setUp($account->id, $this->flow->pendingSecret($session), $typed);
+            $made = $this->twoStep->setUp($account->id, $this->flow->pendingSecret($session), $typed, new Actor($account->id, $account->name));
             $right = $made !== null;
             $codes = $made ?? [];
         }
         if (!$right) {
-            $this->activity->record('sign_in.wrong_code', [], 'account', $account->id);
+            $this->activity->record('sign_in.wrong_code', [], 'account', $account->id, new Actor($account->id, $account->name));
             if ($this->flow->wrongCode($session)) {
                 return $this->startPage($request, 'Too many wrong codes. Ask for a new link.');
             }
@@ -181,6 +199,7 @@ final class SignInController
         $user = $this->security->getUser();
         if ($this->tokens->isValid($request) && $user !== null) {
             $this->activity->record('sign_in.signed_out', [], 'account', $user instanceof SignInUser ? $user->id : $user->getUserIdentifier());
+            $this->sessions?->finish($request->getSession());
             $this->security->logout(false);
             $request->getSession()->invalidate();
         }
@@ -194,6 +213,8 @@ final class SignInController
         $session = $request->getSession();
         $this->security->login(SignInUser::of($account, $this->rules->isAdministrator($account)), SignInAuthenticator::class);
         $this->flow->signedIn($session, $this->now());
+        // Kept among the sign-ins the person can see and end, where the project keeps them (sign_in.sessions).
+        $this->sessions?->begin($session, $account, $request);
         $this->activity->record('sign_in.signed_in', [], 'account', $account->id);
         if ($recoveryCodes !== []) {
             $this->flow->showRecoveryCodes($session, $recoveryCodes);

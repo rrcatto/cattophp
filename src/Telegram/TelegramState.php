@@ -42,4 +42,10 @@ class TelegramState
     {
         $this->connection->executeStatement('DELETE FROM cattophp_telegram_state WHERE name = :name', ['name' => $name]);
     }
+
+    /** An account being deleted: the bot's values it saved stay, no longer saying who saved them. Returns how many. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_telegram_state SET updated_by = NULL WHERE updated_by = :account', ['account' => $account]);
+    }
 }

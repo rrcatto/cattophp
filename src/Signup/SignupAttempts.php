@@ -168,4 +168,10 @@ final class SignupAttempts
     {
         return '{' . implode(',', array_map(static fn(string $value): string => '"' . addcslashes($value, '"\\') . '"', $values)) . '}';
     }
+
+    /** An account being deleted: the sign-up attempt that made it goes, with what the check found. Returns how many. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('DELETE FROM cattophp_signup_attempts WHERE account = :account', ['account' => $account]);
+    }
 }

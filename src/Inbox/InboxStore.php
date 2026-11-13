@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Inbox;
 
+use CattoPHP\Account\AccountRecords;
 use Doctrine\DBAL\Connection;
 use RuntimeException;
 
@@ -278,6 +279,48 @@ final class InboxStore
              ON CONFLICT (conversation_id) DO UPDATE SET verdict = EXCLUDED.verdict, tokens = EXCLUDED.tokens, trained_by = EXCLUDED.trained_by, trained_at = NOW()',
             ['id' => $id, 'verdict' => $verdict, 'tokens' => json_encode($words, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'actor' => $actor],
         );
+    }
+
+    /**
+     * An account being deleted: the messages it sent (from its account, or from its address $email) stay, naming nobody
+     * now: no account or account reference, the sender's name empty, their address AccountRecords::FORGOTTEN_EMAIL and no
+     * network address or browser, and in each message of those conversations its address, wherever it was the sender or
+     * the one written to, the forgotten address too, a received message's sender's name empty. What it answered, wrote,
+     * taught the spam filter and blocked stays too, no longer saying who did it.
+     *
+     * @return array{conversations:int,answered:int,written:int,trained:int,blocked:int}
+     */
+    public function forgetAccount(string $account, ?string $email = null): array
+    {
+        $by = ['account' => $account];
+        $email = mb_strtolower(trim((string) $email));
+        $sent = array_map('intval', $this->connection->fetchFirstColumn(
+            "SELECT id FROM cattophp_inbox_conversations WHERE account = :account OR (:email <> '' AND LOWER(sender_email) = :email) ORDER BY id",
+            $by + ['email' => $email],
+        ));
+        if ($sent !== []) {
+            $ids = ['ids' => '{' . implode(',', $sent) . '}', 'forgotten' => AccountRecords::FORGOTTEN_EMAIL, 'email' => $email];
+            $this->connection->executeStatement(
+                "UPDATE cattophp_inbox_items SET from_name = CASE WHEN direction = 'received' THEN '' ELSE from_name END,
+                        from_email = CASE WHEN direction = 'received' OR (:email <> '' AND LOWER(from_email) = :email) THEN :forgotten ELSE from_email END,
+                        to_email = CASE WHEN :email <> '' AND LOWER(to_email) = :email THEN :forgotten ELSE to_email END
+                  WHERE conversation_id = ANY(CAST(:ids AS bigint[]))",
+                $ids,
+            );
+            $this->connection->executeStatement(
+                "UPDATE cattophp_inbox_conversations SET account = NULL, account_reference = NULL, sender_name = '', sender_email = :forgotten, sender_ip = NULL, sender_agent = NULL
+                  WHERE id = ANY(CAST(:ids AS bigint[]))",
+                ['ids' => $ids['ids'], 'forgotten' => AccountRecords::FORGOTTEN_EMAIL],
+            );
+        }
+
+        return [
+            'conversations' => count($sent),
+            'answered' => (int) $this->connection->executeStatement('UPDATE cattophp_inbox_conversations SET answered_by = NULL WHERE answered_by = :account', $by),
+            'written' => (int) $this->connection->executeStatement('UPDATE cattophp_inbox_items SET written_by = NULL WHERE written_by = :account', $by),
+            'trained' => (int) $this->connection->executeStatement('UPDATE cattophp_inbox_spam_training SET trained_by = NULL WHERE trained_by = :account', $by),
+            'blocked' => (int) $this->connection->executeStatement('UPDATE cattophp_inbox_blocked_senders SET created_by = NULL WHERE created_by = :account', $by),
+        ];
     }
 
     /** Forgets everything the filter learnt. */

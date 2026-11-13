@@ -9,7 +9,6 @@ use CattoPHP\Search\PageHead;
 use CattoPHP\Search\PublicPage;
 use CattoPHP\Search\PublicPageProvider;
 use CattoPHP\Search\PublicPages;
-use CattoPHP\Settings\EnvironmentValues;
 use CattoPHP\Tests\Support\Foundations;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -81,6 +80,16 @@ final class PageHeadTest extends TestCase
         self::assertSame('https://example.com', $head->base());
     }
 
+    public function testThePagesLanguageIsTheInstallationsLocaleASetting(): void
+    {
+        $site = new Foundations();
+        $head = new PageHead(new PublicPages([self::provider()]), $site->installation);
+        self::assertSame('en-GB', $head->language(), 'None set: plain British English, never one read from the process\'s environment.');
+        $site->settings->set('APP_LOCALE', 'en_ZA');
+        self::assertSame('en-ZA', $head->language(), 'As the Settings page says.');
+        self::assertSame('en_ZA', $head->complete('guides', [], '/guides', [], 'Guides')['og']['locale'] ?? null);
+    }
+
     public function testAPublicPageIsCheckedAndFoundByItsKey(): void
     {
         $pages = new PublicPages([self::provider()]);
@@ -95,7 +104,7 @@ final class PageHeadTest extends TestCase
 
     private static function head(string $address = 'https://example.com', bool $picture = true): PageHead
     {
-        $site = new Foundations(['APP_URL' => $address]);
+        $site = new Foundations(['APP_URL' => $address, 'APP_LOCALE' => 'en_ZA']);
         $shared = $picture ? new class implements DefaultSharePicture {
             public function url(string $base): string
             {
@@ -113,7 +122,7 @@ final class PageHeadTest extends TestCase
             }
         } : null;
 
-        return new PageHead(new PublicPages([self::provider()]), $site->installation, new EnvironmentValues(['APP_LOCALE' => 'en_ZA']), null, $shared);
+        return new PageHead(new PublicPages([self::provider()]), $site->installation, null, $shared);
     }
 
     private static function provider(): PublicPageProvider

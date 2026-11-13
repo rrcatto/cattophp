@@ -51,4 +51,10 @@ class RefusedEmails
 
         return $value === false || $value === null ? null : (string) $value;
     }
+
+    /** An account being deleted: the addresses it refused stay refused, no longer saying who refused them. Returns how many. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_site_refused_emails SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
+    }
 }

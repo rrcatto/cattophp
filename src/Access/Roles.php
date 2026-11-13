@@ -206,11 +206,17 @@ final class Roles
             if ($actor !== null && $actor->id === $accountId) {
                 throw new AccessRefused('You cannot take the Administrator role from yourself: another administrator can.');
             }
-            if (count($this->holders(self::ADMIN)) <= 1) {
+            // Counted and taken away as one step, so two administrators taking it from each other at once leave one.
+            if (!$this->store->revokeUnlessLast($accountId, $roleKey)) {
+                unset($this->held[$accountId]);
+                if (!in_array(self::ADMIN, $this->rolesOf($accountId), true)) {
+                    return;
+                }
                 throw new AccessRefused('This is the last administrator: give the role to someone else first.');
             }
+        } else {
+            $this->store->revoke($accountId, $roleKey);
         }
-        $this->store->revoke($accountId, $roleKey);
         unset($this->held[$accountId]);
         $this->activity->record('access.role_taken', ['role' => $roleKey, 'name' => $role->name], 'account', $accountId, $actor);
     }

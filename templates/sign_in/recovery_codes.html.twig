@@ -1,9 +1,11 @@
-{% extends cattophp.layout %}
-{% block body %}
-<main class="cl-sign-in">
-<h1>{{ title }}</h1>
-<p>If you lose your phone, each of these codes signs you in once in place of the code from your app. Keep them somewhere safe now: they are not shown again.</p>
+{# New recovery codes, shown once: each signs the person in once in place of the code from their app. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section cl-sign-in">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'codes-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Keep these somewhere safe', heading_id: 'codes-heading', summary: 'If you lose your phone, each of these codes signs you in once in place of the code from your app. Keep them somewhere safe now: they are not shown again.'}) }}
 <ul class="cl-recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
-<p><a href="{{ continue }}">I have kept them: continue</a></p>
-</main>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'I have kept them: continue', href: continue, icon: 'action-done', variant: 'primary'}) }}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
 {% endblock %}

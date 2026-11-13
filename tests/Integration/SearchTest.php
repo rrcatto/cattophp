@@ -10,7 +10,6 @@ use CattoPHP\Search\PageOverrides;
 use CattoPHP\Search\PublicPage;
 use CattoPHP\Search\PublicPageProvider;
 use CattoPHP\Search\PublicPages;
-use CattoPHP\Settings\EnvironmentValues;
 use CattoPHP\Tests\Support\DatabaseTestCase;
 use CattoPHP\Tests\Support\Foundations;
 use InvalidArgumentException;
@@ -25,7 +24,7 @@ final class SearchTest extends DatabaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->site = new Foundations();
+        $this->site = new Foundations(['APP_LOCALE' => 'en_ZA']);
         $this->pages = new PublicPages([new class implements PublicPageProvider {
             public function pages(): iterable
             {
@@ -51,7 +50,7 @@ final class SearchTest extends DatabaseTestCase
         self::assertSame([], $this->overrides->savePages(['pages' => ['guides' => ['title' => 'Garden guides', 'description' => 'How to plan, plant and prune.']]], $actor), 'The same again changes nothing.');
         self::assertCount(1, $this->site->activityStore->recent(5, 'search.pages_updated'));
 
-        $head = new PageHead($this->pages, $this->site->installation, new EnvironmentValues(['APP_LOCALE' => 'en_ZA']), $this->overrides);
+        $head = new PageHead($this->pages, $this->site->installation, $this->overrides);
         $meta = $head->complete('guides', ['description' => 'The page\'s own.', 'og' => ['title' => 'Guides', 'description' => 'The page\'s own.']], '/guides', [], 'Guides');
         self::assertSame('How to plan, plant and prune.', $meta['description']);
         self::assertSame('Garden guides', $meta['title']);

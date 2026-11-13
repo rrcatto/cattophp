@@ -12,7 +12,29 @@ use CattoPHP\Access\PermissionProvider;
 use CattoPHP\Access\PermissionVoter;
 use CattoPHP\Access\Roles;
 use CattoPHP\Access\RoleStore;
+use CattoPHP\Account\AccountRecords;
+use CattoPHP\Account\ForgetsAccounts;
+use CattoPHP\Account\Records\ApiRecords;
+use CattoPHP\Account\Records\IdentityRecords;
+use CattoPHP\Account\Records\InboxRecords;
+use CattoPHP\Account\Records\MailingRecords;
+use CattoPHP\Account\Records\ProtectionRecords;
+use CattoPHP\Account\Records\SearchRecords;
+use CattoPHP\Account\Records\SetupRecords;
+use CattoPHP\Account\Records\SignupRecords;
+use CattoPHP\Account\Records\TelegramRecords;
+use CattoPHP\Account\SecurityController as AccountSecurityController;
+use CattoPHP\Activity\ActionWords;
+use CattoPHP\Activity\ActivityDetails;
+use CattoPHP\Activity\DetailWords;
 use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Activity\FoundationActionWords;
+use CattoPHP\Activity\SubjectLinks;
+use CattoPHP\Admin\AccountNames;
+use CattoPHP\Admin\ActivityController as AdminActivityController;
+use CattoPHP\Admin\RolesController as AdminRolesController;
+use CattoPHP\Admin\SettingsController as AdminSettingsController;
+use CattoPHP\Admin\SettingsPage;
 use CattoPHP\Activity\ActivityStore;
 use CattoPHP\Activity\DbalActivityStore;
 use CattoPHP\Activity\FileActivityStore;
@@ -34,10 +56,14 @@ use CattoPHP\Http\FormToken;
 use CattoPHP\Http\HtmlLayout;
 use CattoPHP\Http\RequestReference;
 use CattoPHP\Http\SecurityHeadersListener;
+use CattoPHP\Http\StockPages;
+use CattoPHP\Http\AfterResponse;
 use CattoPHP\Http\Throttle;
 use CattoPHP\Http\TwigErrorPageDrawer;
 use CattoPHP\Http\TypedFormListener;
 use CattoPHP\Identity\DiditClient;
+use CattoPHP\Identity\IdentityConnection;
+use CattoPHP\Identity\IdentitySettingGroup;
 use CattoPHP\Identity\IdentityAccounts;
 use CattoPHP\Identity\IdentityApproved;
 use CattoPHP\Identity\IdentityChecks;
@@ -55,6 +81,7 @@ use CattoPHP\Inbox\InboxStore;
 use CattoPHP\Inbox\MailerReplySender;
 use CattoPHP\Inbox\ReplySender;
 use CattoPHP\Installation\Installation;
+use CattoPHP\Installation\PhpTimeZone;
 use CattoPHP\Links\DbalLinkStore;
 use CattoPHP\Links\FileLinkStore;
 use CattoPHP\Links\LinkStore;
@@ -92,6 +119,7 @@ use CattoPHP\Network\GeoIpNetworkLookup;
 use CattoPHP\Network\NetworkLookup;
 use CattoPHP\Network\NoNetworkLookup;
 use CattoPHP\Network\ReputationLists;
+use CattoPHP\Payments\GatewayConnections;
 use CattoPHP\Payments\GatewayDefinitions;
 use CattoPHP\Payments\PaymentGateways;
 use CattoPHP\Payments\PaymentSettings;
@@ -114,6 +142,7 @@ use CattoPHP\Protection\SignedInVisitors;
 use CattoPHP\Protection\SiteLog;
 use CattoPHP\Protection\SiteProtectionTask;
 use CattoPHP\Protection\VisitorAccounts;
+use CattoPHP\Runtime\RunMode;
 use CattoPHP\Runtime\SiteMode;
 use CattoPHP\Scheduler\DbalRunStore;
 use CattoPHP\Scheduler\FileRunStore;
@@ -143,6 +172,7 @@ use CattoPHP\Search\Sitemap;
 use CattoPHP\Search\SitemapSource;
 use CattoPHP\Security\KeyedHash;
 use CattoPHP\Security\SecretCipher;
+use CattoPHP\ServiceTags;
 use CattoPHP\Security\TwoStep\DbalTwoStepStore;
 use CattoPHP\Security\TwoStep\FileTwoStepStore;
 use CattoPHP\Security\TwoStep\TwoStep;
@@ -150,10 +180,14 @@ use CattoPHP\Security\TwoStep\TwoStepStore;
 use CattoPHP\Sessions\DbalSessionStore;
 use CattoPHP\Sessions\FileSessionStore;
 use CattoPHP\Sessions\SessionStore;
+use CattoPHP\Settings\ConnectionStore;
+use CattoPHP\Settings\DbalConnectionStore;
 use CattoPHP\Settings\DbalSettingsStore;
 use CattoPHP\Settings\EnvironmentValues;
 use CattoPHP\Settings\FoundationSettings;
+use CattoPHP\Settings\MemoryConnectionStore;
 use CattoPHP\Settings\MemorySettingsStore;
+use CattoPHP\Settings\ServiceConnections;
 use CattoPHP\Settings\Settings;
 use CattoPHP\Settings\SettingsCatalogue;
 use CattoPHP\Settings\SettingsProvider;
@@ -171,6 +205,7 @@ use CattoPHP\SignIn\SignInFlow;
 use CattoPHP\SignIn\SignInLinkCommand;
 use CattoPHP\SignIn\SignInLinks;
 use CattoPHP\SignIn\SignInRules;
+use CattoPHP\SignIn\SignInSessions;
 use CattoPHP\SignIn\SignInUserProvider;
 use CattoPHP\SignIn\TwoStepResetCommand;
 use CattoPHP\Signup\MailDomainCheck;
@@ -206,8 +241,10 @@ use CattoPHP\Ui\Components;
 use CattoPHP\Ui\ComponentSet;
 use CattoPHP\Ui\DrawingCheck;
 use CattoPHP\Ui\IconLibrary;
+use CattoPHP\Ui\IconSearchCommand;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service_closure;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 use InvalidArgumentException;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -215,6 +252,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Console\ConsoleEvents;
 
 /**
  * CattoPHP in a Symfony project. Its configuration (`config/packages/cattophp.yaml`) says where its records are kept
@@ -244,6 +282,7 @@ final class CattoPHPBundle extends AbstractBundle
                     ->scalarNode('after')->defaultValue('/')->info('Where a person goes after signing in')->end()
                     ->booleanNode('recovery_codes')->defaultTrue()->end()
                     ->scalarNode('two_step_file')->defaultNull()->info('With files: the file of the two-step key, {account} for one per account')->end()
+                    ->booleanNode('sessions')->defaultFalse()->info('Keep each sign-in through these pages among the sign-ins a person can see and end (cattophp_sessions), checked on every request; off for a project that keeps its sign-ins itself')->end()
                 ->end()->end()
                 ->arrayNode('security_headers')->canBeDisabled()->children()
                     ->arrayNode('policy')->normalizeKeys(false)->useAttributeAsKey('directive')->scalarPrototype()->end()->info('Content-Security-Policy directives replaced or added')->end()
@@ -406,7 +445,7 @@ final class CattoPHPBundle extends AbstractBundle
     {
         /** @var array{type:string,connection:string,folder:?string} $storage */
         $storage = $config['storage'];
-        /** @var array{enabled:bool,accounts:string,after:string,recovery_codes:bool,two_step_file:?string} $signIn */
+        /** @var array{enabled:bool,accounts:string,after:string,recovery_codes:bool,two_step_file:?string,sessions:bool} $signIn */
         $signIn = $config['sign_in'];
         /** @var array{enabled:bool,policy:array<string,string>,referrer_policy:string,permissions_policy:string,no_index:bool,no_store:bool} $headers */
         $headers = $config['security_headers'];
@@ -441,11 +480,15 @@ final class CattoPHPBundle extends AbstractBundle
             throw new InvalidArgumentException("CattoPHP's modules cannot start:\n- " . implode("\n- ", $problems));
         }
 
-        $builder->registerForAutoconfiguration(SettingsProvider::class)->addTag(SettingsProvider::TAG);
-        $builder->registerForAutoconfiguration(PermissionProvider::class)->addTag(PermissionProvider::TAG);
-        $builder->registerForAutoconfiguration(SchemaStep::class)->addTag(SchemaStep::TAG);
-        $builder->registerForAutoconfiguration(ComponentSet::class)->addTag(ComponentSet::TAG);
-        $builder->registerForAutoconfiguration(DrawingCheck::class)->addTag(DrawingCheck::TAG);
+        $builder->registerForAutoconfiguration(SettingsProvider::class)->addTag(ServiceTags::SETTINGS);
+        $builder->registerForAutoconfiguration(PermissionProvider::class)->addTag(ServiceTags::PERMISSIONS);
+        $builder->registerForAutoconfiguration(SchemaStep::class)->addTag(ServiceTags::SCHEMA_STEP);
+        $builder->registerForAutoconfiguration(ComponentSet::class)->addTag(ServiceTags::COMPONENT_SET);
+        $builder->registerForAutoconfiguration(DrawingCheck::class)->addTag(ServiceTags::DRAWING_CHECK);
+        $builder->registerForAutoconfiguration(ActionWords::class)->addTag(ServiceTags::ACTION_WORDS);
+        $builder->registerForAutoconfiguration(DetailWords::class)->addTag(ServiceTags::DETAIL_WORDS);
+        $builder->registerForAutoconfiguration(SubjectLinks::class)->addTag(ServiceTags::SUBJECT_LINKS);
+        $builder->registerForAutoconfiguration(ForgetsAccounts::class)->addTag(ServiceTags::FORGETS_ACCOUNTS);
 
         $services = $container->services()->defaults()->private()->autowire();
         $container->parameters()->set('cattophp.application_key', $config['application_key']);
@@ -467,9 +510,9 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(TwoStepStore::class, DbalTwoStepStore::class)->args([$connection]);
             // The foundations' tables, and those of the modules switched on.
             foreach (Modules::schemaSteps($on) as $step) {
-                $services->set($step)->tag(SchemaStep::TAG);
+                $services->set($step)->tag(ServiceTags::SCHEMA_STEP);
             }
-            $services->set(SchemaRunner::class)->args([$connection, tagged_iterator(SchemaStep::TAG)]);
+            $services->set(SchemaRunner::class)->args([$connection, tagged_iterator(ServiceTags::SCHEMA_STEP)]);
             $services->set(MigrateCommand::class)->tag('console.command');
         } else {
             $services->set(SettingsStore::class, MemorySettingsStore::class)->args([false]);
@@ -482,16 +525,23 @@ final class CattoPHPBundle extends AbstractBundle
 
         // The foundations.
         $services->set(ActivityLog::class)->args([service(ActivityStore::class), service('clock'), service('request_stack')->nullOnInvalid(), service('security.token_storage')->nullOnInvalid()]);
-        $services->set(FoundationSettings::class)->args([$config['site_mode'], $signIn['enabled']])->tag(SettingsProvider::TAG);
-        $services->set(SettingsCatalogue::class)->args([tagged_iterator(SettingsProvider::TAG), $config['defaults']]);
+        $services->set(FoundationSettings::class)->args([$config['site_mode'], $signIn['enabled']])->tag(ServiceTags::SETTINGS);
+        $services->set(SettingsCatalogue::class)->args([tagged_iterator(ServiceTags::SETTINGS), $config['defaults']]);
         $services->set(Settings::class);
         $services->set(Installation::class);
+        // PHP's own time zone kept to the installation's, as every request and console command starts.
+        $services->set(PhpTimeZone::class)->args([service(Installation::class)])->public()
+            ->tag('kernel.event_listener', ['event' => KernelEvents::REQUEST, 'method' => 'onRequest', 'priority' => PhpTimeZone::PRIORITY])
+            ->tag('kernel.event_listener', ['event' => ConsoleEvents::COMMAND, 'method' => 'onCommand', 'priority' => PhpTimeZone::PRIORITY]);
         $services->set(SiteMode::class)->args([$config['site_mode'] ? service(Settings::class) : null]);
-        $services->set(FoundationPermissions::class)->tag(PermissionProvider::TAG);
-        $services->set(PermissionCatalogue::class)->args([tagged_iterator(PermissionProvider::TAG)]);
+        $services->set(FoundationPermissions::class)->tag(ServiceTags::PERMISSIONS);
+        $services->set(PermissionCatalogue::class)->args([tagged_iterator(ServiceTags::PERMISSIONS)]);
         $services->set(Roles::class);
         $services->set(PermissionVoter::class)->tag('security.voter');
         $services->set(Throttle::class)->args([service('cache.app')]);
+        // Work done once the response has gone, such as asking for a sign-in link, so its time never shows.
+        $services->set(AfterResponse::class)->args([service('logger')->nullOnInvalid(), service('request_stack')->nullOnInvalid()])->public()
+            ->tag('kernel.event_listener', ['event' => KernelEvents::TERMINATE, 'method' => 'onTerminate']);
         $services->set(Mailer::class)->args([
             service(Settings::class), service(Installation::class), service(SiteMode::class), service('twig'), service('clock'), null,
             service('mailer.transport_factory')->nullOnInvalid(),
@@ -505,14 +555,16 @@ final class CattoPHPBundle extends AbstractBundle
         // Added before the project's own extensions, so a project function, filter or global of the same name wins.
         $services->set(CattoPHPExtension::class)->arg('$layout', $config['layout'])->tag('twig.extension', ['priority' => 100]);
         // The component registry, with the project's own components and the drawings it allows in a feature card.
-        $services->set(Components::class)->args([tagged_iterator(ComponentSet::TAG), tagged_iterator(DrawingCheck::TAG), $ui['icon_sprite'], $ui['public_root']])->public();
+        $services->set(Components::class)->args([tagged_iterator(ServiceTags::COMPONENT_SET), tagged_iterator(ServiceTags::DRAWING_CHECK), $ui['icon_sprite'], $ui['public_root']])->public();
         $services->set(IconLibrary::class)->args([$ui['icon_subjects'], $ui['icon_name_stop_words']])->public();
+        // cattophp:icons:search, for finding an icon's name before a template or a sprite names it.
+        $services->set(IconSearchCommand::class)->args([service(IconLibrary::class)])->tag('console.command');
         $services->set(UiExtension::class)->args([service(Components::class), service(IconLibrary::class)])->tag('twig.extension', ['priority' => 100]);
         // The scheduler, for a project with background work: its tasks are the services that implement ScheduledTask.
         /** @var array{enabled:bool,command_alias:?string,log_archive:array{enabled:bool,folder:?string,first:string}} $scheduler */
         $scheduler = $config['scheduler'];
         if ($scheduler['enabled']) {
-            $builder->registerForAutoconfiguration(ScheduledTask::class)->addTag(ScheduledTask::TAG);
+            $builder->registerForAutoconfiguration(ScheduledTask::class)->addTag(ServiceTags::SCHEDULED_TASK);
             if ($database) {
                 $services->set(RunStore::class, DbalRunStore::class)->args([service($storage['connection'])]);
             } else {
@@ -522,14 +574,29 @@ final class CattoPHPBundle extends AbstractBundle
             if ($logArchive['enabled']) {
                 if (trim((string) $logArchive['folder']) === '') throw new InvalidArgumentException('cattophp.scheduler.log_archive.folder must name the folder the logs are in.');
                 $services->set(LogArchive::class)->args([rtrim((string) $logArchive['folder'], '/'), service(Settings::class), $logArchive['first']])->public();
-                $services->set(LogArchiveTask::class)->args([service(LogArchive::class)])->tag(ScheduledTask::TAG);
-                $services->set(LogArchiveSettings::class)->tag(SettingsProvider::TAG);
+                $services->set(LogArchiveTask::class)->args([service(LogArchive::class)])->tag(ServiceTags::SCHEDULED_TASK);
+                $services->set(LogArchiveSettings::class)->tag(ServiceTags::SETTINGS);
             }
-            $services->set(Scheduler::class)->args([tagged_iterator(ScheduledTask::TAG), service(RunStore::class), service('clock')])->public();
+            // A development site, where a task may be tried as if at another moment: the kernel in debug, not in production.
+            $kernelEnvironment = $builder->hasParameter('kernel.environment') ? $builder->getParameter('kernel.environment') : null;
+            $development = $builder->hasParameter('kernel.debug') && $builder->getParameter('kernel.debug') === true
+                && is_string($kernelEnvironment) && !in_array(strtolower(trim($kernelEnvironment)), [RunMode::PRODUCTION, 'prod'], true);
+            $services->set(Scheduler::class)->args([tagged_iterator(ServiceTags::SCHEDULED_TASK), service(RunStore::class), service('clock'), null, $development])->public();
             $services->set(TaskStatus::class)->args([service(Scheduler::class), service(RunStore::class), service('clock')])->public();
             $alias = trim((string) ($scheduler['command_alias'] ?? ''));
-            $services->set(ScheduleRunCommand::class)->args([service(Scheduler::class)])
+            $services->set(ScheduleRunCommand::class)->args([service(Scheduler::class), null, param('kernel.environment'), service(PhpTimeZone::class)])
                 ->tag('console.command', $alias === '' ? [] : ['command' => 'cattophp:schedule:run|' . $alias]);
+        }
+
+        // Where each connection to an outside service stands, from its last Check the connection, for the modules that
+        // connect to one: identity verification (Didit) and payments (each gateway).
+        if (in_array('identity', $on, true) || in_array('payments', $on, true)) {
+            if ($database) {
+                $services->set(ConnectionStore::class, DbalConnectionStore::class)->args([service($storage['connection'])]);
+            } else {
+                $services->set(ConnectionStore::class, MemoryConnectionStore::class);
+            }
+            $services->set(ServiceConnections::class)->args([service(ConnectionStore::class), service(KeyedHash::class)])->public();
         }
 
         // The setup checklist, for a project with steps a new installation needs: its steps come from the services that
@@ -537,9 +604,10 @@ final class CattoPHPBundle extends AbstractBundle
         /** @var array{enabled:bool} $setup */
         $setup = $config['setup'];
         if ($setup['enabled']) {
-            $builder->registerForAutoconfiguration(SetupStepProvider::class)->addTag(SetupStepProvider::TAG);
+            $builder->registerForAutoconfiguration(SetupStepProvider::class)->addTag(ServiceTags::SETUP_STEPS);
             $services->set(SetupMarkStore::class, DbalSetupMarkStore::class)->args([service($storage['connection'])]);
-            $services->set(SetupChecklist::class)->args([tagged_iterator(SetupStepProvider::TAG), service(SetupMarkStore::class), service('clock'), service(ActivityLog::class)])->public();
+            $services->set(SetupChecklist::class)->args([tagged_iterator(ServiceTags::SETUP_STEPS), service(SetupMarkStore::class), service('clock'), service(ActivityLog::class)])->public();
+            $services->set(SetupRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
         }
 
         // What an address says about a visitor, for site protection and the sign-up check: CattoPHP's lookup (its country and
@@ -567,14 +635,15 @@ final class CattoPHPBundle extends AbstractBundle
         /** @var array{enabled:bool,task_priority:int} $signup */
         $signup = $config['signup'];
         if ($signup['enabled']) {
-            $services->set(SignupSettingGroup::class)->tag(SettingsProvider::TAG);
+            $services->set(SignupSettingGroup::class)->tag(ServiceTags::SETTINGS);
             $services->set(SignupCountries::class)->args([service(Settings::class), service(EnvironmentValues::class)])->public();
             $services->set(SignupAttempts::class)->args([service($storage['connection'])])->public();
+            $services->set(SignupRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $services->set(MailDomainCheck::class);
             $services->set(SignupChecks::class)->args([service(SignupAttempts::class), service(SignupCountries::class), param('cattophp.application_key'), service(NetworkLookup::class),
                 $lists ? service(ReputationLists::class) : null, service(MailDomainCheck::class), service('request_stack')->nullOnInvalid()])->public();
             if ($scheduler['enabled'] && $lists) {
-                $services->set(SignupListsTask::class)->args([service(ReputationLists::class)])->tag(ScheduledTask::TAG, ['priority' => $signup['task_priority']]);
+                $services->set(SignupListsTask::class)->args([service(ReputationLists::class)])->tag(ServiceTags::SCHEDULED_TASK, ['priority' => $signup['task_priority']]);
             }
         }
 
@@ -583,9 +652,13 @@ final class CattoPHPBundle extends AbstractBundle
         /** @var array{enabled:bool,return_path:string,webhook_path:string,accounts:?string,approved:?string,account_detail:string,minimum_age:?int,http_client:string} $identity */
         $identity = $config['identity'];
         if ($identity['enabled']) {
-            $services->set(IdentitySettings::class)->args([service(EnvironmentValues::class), service(SiteMode::class), service(Installation::class), $identity['return_path'], $identity['webhook_path']])->public();
+            // Didit's keys are a settings group: .env gives their starting values, Settings overrides them with a Reset.
+            $services->set(IdentitySettingGroup::class)->tag(ServiceTags::SETTINGS);
+            $services->set(IdentitySettings::class)->args([service(EnvironmentValues::class), service(SiteMode::class), service(Installation::class), $identity['return_path'], $identity['webhook_path'], service(Settings::class)])->public();
             $services->set(DiditClient::class)->args([service($identity['http_client']), service(IdentitySettings::class)])->public();
+            $services->set(IdentityConnection::class)->args([service(ServiceConnections::class), service(Settings::class), service(IdentitySettings::class), service(DiditClient::class)])->public();
             $services->set(IdentityChecks::class)->args([service($storage['connection'])])->public();
+            $services->set(IdentityRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $identityAccounts = $identity['accounts'] !== null && $identity['accounts'] !== '';
             if ($identityAccounts) {
                 $services->alias(IdentityAccounts::class, (string) $identity['accounts']);
@@ -608,9 +681,10 @@ final class CattoPHPBundle extends AbstractBundle
                 $services->set(SignupCountries::class)->args([service(Settings::class), service(EnvironmentValues::class)])->public();
                 $services->set(MailDomainCheck::class);
             }
-            $services->set(InboxSettingGroup::class)->tag(SettingsProvider::TAG);
+            $services->set(InboxSettingGroup::class)->tag(ServiceTags::SETTINGS);
             $services->set(InboxSettings::class)->args([service(Settings::class)])->public();
             $services->set(InboxStore::class)->args([service($storage['connection']), $inbox['reference_prefix']])->public();
+            $services->set(InboxRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $services->set(Inbox::class)->args([service(InboxStore::class), service(InboxSettings::class), service(FormStamp::class), service(NetworkLookup::class),
                 $lists ? service(ReputationLists::class) : null, service(MailDomainCheck::class), service(SignupCountries::class), service(ActivityLog::class),
                 service('request_stack')->nullOnInvalid()])->public();
@@ -629,7 +703,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(ImapMailbox::class)->public();
             $services->set(InboxMailbox::class)->args([service(InboxSettings::class), service(InboxStore::class), service(ImapMailbox::class)])->public();
             if ($scheduler['enabled']) {
-                $services->set(InboxMailboxTask::class)->args([service(InboxMailbox::class)])->tag(ScheduledTask::TAG, ['priority' => $inbox['task_priority']]);
+                $services->set(InboxMailboxTask::class)->args([service(InboxMailbox::class)])->tag(ServiceTags::SCHEDULED_TASK, ['priority' => $inbox['task_priority']]);
             }
         }
 
@@ -638,13 +712,13 @@ final class CattoPHPBundle extends AbstractBundle
         /** @var array{enabled:bool,project:string,callback_path:string,webhook_path:string,campaign_project:?string,recipient_addresses:?string,http_client:string} $mailing */
         $mailing = $config['mailing'];
         if ($mailing['enabled']) {
-            $builder->registerForAutoconfiguration(CattoMailEventHandler::class)->addTag(CattoMailEventHandler::TAG);
-            $services->set(MailingSettingGroup::class)->tag(SettingsProvider::TAG);
+            $builder->registerForAutoconfiguration(CattoMailEventHandler::class)->addTag(ServiceTags::CATTOMAIL_EVENT_HANDLER);
+            $services->set(MailingSettingGroup::class)->tag(ServiceTags::SETTINGS);
             $services->set(MailingSettings::class)->args([service(Settings::class)])->public();
             $services->set(CattoMailClient::class)->args([service($mailing['http_client']), service(MailingSettings::class)])->public();
             $services->set(CattoMailConnection::class)->args([service(MailingSettings::class), service(CattoMailClient::class), service($storage['connection']), service(Settings::class),
                 service(Installation::class), service('clock'), $mailing['project'], $mailing['callback_path'], $mailing['webhook_path'], service(ActivityLog::class)])->public();
-            $services->set(CattoMailEvents::class)->args([service($storage['connection']), tagged_iterator(CattoMailEventHandler::TAG)])->public();
+            $services->set(CattoMailEvents::class)->args([service($storage['connection']), tagged_iterator(ServiceTags::CATTOMAIL_EVENT_HANDLER)])->public();
             $services->set(CattoMailWebhook::class)->args([service(MailingSettings::class), service(CattoMailEvents::class), service('clock')])->public();
             $addresses = $mailing['recipient_addresses'] !== null && $mailing['recipient_addresses'] !== '';
             if ($addresses) {
@@ -666,8 +740,9 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(Links::class)->args([service($storage['connection'])])->public();
             $services->set(MailingFigures::class)->args([service($storage['connection'])])->public();
             $services->set(CopyOutcomes::class)->args([service(Copies::class), service(Suppressions::class), service(Consents::class), service(ActivityLog::class)])->public();
-            $services->set(CopyEvents::class)->args([service(Copies::class), service(CopyOutcomes::class)])->tag(CattoMailEventHandler::TAG);
-            if ($mailing['campaign_project'] !== null && $mailing['campaign_project'] !== '') {
+            $services->set(CopyEvents::class)->args([service(Copies::class), service(CopyOutcomes::class)])->tag(ServiceTags::CATTOMAIL_EVENT_HANDLER);
+            $campaigns = $mailing['campaign_project'] !== null && $mailing['campaign_project'] !== '';
+            if ($campaigns) {
                 $services->alias(CampaignProject::class, (string) $mailing['campaign_project']);
                 $services->set(CampaignSender::class)->args([service(Campaigns::class), service(Copies::class), service(MailingTransports::class), service(CopyOutcomes::class),
                     service(Subscriptions::class), service(Suppressions::class), service(CampaignProject::class), service($storage['connection']), service('clock')])->public();
@@ -675,6 +750,7 @@ final class CattoPHPBundle extends AbstractBundle
                 $services->set(CopyLinks::class)->args([service(Copies::class), service(Links::class), service(Campaigns::class), service(Subscriptions::class), service(CampaignProject::class)])->public();
                 $services->set(Forwards::class)->args([service($storage['connection']), service(Suppressions::class), service(Mailer::class), service(CampaignProject::class), service(ActivityLog::class)])->public();
             }
+            $services->set(MailingRecords::class)->arg('$forwards', $campaigns ? service(Forwards::class) : null)->arg('$events', service(CattoMailEvents::class))->tag(ServiceTags::FORGETS_ACCOUNTS);
         }
 
         // Site protection, for a public site: the Site Log, flags, time-outs and lockouts, the rules every minute, the form
@@ -688,7 +764,8 @@ final class CattoPHPBundle extends AbstractBundle
             foreach ([SiteLog::class, Flags::class, Lockouts::class, RefusedEmails::class] as $store) {
                 $services->set($store)->args([$connection])->public();
             }
-            $services->set(ProtectionSettingGroup::class)->tag(SettingsProvider::TAG);
+            $services->set(ProtectionRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
+            $services->set(ProtectionSettingGroup::class)->tag(ServiceTags::SETTINGS);
             $services->set(ProtectionSettings::class)->args([service(Settings::class)])->public();
             if ($protection['visitors'] !== null && $protection['visitors'] !== '') {
                 $services->alias(VisitorAccounts::class, $protection['visitors']);
@@ -709,7 +786,7 @@ final class CattoPHPBundle extends AbstractBundle
                     ->tag('kernel.event_listener', ['event' => 'kernel.terminate']);
             }
             if ($scheduler['enabled']) {
-                $services->set(SiteProtectionTask::class)->args([service(ProtectionRules::class)])->tag(ScheduledTask::TAG, ['priority' => $protection['task_priority']]);
+                $services->set(SiteProtectionTask::class)->args([service(ProtectionRules::class)])->tag(ServiceTags::SCHEDULED_TASK, ['priority' => $protection['task_priority']]);
             }
         }
 
@@ -721,6 +798,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(TelegramState::class)->args([$connection]);
             $services->set(TelegramLog::class)->args([$connection])->public();
             $services->set(TelegramAccounts::class)->args([$connection])->public();
+            $services->set(TelegramRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $services->set(TelegramBot::class)->args([service(TelegramState::class), service(SecretCipher::class)])->public();
             $services->set(TelegramWords::class)->args([service(SiteMode::class), service(Installation::class)])->public();
             $services->set(TelegramClient::class)->args([service($telegram['http_client'])])->public();
@@ -734,7 +812,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(OwnerMessageSender::class)->args([service(TelegramLog::class), service(TelegramBot::class), service(TelegramClient::class), service('clock'), service(TelegramInbox::class)])->public();
             $services->set(TelegramSetup::class)->args([service(TelegramBot::class), service(TelegramLog::class), service(TelegramWords::class), service(TelegramClient::class), service(TelegramInbox::class), $telegram['choices']])->public();
             if ($scheduler['enabled']) {
-                $services->set(TelegramTask::class)->args([service(OwnerMessageSender::class)])->tag(ScheduledTask::TAG, ['priority' => $telegram['task_priority']]);
+                $services->set(TelegramTask::class)->args([service(OwnerMessageSender::class)])->tag(ServiceTags::SCHEDULED_TASK, ['priority' => $telegram['task_priority']]);
             }
         }
 
@@ -750,6 +828,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(ApiTokens::class)->args([service($storage['connection']), service(Roles::class), $api['scopes'], $api['token_prefix'], $api['all_scopes'],
                 $accounts ? service(ApiAccounts::class) : null, service(ActivityLog::class)])->public();
             $services->set(ApiAccess::class)->public();
+            $services->set(ApiRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $services->set(ApiTokenAuthenticator::class)->args([service(ApiTokens::class), service(KeyedHash::class)])->public();
             $services->set(ApiScopeVoter::class)->args([service(ApiTokens::class)])->tag('security.voter');
             $services->set(ApiExceptionListener::class)->args([$api['path']])->tag('kernel.event_subscriber');
@@ -761,7 +840,7 @@ final class CattoPHPBundle extends AbstractBundle
         $documents = $config['documents'];
         if ($documents['enabled']) {
             $services->set(TemplateValidator::class)->public();
-            $services->set(ValueFormatter::class)->public();
+            $services->set(ValueFormatter::class)->args([null, null, service(Installation::class)])->public();
             $images = $documents['images'] !== null && $documents['images'] !== '';
             if ($images) {
                 $services->alias(DocumentImages::class, (string) $documents['images']);
@@ -776,25 +855,26 @@ final class CattoPHPBundle extends AbstractBundle
         /** @var array{enabled:bool,private_paths:list<array{why:string,paths:list<string>}>,share_pictures:string,rsvg_convert:?string,llms_txt:?string,site_picture:?string,cache:string} $search */
         $search = $config['search'];
         if ($search['enabled']) {
-            $builder->registerForAutoconfiguration(SitemapSource::class)->addTag(SitemapSource::TAG);
-            $builder->registerForAutoconfiguration(PublicPageProvider::class)->addTag(PublicPageProvider::PAGES_TAG);
-            $services->set(SearchSettingGroup::class)->tag(SettingsProvider::TAG);
+            $builder->registerForAutoconfiguration(SitemapSource::class)->addTag(ServiceTags::SITEMAP_SOURCES);
+            $builder->registerForAutoconfiguration(PublicPageProvider::class)->addTag(ServiceTags::PUBLIC_PAGES);
+            $services->set(SearchSettingGroup::class)->tag(ServiceTags::SETTINGS);
             $services->set(SearchSettings::class)->args([service(Settings::class)])->public();
             $services->set(SharePictures::class)->args([$search['share_pictures'], $search['rsvg_convert']])->public();
-            $services->set(Sitemap::class)->args([tagged_iterator(SitemapSource::TAG), service(SiteMode::class), service(Installation::class), service($search['cache'])])->public();
+            $services->set(Sitemap::class)->args([tagged_iterator(ServiceTags::SITEMAP_SOURCES), service(SiteMode::class), service(Installation::class), service($search['cache'])])->public();
             $content = $search['llms_txt'] !== null && $search['llms_txt'] !== '';
             if ($content) {
                 $services->alias(LlmsTxtContent::class, (string) $search['llms_txt']);
             }
             $services->set(LlmsTxt::class)->args([service(Sitemap::class), service(SiteMode::class), $content ? service(LlmsTxtContent::class) : null])->public();
             $services->set(RobotsTxt::class)->args([service(SearchSettings::class), service(Sitemap::class), service(LlmsTxt::class), $search['private_paths']])->public();
-            $services->set(PublicPages::class)->args([tagged_iterator(PublicPageProvider::PAGES_TAG)])->public();
+            $services->set(PublicPages::class)->args([tagged_iterator(ServiceTags::PUBLIC_PAGES)])->public();
             $services->set(PageOverrides::class)->args([service($storage['connection']), service(PublicPages::class), service(ActivityLog::class)])->public();
+            $services->set(SearchRecords::class)->tag(ServiceTags::FORGETS_ACCOUNTS);
             $picture = $search['site_picture'] !== null && $search['site_picture'] !== '';
             if ($picture) {
                 $services->alias(DefaultSharePicture::class, (string) $search['site_picture']);
             }
-            $services->set(PageHead::class)->args([service(PublicPages::class), service(Installation::class), service(EnvironmentValues::class), service(PageOverrides::class),
+            $services->set(PageHead::class)->args([service(PublicPages::class), service(Installation::class), service(PageOverrides::class),
                 $picture ? service(DefaultSharePicture::class) : null])->public();
         }
 
@@ -802,8 +882,9 @@ final class CattoPHPBundle extends AbstractBundle
         $payments = $config['payments'];
         if ($payments['enabled']) {
             $services->set(GatewayDefinitions::class)->args([$payments['gateways']]);
-            $services->set(PaymentSettings::class)->args([service(GatewayDefinitions::class)])->tag(SettingsProvider::TAG);
+            $services->set(PaymentSettings::class)->args([service(GatewayDefinitions::class)])->tag(ServiceTags::SETTINGS);
             $services->set(PaymentGateways::class)->args([service(GatewayDefinitions::class), service(Settings::class), service('request_stack')->nullOnInvalid()])->public();
+            $services->set(GatewayConnections::class)->args([service(PaymentGateways::class), service(Settings::class), service(ServiceConnections::class)])->public();
         }
         // The theme system, for a project with themes: their packages checked, installed, published, chosen and previewed,
         // and Twig's @theme pointed at the theme a request is drawn in.
@@ -847,6 +928,12 @@ final class CattoPHPBundle extends AbstractBundle
                 ->tag('kernel.event_listener', ['event' => KernelEvents::EXCEPTION, 'method' => 'onException', 'priority' => -16]);
         }
 
+        // The sign-ins a person can see and end, for a project that switches them on (sign_in.sessions); one that keeps its
+        // sign-ins itself leaves them off, so nothing is kept twice.
+        $sessions = $signIn['enabled'] && $signIn['sessions'];
+        if ($sessions) {
+            $services->set(SignInSessions::class)->public();
+        }
         if ($signIn['enabled']) {
             $services->set(TwoStep::class)->arg('$recoveryCodes', $signIn['recovery_codes']);
             if ($signIn['accounts'] === OwnerOnlyAccounts::class) {
@@ -856,7 +943,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(SignInRules::class)->args([service(Settings::class), $database ? service(Roles::class) : null]);
             $services->set(SignInFlow::class);
             $services->set(SignInLinks::class)->arg('$urls', service('router'));
-            $services->set(SignInUserProvider::class);
+            $services->set(SignInUserProvider::class)->arg('$sessions', $sessions ? service(SignInSessions::class) : null);
             $services->set(SignInAuthenticator::class);
             $services->set(SignInEntryPoint::class)->args([service('router')]);
             $services->set(SignInController::class)
@@ -864,12 +951,39 @@ final class CattoPHPBundle extends AbstractBundle
                     service(SignInLinks::class), service(SignInAccounts::class), service(SignInRules::class), service(SignInFlow::class),
                     service(TwoStep::class), service(FormToken::class), service('security.helper'), service(Installation::class),
                     service(ActivityLog::class), service('twig'), service('router'), service('logger'), service('clock'), $signIn['after'],
-                    $themedPages ? service(PageRenderer::class) : null,
+                    $themedPages ? service(PageRenderer::class) : null, $sessions ? service(SignInSessions::class) : null, service(AfterResponse::class),
                 ])
                 ->public()
                 ->tag('controller.service_arguments');
             $services->set(SignInLinkCommand::class)->tag('console.command');
             $services->set(TwoStepResetCommand::class)->tag('console.command');
+        }
+
+        // CattoPHP's own pages beyond signing in, in the project's look: Administration's Settings, Roles and Activity log
+        // (config/routes/admin.php) and a person's Sign-in and security (config/routes/account.php), each a route file a
+        // project imports or leaves out.
+        $services->set(FoundationActionWords::class)->tag(ServiceTags::ACTION_WORDS);
+        $services->set(StockPages::class)->args([
+            service('twig'), service(FormToken::class), service('router'), service('security.authorization_checker')->nullOnInvalid(),
+            service('security.token_storage')->nullOnInvalid(), $themedPages ? service(PageRenderer::class) : null,
+        ]);
+        $services->set(AccountNames::class)->args([$signIn['enabled'] ? service(SignInAccounts::class) : null]);
+        // Forgetting an account the project deletes: the foundations' records, then each module's switched on and the
+        // project's own (ForgetsAccounts), in one transaction where they are in the database.
+        $services->set(AccountRecords::class)->args([
+            service(Roles::class), service(RoleStore::class), service(TwoStepStore::class), service(LinkStore::class), service(SessionStore::class),
+            service(SettingsStore::class), service(ActivityStore::class), service(ActivityLog::class), tagged_iterator(ServiceTags::FORGETS_ACCOUNTS),
+            // The project's accounts by a closure: its own accounts service may take this to delete an account.
+            $database ? service($storage['connection']) : null, $signIn['enabled'] ? service_closure(SignInAccounts::class) : null, service(Installation::class),
+        ])->public();
+        $services->set(SettingsPage::class);
+        $services->set(AdminSettingsController::class)->public()->tag('controller.service_arguments');
+        $services->set(AdminRolesController::class)->arg('$accounts', $signIn['enabled'] ? service(SignInAccounts::class) : null)->public()->tag('controller.service_arguments');
+        $services->set(ActivityDetails::class)->args([service(Installation::class), tagged_iterator(ServiceTags::DETAIL_WORDS)])->public();
+        $services->set(AdminActivityController::class)->arg('$words', tagged_iterator(ServiceTags::ACTION_WORDS))->arg('$details', service(ActivityDetails::class))
+            ->arg('$links', tagged_iterator(ServiceTags::SUBJECT_LINKS))->public()->tag('controller.service_arguments');
+        if ($signIn['enabled']) {
+            $services->set(AccountSecurityController::class)->arg('$sessions', $sessions ? service(SignInSessions::class) : null)->public()->tag('controller.service_arguments');
         }
     }
 }

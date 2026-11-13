@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Settings;
 
+use CattoPHP\Installation\Installation;
 use CattoPHP\Runtime\SiteMode;
 
 /** The settings of CattoPHP's own foundations: the installation, demo or live, mail and sign-in. */
@@ -15,12 +16,13 @@ final class FoundationSettings implements SettingsProvider
 
     public function settingGroups(): iterable
     {
-        yield new SettingGroup('installation', 'This installation', 'Its name, the organisation behind it, its address, its administrator and its time zone.', [
+        yield new SettingGroup('installation', 'This installation', 'Its name, the organisation behind it, its address, its administrator, its time zone and its language.', [
             new Setting('APP_NAME', 'Name', help: 'Shown in page titles and emails.'),
             new Setting('APP_ORGANISATION', 'Organisation', optional: true),
             new Setting('APP_URL', 'Public address', SettingType::Address, help: 'The address people open it at, such as https://example.com. Links in emails start with it.'),
             new Setting('APP_ADMIN_EMAIL', 'Administrator\'s email address', SettingType::Email),
             new Setting('APP_TIMEZONE', 'Time zone', SettingType::TimeZone, 'UTC', 'Every time shown is in this time zone, such as Africa/Johannesburg.'),
+            new Setting('APP_LOCALE', 'Language and region', default: Installation::LOCALE, help: 'How amounts of money are written and the language the pages say they are in, as a locale: en_GB, or en_ZA for South Africa.', longest: 20),
         ]);
         if ($this->siteMode) {
             yield new SettingGroup('site_mode', 'Demo or live', 'A demo site says so on every page and in every email, and asks search engines not to list it.', [

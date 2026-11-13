@@ -192,6 +192,12 @@ summary{display:list-item;cursor:pointer}
 @media(max-width:900px){.dataset-search .help{order:1}.dataset-search-actions{order:2}}
 .dataset-search .cl-ui-field{flex:1 1 20rem;min-width:0;margin:0}
 .dataset-search input[type=search]{width:100%}
+/* The search box looks like the form's fields (.cl-input) wherever nothing else paints it. Inside :where(), so it counts
+   for nothing against any other rule: a theme or project that paints its fields by type (input[type=search]) or the box
+   itself keeps its own look. */
+:where(.dataset-search input[type=search]){padding:.375rem .75rem;color:#212529;background-color:#fff;border:1px solid #dee2e6;border-radius:.375rem}
+:where(.dataset-search input[type=search]:focus){color:#212529;background-color:#fff;border-color:#86b7fe;outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+:where(.dataset-search input[type=search])::placeholder{color:rgba(33,37,41,.75);opacity:1}
 .dataset-search-actions{display:flex;gap:.5rem;align-items:center}
 /* Live dataset search: the status text is the loading indicator. htmx toggles the request class
    on the form, so the message is hidden except while a search is actually in flight. Its geometry stays in this core stylesheet. */
@@ -316,8 +322,6 @@ summary{display:list-item;cursor:pointer}
 .cl-ui-row-actions:not(.cl-ui-table .cl-ui-row-actions){flex-wrap:wrap!important}
 .cl-ui-row-actions form,.cl-ui-table td form{display:inline-flex!important;margin:0!important}
 .cl-ui-table td .d-flex{flex-wrap:nowrap!important}
-.cl-ui-table td>div,.cl-ui-table td>p,.cl-ui-table td>span.muted,.cl-ui-table td>.small{display:inline!important;margin:0}
-.cl-ui-table td>div.muted::before,.cl-ui-table td>.small.muted::before{content:"·";margin:0 .4rem;opacity:.5}
 /* Two or more actions in a row is a menu, not a row of buttons.
 
    A row of buttons in a table cell is a promise the column cannot keep: five actions need about
@@ -482,8 +486,7 @@ summary{display:list-item;cursor:pointer}
      stacked instead of forming the row the markup is built as.
    - .cl-filter-chip had no rule in any theme, so a status filter drew as bare running
      links and the selected filter was distinguishable only by aria-current.
-   - .cl-question-editor / .cl-option-editor were carded in most themes and bare in one,
-     where every question and answer option in the question editor ran together. */
+   - a project's own editors were carded in most themes and bare in one. */
 .cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 /* Controls sitting in a row line up with each other.
 
@@ -596,6 +599,14 @@ summary{display:list-item;cursor:pointer}
 
    `~` matches however many elements sit between, hidden or not. */
 .cl-ui-field~.cl-ui-action,.cl-ui-field~button,.cl-ui-field~.cl-ui-form-actions{margin-top:1rem}
+/* Several forms in one card, each a field and its actions (.cl-card-form), and a disclosure in a card's flow
+   (.cl-disclosure, such as Cannot scan it?). A paragraph or a list keeps its own margin below it; a form and a details
+   element have none, so the next form's first label sat on the button above it (Make new recovery codes, then the field
+   to turn two-step sign-in off) or on the summary. The next form keeps from the last one's actions the space they keep
+   above their rule; what follows a disclosure, the space between two fields. A page asks for it by the class, so no
+   other page's forms move. */
+.cl-card-form+.cl-card-form{margin-top:1.5rem}
+.cl-disclosure{margin-bottom:1rem}
 /* The two Help accordion levels are laid out the same way.
 
    The group summary was a flex row with its disclosure marker hidden; the item summary underneath
@@ -691,9 +702,6 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-tree-toggle[aria-expanded="true"] .cl-ui-icon{transform:rotate(90deg)}
 .cl-tree-spacer{flex:0 0 auto;width:1.1rem}
 .cl-tree-name{overflow-wrap:anywhere}
-.cl-tree-node[data-node-type="section"]>.cl-tree-row .cl-tree-name{font-weight:700}
-.cl-tree--categories .cl-tree-node[data-depth="1"]>.cl-tree-row .cl-tree-name{font-weight:700}
-.cl-tree--categories .cl-tree-row>.cl-ui-action-group{flex:0 1 auto;flex-wrap:nowrap;justify-content:flex-end;gap:.35rem}
 .cl-tree-toggle[type="submit"]{-webkit-appearance:none;appearance:none}
 .cl-tree-meta{font-size:.82rem;opacity:.75;overflow-wrap:anywhere}
 .cl-ui-row-menu--compact>summary.cl-ui-row-trigger{justify-content:center;min-width:36px;min-height:36px}
@@ -739,10 +747,6 @@ label.cl-ui-tree-select-option{position:relative}
    spacing. */
 .cl-ui-section-head{margin-bottom:1rem}
 .cl-ui-section-head+*{margin-top:0}
-.cl-checkout-steps { display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
-.cl-checkout-steps [aria-current] { font-weight:700; text-decoration:underline; }
-.cl-checkout-promo { margin:1.5rem 0; display:grid; gap:.75rem; }
-.cl-checkout-promo-applied { margin:0; overflow-wrap:anywhere; }
 /* Platform UI: canonical functional geometry; themes own its visual treatment. */
 .cl-ui-surface{min-width:0;padding:clamp(1rem,2vw,1.4rem);background:var(--cl-surface,#fff);color:var(--cl-ink,inherit);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}
 .cl-ui-surface--compact{padding:.8rem}
@@ -788,6 +792,24 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem;overflow-wrap
 .cl-ui-table{max-width:100%;overflow-x:auto}
 .cl-ui-table table{width:100%;border-collapse:collapse}
 .cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
+/* A table drawn with stack: true (data-stack="narrow") becomes a card for each row on a narrow screen: each cell a line of
+   its column's heading and its value, the value wrapped where a table would cut it short. The heading comes from the
+   cell's own data-label, which the template writes beside the column heading it repeats; an empty cell is left out of
+   the card, and the caption stays beneath. The markup stays the table it is, so a screen reader still has its rows,
+   columns and headings: the head row is hidden from sight only, and the label drawn before each value is not read out
+   again (its alternative text is empty). Nothing is done by script. */
+@media (max-width:767.98px){
+.cl-ui-table[data-stack="narrow"]>table,.cl-ui-table[data-stack="narrow"]>table>tbody,.cl-ui-table[data-stack="narrow"]>table>tbody>tr,.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th){display:block!important;width:auto!important;max-width:none!important;min-width:0!important}
+.cl-ui-table[data-stack="narrow"]>table{display:flex!important;flex-direction:column;table-layout:auto!important}
+.cl-ui-table[data-stack="narrow"]>table>caption{display:block;order:1}
+.cl-ui-table[data-stack="narrow"]>table>thead{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr{margin:0 0 .75rem;padding:.35rem 0;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,12px);background:var(--cl-page-surface,#fff)}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th){display:flow-root!important;padding:.3rem .75rem .3rem calc(var(--cl-stack-label,8.5rem) + 1.5rem)!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere;text-align:left!important;border:0!important;background:transparent}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th)::before{content:attr(data-label);content:attr(data-label) / "";float:left;width:var(--cl-stack-label,8.5rem);margin-left:calc(-1 * var(--cl-stack-label,8.5rem) - .75rem);font-weight:600;overflow-wrap:anywhere}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):not([data-label]){padding-left:.75rem!important}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):not([data-label])::before{content:none}
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):empty{display:none!important}
+}
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}
 .cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
 .cl-ui-stat-grid[data-columns="5"]{grid-template-columns:repeat(auto-fill,minmax(max(calc((100% - 4rem) / 5),min(max(calc((100% - 3rem) / 4 + 1px),min(100%,10.5rem)),calc(min(100%,10.5rem) + (min(100%,10.5rem) - (100% - 4rem) / 5) * 100000))),1fr))}
@@ -831,7 +853,9 @@ a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-off
 .cl-ui-badge--danger{background:#ffe3e6;color:#832030}
 .cl-ui-badge--info{background:#e0eefb;color:#214c70}
 .cl-ui-badge--permanent{background:#ede2fc;color:#503073}
-.cl-ui-notice{display:flex;align-items:start;justify-content:space-between;gap:.75rem;padding:1rem;border:1px solid currentColor;border-radius:.6rem;background:#e0eefb;color:#214c70}
+.cl-ui-notice{display:flex;align-items:start;justify-content:flex-start;gap:.75rem;padding:1rem;border:1px solid currentColor;border-radius:.6rem;background:#e0eefb;color:#214c70}
+/* The icon sits beside the words, and a dismissable notice's close button at the far end. */
+.cl-ui-notice>.cl-ui-close{margin-inline-start:auto}
 .cl-ui-notice--success{background:#e0f4e8;color:#18582c}
 .cl-ui-notice--warning{background:#fff0cb;color:#684b09}
 .cl-ui-notice--danger{background:#ffe3e6;color:#832030}
@@ -935,9 +959,6 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-ui-notice-heading{display:block;margin-bottom:.3rem}
 /* Native fields keep their natural height alongside multiline controls. */
 .cl-ui-form-grid>.cl-ui-field{align-content:start}
-/* Question/option composition is shared by saved records and Twig prototypes. */
-#question-editor [data-options]{margin-block:1rem}
-#question-editor [data-option]+[data-option]{margin-top:1rem}
 @media (max-width:1100px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:1fr}}
 /* Three to a row is one to a row on a phone, as four to a row is. */
@@ -1006,6 +1027,9 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
  * outlined, so the choice reads the same with a mouse, a keyboard or a screen reader. */
 .cl-ui-picture-choice{border:0;margin:0;padding:0;min-width:0}
 .cl-ui-picture-choice-legend{float:none;width:auto;margin:0 0 .5rem;padding:0;font-size:1rem;font-weight:600}
+/* Why a choice was refused sits between the legend (and its help) and the cards, as far from the cards as the legend is. */
+.cl-ui-picture-choice>.cl-ui-field-error{margin:0 0 .5rem}
+.cl-ui-picture-choice>.cl-ui-field-help+.cl-ui-field-error{margin-top:.25rem}
 .cl-ui-picture-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:.75rem}
 .cl-ui-picture-choice-item{position:relative;display:flex;flex-direction:column;gap:.45rem;min-width:0;padding:.5rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:var(--cl-page-surface,#fff);color:inherit;cursor:pointer}
 .cl-ui-picture-choice-item img{display:block;width:100%;aspect-ratio:297/210;object-fit:cover;border:1px solid var(--cl-border,#d9dee5);background:#fff}
@@ -1144,33 +1168,6 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-page-head-badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0 0}
 @media(max-width:700px){.cl-page-head-media img{width:4.5rem;height:4.5rem}}
 .cl-page-head-inner:has(.cl-page-head-media){align-items:center}
-
-.cl-flashcards{margin:1.5rem 0}
-.cl-flashcards-list{display:grid;gap:.75rem;padding-left:1.4rem}
-.cl-flashcard{padding:.75rem 1rem;border:1px solid #d9e0e8;border-radius:.6rem;background:#fff}
-.cl-flashcard-front{margin:0;font-weight:700}
-.cl-flashcard-hint{margin:.35rem 0 0;color:#5f6f82;font-size:.95rem}
-.cl-flashcard-hint span{font-weight:700}
-.cl-flashcard-back{margin-top:.5rem}
-.cl-flashcard-back summary{cursor:pointer;color:#145da0;font-weight:600}
-.cl-flashcard-back p{margin:.4rem 0 0}
-.cl-flashcards-player{display:grid;gap:1rem;max-width:40rem;margin-inline:auto}
-.cl-flashcards-status{margin:0;text-align:center;color:#5f6f82;font-size:.95rem}
-.cl-flashcards-card{display:grid;align-content:center;gap:.75rem;min-height:14rem;padding:clamp(1.25rem,4vw,2.25rem);border:2px solid #d6e4f2;border-radius:1rem;background:#fbfdff;text-align:center;box-shadow:0 8px 24px rgba(20,35,50,.08)}
-.cl-flashcards-card.is-turned{border-color:#145da0;background:#f2f8fe}
-.cl-flashcards-card:focus-visible{outline:3px solid #145da0;outline-offset:3px}
-.cl-flashcards-side{margin:0;font-size:.75rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7a8899}
-.cl-flashcards-front{margin:0;font-size:clamp(1.15rem,2.6vw,1.45rem);font-weight:700;color:#16283e}
-.cl-flashcards-hint{margin:0;color:#5f6f82}
-.cl-flashcards-back{margin:0;font-size:1.1rem;color:#173b61}
-.cl-flashcards-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.75rem}
-.cl-flashcards-button{min-height:44px;min-width:8rem;padding:.6rem 1.2rem;border-radius:.55rem;font:inherit;font-weight:700;cursor:pointer}
-.cl-flashcards-primary{background:#145da0;border:1px solid #145da0;color:#fff}
-.cl-flashcards-primary:hover{background:#0e467a}
-.cl-flashcards-secondary{background:#fff;border:1px solid #9fb3c8;color:#173b61}
-.cl-flashcards-secondary:hover{border-color:#145da0}
-.cl-flashcards-button:focus-visible,.cl-flashcards-link:focus-visible{outline:3px solid #145da0;outline-offset:2px}
-.cl-flashcards-link{display:block;margin:1rem auto 0;padding:.4rem .6rem;border:0;background:none;color:#145da0;font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
 /* A choice made by drawn slides (a layout, a look, a background): the grid follows the drawings' width. */
 .cl-ui-picture-choice-drawing{display:block}
 .cl-ui-picture-choice-item--drawing input{z-index:2}
@@ -1291,13 +1288,3 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-share-98{--cl-share:98%}
 .cl-share-99{--cl-share:99%}
 .cl-share-100{--cl-share:100%}
-/* Share this page: one Share link, and its window's seven
-   options as tiles, each the same size, four to a row (three on a phone), in the theme's colours and corners. */
-.cl-share-page{margin-top:1rem}
-.cl-share-page-options{display:grid;grid-template-columns:repeat(4,6.5rem);gap:.75rem;margin:0;padding:0;list-style:none}
-@media (max-width:36rem){.cl-share-page-options{grid-template-columns:repeat(3,6rem)}}
-.cl-share-page-option{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;width:100%;min-height:5.5rem;padding:.75rem .5rem;border:1px solid var(--cl-border,rgba(0,0,0,.2));border-radius:var(--cl-radius,.375rem);background:var(--cl-surface,#fff);color:inherit;font:inherit;font-size:.875rem;cursor:pointer;text-decoration:none}
-.cl-share-page-option:hover,.cl-share-page-option:focus-visible{border-color:currentColor;color:var(--cl-accent,currentColor)}
-.cl-share-page-mark,.cl-share-page-option .cl-ui-icon{width:1.75rem;height:1.75rem}
-.cl-share-page-mark{fill:currentColor;stroke:none}
-.cl-share-page-done{margin:.75rem 0 0;font-size:.875rem}

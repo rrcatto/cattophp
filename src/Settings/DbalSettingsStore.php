@@ -44,6 +44,11 @@ final class DbalSettingsStore implements SettingsStore
         return $this->connection->executeStatement('DELETE FROM cattophp_settings WHERE name = ?', [$name]) > 0;
     }
 
+    public function forgetAccount(string $accountId): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_settings SET updated_by = NULL WHERE updated_by = ?', [$accountId]);
+    }
+
     public function isWritable(): bool
     {
         return true;

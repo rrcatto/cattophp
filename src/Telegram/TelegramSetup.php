@@ -48,7 +48,7 @@ class TelegramSetup
         $choices = [];
         foreach ($this->choices as $name) $choices[$name] = $this->bot->choice($name);
 
-        return $choices + ['state' => $state, 'has_key' => $saved['key'] !== '', 'connected' => $connected, 'disconnected' => $saved['disconnected'], 'bot_name' => $saved['bot_name'], 'username' => $saved['username'],
+        return $choices + ['state' => $state, 'has_key' => $saved['key'] !== '', 'connected' => $connected, 'connection_dropped' => $saved['connection_dropped'], 'bot_name' => $saved['bot_name'], 'username' => $saved['username'],
             'title' => match ($state) { 'connected' => 'Connected: ' . $link, 'failing' => 'Not getting through: ' . $link, default => 'Not connected' },
             'title_tone' => match ($state) { 'connected' => 'success', 'failing' => 'danger', default => 'neutral' },
             'sign_in' => $saved['sign_in'], 'waiting' => $status['waiting'], 'last_error' => $status['last_error'], 'choices' => $choices];
@@ -114,7 +114,7 @@ class TelegramSetup
         $this->log->logTest($reference, $body, null, $username);
     }
 
-    public function disconnect(?Actor $actor = null): void
+    public function dropConnection(?Actor $actor = null): void
     {
         $this->bot->forget($actor);
     }

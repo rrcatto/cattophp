@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace CattoPHP\Tests\Unit\SignIn;
 
+use CattoPHP\Activity\Actor;
 use CattoPHP\Security\TwoStep\FileTwoStepStore;
+use CattoPHP\Security\TwoStep\TwoStepRecord;
 use CattoPHP\Security\TwoStep\OneTimeCode;
 use CattoPHP\Tests\Support\Foundations;
 use PHPUnit\Framework\TestCase;
@@ -78,6 +80,24 @@ final class TwoStepTest extends TestCase
         }
     }
 
+    public function testWhatOnlyThePersonCanDoIsRecordedAsTheirsNeverTheSystems(): void
+    {
+        $site = new Foundations();
+        $twoStep = $site->twoStep();
+        $codes = (array) $twoStep->setUp('7', self::SECRET, OneTimeCode::codeAt(self::SECRET, $site->clock->now()->getTimestamp()));
+        $setUp = $site->activity->recent(1, 'two_step.set_up')[0];
+        self::assertSame(['7', '7'], [$setUp->actorId, $setUp->actorName], 'set up at sign-in, nobody signed in yet: the person, by their id');
+        self::assertSame(['recovery_codes' => 8], $setUp->details, 'how many codes were made, which is no secret');
+
+        $twoStep->check('7', $codes[0], new Actor('7', 'Anna Example'));
+        self::assertSame(['7', 'Anna Example'], [$site->activity->recent(1, 'two_step.recovery_code_used')[0]->actorId, $site->activity->recent(1, 'two_step.recovery_code_used')[0]->actorName], 'named as the project names them');
+        $twoStep->renewRecoveryCodes('7');
+        self::assertSame('7', $site->activity->recent(1, 'two_step.recovery_codes_renewed')[0]->actorId);
+
+        $twoStep->reset('7', new Actor('1', 'An Administrator'));
+        self::assertSame('1', $site->activity->recent(1, 'two_step.reset')[0]->actorId, 'starting again may be someone else\'s doing');
+    }
+
     public function testResettingStartsAgain(): void
     {
         $site = new Foundations();
@@ -102,8 +122,43 @@ final class TwoStepTest extends TestCase
             self::assertTrue($twoStep->isSetUp('owner'));
             self::assertTrue($twoStep->check('owner', OneTimeCode::codeAt(self::SECRET, $now)));
             $kept = json_decode((string) file_get_contents($folder . '/one-time-code.json'), true);
-            self::assertSame(['secret' => self::SECRET, 'last_counter' => intdiv($now, 30)], $kept, 'kept in the same form');
+            self::assertSame(['secret' => self::SECRET, 'last_counter' => intdiv($now, 30), 'account' => hash('sha256', 'owner')], $kept, 'kept in the same form, saying now whose key it is');
             self::assertSame(0600, fileperms($folder . '/one-time-code.json') & 0777);
+        } finally {
+            Foundations::remove($folder);
+        }
+    }
+
+    /**
+     * Review finding 15: one file for one person says whose key it holds, so another account finds no key there, forgetting
+     * another account leaves it alone, and setting one up for another account is refused rather than replacing it. A file
+     * kept before it said whose is the one person's, whoever asks, and is never forgotten for anyone.
+     */
+    public function testOneFileHoldsOnePersonsKeyThatNoOtherAccountForgetsOrReplaces(): void
+    {
+        $folder = Foundations::folder();
+        try {
+            $file = $folder . '/one-time-code.json';
+            $store = new FileTwoStepStore($file);
+            $at = new \DateTimeImmutable('2026-11-09 10:00:00');
+            $store->change('owner', static fn (): TwoStepRecord => new TwoStepRecord(self::SECRET, 1, [], $at));
+
+            self::assertNull($store->find('anna'), 'Another account finds no key there.');
+            self::assertFalse($store->forget('anna'), 'Forgetting another account leaves the person\'s key.');
+            try {
+                $store->change('anna', static fn (): TwoStepRecord => new TwoStepRecord('KRSXG5CTMVRXEZLU', 1, [], $at));
+                self::fail('Another account\'s key replaced the person\'s.');
+            } catch (\RuntimeException $refused) {
+                self::assertStringContainsString('{account}', $refused->getMessage(), 'Says how to keep one per account.');
+            }
+            self::assertSame(self::SECRET, $store->find('owner')?->secret, 'The person\'s key, as it was.');
+            self::assertTrue($store->forget('owner'));
+            self::assertFileDoesNotExist($file);
+
+            file_put_contents($file, json_encode(['secret' => self::SECRET, 'last_counter' => 1]));
+            self::assertNotNull($store->find('anyone'), 'Kept before it said whose: the one person\'s.');
+            self::assertFalse($store->forget('anyone'), 'Never forgotten for an account it may not be.');
+            self::assertFileExists($file);
         } finally {
             Foundations::remove($folder);
         }

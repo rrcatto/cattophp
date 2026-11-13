@@ -10,8 +10,6 @@ namespace CattoPHP\Search;
  */
 interface SitemapSource
 {
-    public const TAG = 'cattophp.sitemap_sources';
-
     /** How many addresses it lists now. */
     public function count(): int;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Document;
 
+use CattoPHP\Installation\Installation;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
@@ -14,8 +15,8 @@ use Throwable;
  * Turns one placeholder's value into HTML according to its kind, and decides whether a value is
  * present for {{#if}}. Every value is escaped; the only markup in the output is the line breaks the
  * multiline and address kinds produce themselves. Money is formatted from integer minor units, never from a float, in
- * the installation's locale (APP_LOCALE, en_ZA when it is not set) by intl's NumberFormatter, or as the code and the
- * amount without intl. Dates are shown as "6 October 2026" in the installation's time zone.
+ * the installation's locale (APP_LOCALE, a setting: Installation::locale(), en_GB when it names none) by intl's
+ * NumberFormatter, or as the code and the amount without intl. Dates are shown as "6 October 2026" in the installation's time zone.
  */
 final class ValueFormatter
 {
@@ -23,8 +24,8 @@ final class ValueFormatter
 
     private readonly DateTimeZone $zone;
 
-    /** @param string|null $locale the locale amounts are written in; null reads APP_LOCALE each time */
-    public function __construct(?DateTimeZone $zone = null, private readonly ?string $locale = null)
+    /** @param string|null $locale the locale amounts are written in; null asks the installation each time (APP_LOCALE) */
+    public function __construct(?DateTimeZone $zone = null, private readonly ?string $locale = null, private readonly ?Installation $installation = null)
     {
         $this->zone = $zone ?? new DateTimeZone(date_default_timezone_get());
     }
@@ -79,8 +80,8 @@ final class ValueFormatter
     /** An amount in minor units as a reader of this installation sees it, such as R 1 200,00. */
     public function money(int $minor, string $currency): string
     {
-        $locale = $this->locale ?? self::environment('APP_LOCALE');
-        $locale = $locale !== '' ? $locale : 'en_ZA';
+        $locale = $this->locale ?? $this->installation?->locale() ?? Installation::LOCALE;
+        $locale = $locale !== '' ? $locale : Installation::LOCALE;
         $major = intdiv($minor, 100) . '.' . str_pad((string) ($minor % 100), 2, '0', STR_PAD_LEFT);
         if (!class_exists(NumberFormatter::class)) {
             return $currency . ' ' . number_format($minor / 100, 2, '.', ',');
@@ -88,13 +89,6 @@ final class ValueFormatter
         $formatted = (new NumberFormatter($locale, NumberFormatter::CURRENCY))->formatCurrency($minor / 100, $currency);
 
         return $formatted === false ? $currency . ' ' . $major : $formatted;
-    }
-
-    private static function environment(string $name): string
-    {
-        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
-
-        return is_string($value) ? trim($value) : '';
     }
 
     public static function escape(string $value): string

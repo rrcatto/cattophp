@@ -1,0 +1,18 @@
+{# Administration > Roles: every role, what it allows and who holds it. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{% if may_change %}{{ ui('action.link', {label: 'New role', href: path('cattophp_admin_role_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'roles-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The roles', heading_id: 'roles-heading', summary: may_change ? 'Open a role to change what it allows or who holds it.' : 'Open a role to see what it allows and who holds it.'}) }}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every role, what it allows and who holds it', stack: true})} %}
+{% block header %}<tr><th scope="col">Role</th><th scope="col">Its key</th><th scope="col">What it allows</th><th scope="col">Held by</th></tr>{% endblock %}
+{% block body %}
+{% for role in roles %}
+<tr><td data-label="Role"><a href="{{ role.href }}">{{ role.name }}</a></td><td data-label="Its key"><code>{{ role.key }}</code></td><td data-label="What it allows">{{ role.allows }}</td><td data-label="Held by">{{ role.holders }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

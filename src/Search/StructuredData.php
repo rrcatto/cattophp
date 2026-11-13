@@ -143,11 +143,11 @@ final class StructuredData
         return 'PT' . intdiv($halves, 2) . 'H' . ($halves % 2 === 1 ? '30M' : '');
     }
 
-    /** The page's language from a locale (en_ZA is en-ZA), en-ZA when it is not one. */
+    /** The page's language from a locale (en_ZA is en-ZA), en-GB when it is not one. */
     public static function language(string $locale): string
     {
         $locale = trim(str_replace('_', '-', $locale));
-        return preg_match('/^[a-z]{2,3}(-[A-Za-z]{2})?$/', $locale) === 1 ? $locale : 'en-ZA';
+        return preg_match('/^[a-z]{2,3}(-[A-Za-z]{2})?$/', $locale) === 1 ? $locale : 'en-GB';
     }
 
     /**

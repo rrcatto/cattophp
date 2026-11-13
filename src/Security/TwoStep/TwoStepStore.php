@@ -17,5 +17,6 @@ interface TwoStepStore
      */
     public function change(string $accountId, callable $change): void;
 
-    public function forget(string $accountId): void;
+    /** Removes the account's key and recovery codes, without reading them; true when it had them. */
+    public function forget(string $accountId): bool;
 }

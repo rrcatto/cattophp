@@ -133,7 +133,7 @@ final class InboxSettings
         $this->settings?->resetGroup(self::GROUP, $actor);
     }
 
-    /** Forgets the mailbox (Disconnect): its user and password emptied, so nothing is fetched. */
+    /** Forgets the mailbox (Drop connection): its user and password emptied, so nothing is fetched. */
     public function forgetMailbox(?Actor $actor = null): void
     {
         foreach (['INBOX_IMAP_USER', 'INBOX_IMAP_PASSWORD', 'INBOX_IMAP_HOST'] as $name) $this->settings?->reset($name, $actor);

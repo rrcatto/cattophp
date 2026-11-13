@@ -67,6 +67,30 @@ final class TreeSelectTest extends TestCase
         self::assertSame('Uncategorised', trim((string) $uncategorised->query('//button[@id="category"]')->item(0)?->textContent), 'No category shows Uncategorised.');
     }
 
+    /** An option's keys are a set: in any order they draw the same list, and a refusal names the key that is wrong. */
+    public function testAnOptionsKeysMayComeInAnyOrderAndARefusalNamesTheKey(): void
+    {
+        $shuffled = [
+            ['path' => 'All categories', 'depth' => 0, 'label' => 'All categories', 'value' => ''],
+            ['children' => [
+                ['depth' => 2, 'path' => 'Business › Management', 'value' => '2', 'label' => 'Management', 'children' => [
+                    ['label' => 'Project Management', 'value' => '3', 'path' => 'Business › Management › Project Management', 'depth' => 3],
+                ]],
+                ['path' => 'Business › Finance', 'label' => 'Finance', 'depth' => 2, 'value' => '4'],
+            ], 'value' => '1', 'label' => 'Business', 'path' => 'Business', 'depth' => 1],
+            ['label' => 'Technology', 'path' => 'Technology', 'value' => '5', 'depth' => 1],
+        ];
+        $props = ['id' => 'picker', 'name' => 'category', 'selected' => '3', 'placeholder' => 'All categories', 'list_label' => 'Categories'];
+        self::assertSame(UiHarness::render('form.tree-select', $props + ['items' => self::ITEMS]), UiHarness::render('form.tree-select', $props + ['items' => $shuffled]));
+
+        try {
+            UiHarness::components()->properties('form.tree-select', $props + ['items' => [['value' => '1', 'label' => 'Business', 'depth' => 1, 'path' => 'Business', 'colour' => 'red']]]);
+            self::fail('Accepted a key it does not take.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString('in any order: "Business" has colour, which it does not take.', $refused->getMessage());
+        }
+    }
+
     public function testAnOptionMayCarryItsIcon(): void
     {
         $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h16"/></svg>';
@@ -80,6 +104,27 @@ final class TreeSelectTest extends TestCase
         }
         $this->expectException(\InvalidArgumentException::class);
         UiHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'items' => [['value' => '1', 'label' => 'Business', 'depth' => 1, 'path' => 'Business', 'icon' => ['not', 'markup']]], 'selected' => '', 'placeholder' => 'Choose', 'list_label' => 'Categories']);
+    }
+
+    /**
+     * Review (an older gap, unchanged since 0.3.0): an option's icon is drawn inline through |authored, so it is checked as
+     * a feature card's is, an SVG picture free of scripts and outside links, and anything else is refused with its label.
+     */
+    public function testAnOptionsIconIsAPictureFreeOfScriptsAndOutsideLinks(): void
+    {
+        foreach ([
+            'a script' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+            'an event handler' => '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><path d="M4 4h16"/></svg>',
+            'an outside link' => '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.org/a.png"/></svg>',
+            'no SVG at all' => '<img src="x" onerror="alert(1)">',
+        ] as $what => $icon) {
+            try {
+                UiHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'items' => [['value' => '1', 'label' => 'Business', 'depth' => 1, 'path' => 'Business', 'icon' => $icon]], 'selected' => '', 'placeholder' => 'Choose', 'list_label' => 'Categories']);
+                self::fail($what . ' was drawn as an icon.');
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString('"Business"', $refused->getMessage(), $what);
+            }
+        }
     }
 
     public function testNothingChosenShowsThePlaceholder(): void

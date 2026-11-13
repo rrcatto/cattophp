@@ -19,6 +19,11 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
  * email, any other gets nothing. Each address and each network address may ask only so often
  * (AUTH_REQUEST_LIMIT_EMAIL, AUTH_REQUEST_LIMIT_IP, in AUTH_REQUEST_WINDOW), counted for addresses with and without
  * accounts alike. Opening the link only shows a button: a mail scanner that opens it uses nothing up.
+ *
+ * Where the project lets people join by signing in for the first time (its accounts implement JoiningAccounts), an
+ * address with no account that may join (SignInRules::mayJoin) is sent a link too, kept as a joining link for the
+ * address alone: the account is made only when the link is used. Nothing names such an address in the activity log
+ * before then.
  */
 final class SignInLinks
 {
@@ -29,6 +34,9 @@ final class SignInLinks
 
     /** A sign-in link's purpose among the links that work once. */
     public const PURPOSE = 'sign_in';
+
+    /** A joining link's: sent to an address with no account yet, which may join. */
+    public const JOIN_PURPOSE = 'sign_in_join';
 
     /** How long a used or run-out link is kept, so a project can still count requests by it. */
     private const KEPT_FOR = '-7 days';
@@ -60,9 +68,23 @@ final class SignInLinks
             || !$this->throttle->allow('sign_in_network', [$networkAddress], $this->settings->int('AUTH_REQUEST_LIMIT_IP'), $window)) {
             return self::TOO_MANY;
         }
-        $account = filter_var($email, FILTER_VALIDATE_EMAIL) === false ? null : $this->accounts->forEmail($email);
+        $wellFormed = filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        $account = $wellFormed ? $this->accounts->forEmail($email) : null;
         if ($account === null) {
-            return self::NO_ACCOUNT;
+            if (!$wellFormed || !$this->accounts instanceof JoiningAccounts || !$this->rules->mayJoin($email)) {
+                return self::NO_ACCOUNT;
+            }
+            $token = $this->createJoining($email, $returnPath);
+            $this->mailer->sendTemplate($email, '@CattoPHP/email/sign_in_link.txt.twig', [
+                'name' => $this->installation->name(),
+                'link' => $this->address($token),
+                'lifetime' => $this->settings->duration('AUTH_MAGIC_LINK_TTL')->words(),
+                'two_step' => $this->rules->twoStepRequired($this->rules->isAdministratorAddress($email)),
+            ]);
+            // Who asked is not named: the address has no account, and may never have one.
+            $this->activity->record('sign_in.joining_link_sent');
+
+            return self::SENT;
         }
         if (!$this->rules->maySignIn($account)) {
             $this->activity->record('sign_in.link_refused', ['reason' => 'not allowed to sign in'], 'account', $account->id);
@@ -94,33 +116,80 @@ final class SignInLinks
         return $token;
     }
 
+    /** A new link for an address with no account that may join: kept for the address alone, the account made when it is used. */
+    public function createJoining(string $email, ?string $returnPath = null): string
+    {
+        $now = $this->clock->now();
+        $token = bin2hex(random_bytes(32));
+        $path = self::safePath($returnPath);
+        $this->store->add(self::hash($token), self::JOIN_PURPOSE, mb_strtolower(trim($email)), null, $path === null ? [] : ['return_path' => $path], null, $now,
+            $this->settings->duration('AUTH_MAGIC_LINK_TTL')->after($now));
+        $this->store->forgetOld($now->modify(self::KEPT_FOR));
+
+        return $token;
+    }
+
     /** The link's full address. */
     public function address(string $token): string
     {
         return $this->installation->addressOf($this->urls->generate('cattophp_sign_in_link', ['token' => $token]));
     }
 
+    /** The link while it can be used, without using it: a joining link with no account yet, its address in $joining. */
     public function usable(string $token): ?SignInLink
     {
-        $link = self::isWellFormed($token) ? $this->store->usable(self::hash($token), self::PURPOSE, $this->clock->now()) : null;
+        if (!self::isWellFormed($token)) {
+            return null;
+        }
+        $now = $this->clock->now();
+        $link = $this->store->usable(self::hash($token), self::PURPOSE, $now);
+        if ($link !== null) {
+            return self::signInLink($link);
+        }
+        $joining = $this->joinable() ? $this->store->usable(self::hash($token), self::JOIN_PURPOSE, $now) : null;
 
-        return $link === null ? null : self::signInLink($link);
+        return $joining === null || $joining->email === null ? null : new SignInLink('', $joining->expiresAt, self::returnPathOf($joining), $joining->email);
     }
 
-    /** Uses the link up and returns it; of two attempts at the same moment only one gets it. */
+    /**
+     * Uses the link up and returns it; of two attempts at the same moment only one gets it. A joining link makes the
+     * account now (JoiningAccounts::join), if the address may still join.
+     */
     public function claim(string $token): ?SignInLink
     {
+        if (!self::isWellFormed($token)) {
+            return null;
+        }
         $now = $this->clock->now();
-        $link = self::isWellFormed($token) ? $this->store->usable(self::hash($token), self::PURPOSE, $now) : null;
+        $link = $this->store->usable(self::hash($token), self::PURPOSE, $now);
+        if ($link !== null) {
+            return $link->accountId !== null && $this->store->use($link->id, $now) ? self::signInLink($link) : null;
+        }
+        $joining = $this->joinable() ? $this->store->usable(self::hash($token), self::JOIN_PURPOSE, $now) : null;
+        if ($joining === null || $joining->email === null || !$this->rules->mayJoin($joining->email) || !$this->store->use($joining->id, $now)) {
+            return null;
+        }
+        $account = $this->accounts instanceof JoiningAccounts ? $this->accounts->join($joining->email) : null;
 
-        return $link !== null && $link->accountId !== null && $this->store->use($link->id, $now) ? self::signInLink($link) : null;
+        return $account === null ? null : new SignInLink($account->id, $joining->expiresAt, self::returnPathOf($joining));
+    }
+
+    /** Whether people join here by signing in for the first time. */
+    public function joinable(): bool
+    {
+        return $this->accounts instanceof JoiningAccounts;
     }
 
     private static function signInLink(\CattoPHP\Links\Link $link): ?SignInLink
     {
+        return $link->accountId === null ? null : new SignInLink($link->accountId, $link->expiresAt, self::returnPathOf($link));
+    }
+
+    private static function returnPathOf(\CattoPHP\Links\Link $link): ?string
+    {
         $path = $link->context['return_path'] ?? null;
 
-        return $link->accountId === null ? null : new SignInLink($link->accountId, $link->expiresAt, is_string($path) ? $path : null);
+        return is_string($path) ? $path : null;
     }
 
     public static function isWellFormed(string $token): bool

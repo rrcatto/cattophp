@@ -1,15 +1,20 @@
-{% extends cattophp.layout %}
-{% block body %}
-<main class="cl-sign-in">
-<h1>{{ title }}</h1>
-<p>Type your email address and we will email you a link to sign in.</p>
-{% if note %}<p class="cl-sign-in-note" role="status"><strong>{{ note }}</strong></p>{% endif %}
+{#
+	Signing in: an email address, and a link emailed to it. Every address sees the same answer, so nobody learns which have
+	accounts. Drawn in the project's look by page/stock.html.twig: its theme where it has one, else its layout.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section cl-sign-in">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'sign-in-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Your email address', heading_id: 'sign-in-heading', summary: 'Type your email address and we will email you a link to sign in. It works once, on this device.'}) }}
+{% if note %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p class="cl-sign-in-note">{{ note }}</p>{% endblock %}{% endembed %}{% endif %}
 <form method="post" action="{{ path('cattophp_sign_in_send') }}">
 <input type="hidden" name="_token" value="{{ form_token() }}">
 {% if return %}<input type="hidden" name="return" value="{{ return }}">{% endif %}
 <div class="cl-trap" hidden><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
-<label>Email address <input type="email" name="email" required autocomplete="email" maxlength="254"></label>
-<button type="submit">Email me a link</button>
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'sign-in-email', required: true})} %}{% block control %}<input class="cl-input" id="sign-in-email" type="email" name="email" required autocomplete="email" maxlength="254" placeholder="you@example.com" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Email me a link', type: 'submit', icon: 'action-email', variant: 'primary'}) }}{% endblock %}{% endembed %}
 </form>
-</main>
+{% endblock %}{% endembed %}
+</section>
 {% endblock %}

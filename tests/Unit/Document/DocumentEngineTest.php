@@ -17,6 +17,7 @@ use CattoPHP\Document\TemplateParser;
 use CattoPHP\Document\TemplateValidationException;
 use CattoPHP\Document\TemplateValidator;
 use CattoPHP\Document\ValueFormatter;
+use CattoPHP\Tests\Support\Foundations;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -187,6 +188,21 @@ final class DocumentEngineTest extends TestCase
                 self::assertStringContainsString($expected, $all);
             }
         }
+    }
+
+    public function testAmountsAreWrittenInTheInstallationsLocaleASetting(): void
+    {
+        $money = new PlaceholderDefinition('x.amount', '', PlaceholderKind::Money);
+        $amount = ['minor' => 120000, 'currency' => 'ZAR'];
+        $southAfrica = new Foundations(['APP_LOCALE' => 'en_ZA']);
+        $british = new Foundations();
+        $zone = new DateTimeZone('UTC');
+
+        self::assertSame((new ValueFormatter($zone, 'en_ZA'))->money(120000, 'ZAR'), (new ValueFormatter($zone, null, $southAfrica->installation))->money(120000, 'ZAR'), 'APP_LOCALE from .env, through Settings.');
+        self::assertSame((new ValueFormatter($zone, 'en_GB'))->money(120000, 'ZAR'), (new ValueFormatter($zone, null, $british->installation))->money(120000, 'ZAR'), 'None set: plain British English.');
+        self::assertNotSame((new ValueFormatter($zone, 'en_ZA'))->money(120000, 'ZAR'), (new ValueFormatter($zone, 'en_GB'))->money(120000, 'ZAR'), 'The two are written differently, so the test tells them apart.');
+        $british->settings->set('APP_LOCALE', 'en_ZA');
+        self::assertSame((new ValueFormatter($zone, 'en_ZA'))->format($money, $amount), (new ValueFormatter($zone, null, $british->installation))->format($money, $amount), 'Changed on the Settings page: read each time.');
     }
 
     public function testValuesAreFormattedByKindAndAlwaysEscaped(): void

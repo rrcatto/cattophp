@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Mailing;
 
+use CattoPHP\Account\AccountRecords;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 
@@ -198,10 +199,19 @@ final class Copies
         );
     }
 
-    /** A person whose account is gone: their copies stay, for the figures, without them. */
-    public function forget(string $account): void
+    /**
+     * A person whose account is gone: their copies stay, for the figures, naming nobody: no account, the address
+     * AccountRecords::FORGOTTEN_EMAIL (in what the transport said of it too), nothing of their own kept (content), and a new
+     * token nobody holds, so the links in the copy they were sent no longer open it.
+     */
+    public function forget(string $account): int
     {
-        $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET account = NULL WHERE account = :account', ['account' => $account]);
+        return (int) $this->connection->executeStatement(
+            "UPDATE " . self::TABLE . " SET account = NULL, email = :forgotten, content = '{}'::jsonb, token = md5(gen_random_uuid()::text || id::text),
+                    status_detail = replace(status_detail, email, :forgotten)
+              WHERE account = :account",
+            ['account' => $account, 'forgotten' => AccountRecords::FORGOTTEN_EMAIL]
+        );
     }
 
     /**

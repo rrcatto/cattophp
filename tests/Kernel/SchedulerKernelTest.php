@@ -46,9 +46,28 @@ final class SchedulerKernelTest extends TestCase
             self::assertInstanceOf(Settings::class, $settings);
             self::assertSame('2w', $settings->get('LOG_ARCHIVES_KEPT_FOR'), 'Its setting is in the project\'s Settings.');
             self::assertFileExists($this->folder . '/storage/scheduled-jobs.json', 'A project without a database keeps its runs in its folder.');
+            // The tests' kernel is not in debug, as a production site's is not: no task is run as if it were later.
+            self::assertSame(Command::INVALID, $tester->execute(['--job' => ['reminders'], '--now' => '2026-12-01 09:00']));
+            self::assertStringContainsString('only on a development site', $tester->getDisplay());
+        } finally {
+            $kernel->shutdown();
+        }
+    }
+
+    public function testADevelopmentSiteTriesATaskAsIfItWereLaterWithoutMovingItsRuns(): void
+    {
+        $kernel = new TestKernel($this->folder, scheduler: true, debug: true);
+        $kernel->boot();
+        try {
+            $tester = new CommandTester((new Application($kernel))->find('schedule:run'));
+            self::assertSame(Command::SUCCESS, $tester->execute(['--job' => ['reminders']]));
+            // A development site (the kernel in debug, its environment test, which is development) runs a task as if it were later.
+            self::assertSame(Command::SUCCESS, $tester->execute(['--job' => ['reminders'], '--now' => '2026-12-01 09:00']));
+            self::assertStringContainsString('reminders: As at 2026-12-01 09:00: No reminders were due.', $tester->getDisplay());
             $status = $kernel->getContainer()->get(TaskStatus::class);
             self::assertInstanceOf(TaskStatus::class, $status);
-            self::assertSame(['reminders', 'Reminders', false, 1], [$status->tasks()[0]['key'], $status->tasks()[0]['label'], $status->tasks()[0]['overdue'], $status->tasks()[0]['run_count']]);
+            $task = $status->tasks()[0];
+            self::assertSame(['reminders', 1, 'No reminders were due.', 'As at 2026-12-01 09:00: No reminders were due.', false], [$task['key'], $task['run_count'], $task['summary'], $task['trial_summary'], $task['trial_failed']], 'The trial apart from the runs.');
         } finally {
             $kernel->shutdown();
         }

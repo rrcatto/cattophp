@@ -182,4 +182,18 @@ final class ApiTokens
 
         return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' . substr($hex, 12, 4) . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20);
     }
+
+    /**
+     * An account being deleted: every token issued to it goes, and the tokens it made for others no longer say who made
+     * them.
+     *
+     * @return array{tokens:int,made:int}
+     */
+    public function forget(string $account): array
+    {
+        return [
+            'tokens' => (int) $this->connection->executeStatement('DELETE FROM cattophp_api_tokens WHERE account_id = :account', ['account' => $account]),
+            'made' => (int) $this->connection->executeStatement('UPDATE cattophp_api_tokens SET created_by = NULL WHERE created_by = :account', ['account' => $account]),
+        ];
+    }
 }

@@ -41,6 +41,17 @@ final class IconLibrary
         return isset($this->icons()[$name]);
     }
 
+    /**
+     * The words the library gives an icon besides its name (Lucide's tags, such as power, hole and diy for drill), empty
+     * when the library has no icon of this name.
+     *
+     * @return list<string>
+     */
+    public function tags(string $name): array
+    {
+        return $this->icons()[$name]['tags'] ?? [];
+    }
+
     /** The icon as an SVG drawn in the theme's colour, or null when the library has no icon of this name. */
     public function svg(string $name): ?string
     {

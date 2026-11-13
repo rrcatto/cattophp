@@ -14,7 +14,8 @@ use Symfony\Component\Security\Core\User\UserProviderInterface;
 
 /**
  * Loads the signed-in account on every request, so a sign-in ends at once when the account is disabled or removed,
- * may no longer sign in, or the sign-in has lasted AUTH_SESSION_TTL.
+ * may no longer sign in, or the sign-in has lasted AUTH_SESSION_TTL; and, where the project keeps sign-ins a person can
+ * see and end (`sign_in.sessions`), when this browser's sign-in was ended or is no longer kept.
  *
  * @implements UserProviderInterface<SignInUser>
  */
@@ -26,6 +27,7 @@ final class SignInUserProvider implements UserProviderInterface
         private readonly Settings $settings,
         private readonly RequestStack $requests,
         private readonly ClockInterface $clock,
+        private readonly ?SignInSessions $sessions = null,
     ) {
     }
 
@@ -45,10 +47,14 @@ final class SignInUserProvider implements UserProviderInterface
             throw new UnsupportedUserException('Not an account of this sign-in.');
         }
         $request = $this->requests->getMainRequest();
-        $at = $request !== null && $request->hasSession() ? $request->getSession()->get(SignInFlow::SIGNED_IN_AT) : null;
+        $session = $request !== null && $request->hasSession() ? $request->getSession() : null;
+        $at = $session?->get(SignInFlow::SIGNED_IN_AT);
         $lasts = $this->settings->duration('AUTH_SESSION_TTL')->lengthInSeconds();
-        if (!is_int($at) || $at <= $this->clock->now()->getTimestamp() - $lasts) {
+        if ($session === null || !is_int($at) || $at <= $this->clock->now()->getTimestamp() - $lasts) {
             throw new UserNotFoundException('The sign-in has run out.');
+        }
+        if ($this->sessions !== null && !$this->sessions->holds($session, $user->id)) {
+            throw new UserNotFoundException('The sign-in was ended.');
         }
 
         return $this->loadUserByIdentifier($user->id);

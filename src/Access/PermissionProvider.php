@@ -10,8 +10,6 @@ namespace CattoPHP\Access;
  */
 interface PermissionProvider
 {
-    public const TAG = 'cattophp.permissions';
-
     /** @return iterable<Permission> */
     public function permissions(): iterable;
 }

@@ -56,9 +56,9 @@ final class DbalTwoStepStore implements TwoStepStore
         });
     }
 
-    public function forget(string $accountId): void
+    public function forget(string $accountId): bool
     {
-        $this->connection->executeStatement('DELETE FROM cattophp_two_step WHERE account_id = ?', [$accountId]);
+        return $this->connection->executeStatement('DELETE FROM cattophp_two_step WHERE account_id = ?', [$accountId]) > 0;
     }
 
     /** @param array<string,mixed> $row */

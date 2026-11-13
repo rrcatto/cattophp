@@ -1,7 +1,8 @@
 {#
 	One card in a data.card-grid: its picture (a person's round picture, an organisation's square logo, a record's wide
-	cover), its title (linked to its page when it has one; a person's is named with data.person in the title
-	slot), its details and its actions. The actions keep to the card's foot.
+	cover, or none for a record a picture would not help, such as a sign-in, whose words keep to the start), its title
+	(linked to its page when it has one; a person's is named with data.person in the title slot), its details and its
+	actions. The actions keep to the card's foot.
 #}
 <li class="cl-ui-card" data-picture="{{ props.picture }}">
 	<div class="cl-ui-card-picture">{% block picture %}{% endblock %}</div>

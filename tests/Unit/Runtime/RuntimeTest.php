@@ -48,4 +48,27 @@ final class RuntimeTest extends TestCase
         self::assertSame('example.com', $site->installation->domain());
         self::assertSame('12:00', $site->installation->localTime($site->clock->now())->format('H:i'), '10:00 UTC is 12:00 in Johannesburg');
     }
+
+    public function testTheInstallationsLocaleIsASettingPlainBritishEnglishUnlessItSaysOtherwise(): void
+    {
+        self::assertSame('en_GB', (new Foundations())->installation->locale(), 'CattoPHP\'s own: none in .env.');
+        $site = new Foundations(['APP_LOCALE' => 'en_ZA']);
+        self::assertSame('en_ZA', $site->installation->locale(), 'From .env.');
+        self::assertSame(\CattoPHP\Settings\Settings::FROM_ENV, $site->settings->source('APP_LOCALE'));
+        $site->settings->set('APP_LOCALE', 'en-US');
+        self::assertSame('en_US', $site->installation->locale(), 'Settings over .env, written either way.');
+        $site->settings->reset('APP_LOCALE');
+        self::assertSame('en_ZA', $site->installation->locale(), 'Reset: .env again.');
+        self::assertSame('installation', $site->catalogue->groupOf('APP_LOCALE'), 'Beside the time zone.');
+        self::assertSame('en_GB', (new Foundations(['APP_LOCALE' => 'not a locale']))->installation->locale(), 'Not a locale: the plain one.');
+    }
+
+    public function testThePagesLanguageIsTheLocaleWrittenAsHtmlNamesIt(): void
+    {
+        self::assertSame('en-GB', (new Foundations())->installation->language(), 'None set: plain British English.');
+        self::assertSame('en-ZA', (new Foundations(['APP_LOCALE' => 'en_ZA']))->installation->language());
+        self::assertSame('en-ZA', (new Foundations(['APP_LOCALE' => 'en-za']))->installation->language(), 'The region in capitals, however it was written.');
+        self::assertSame('af', (new Foundations(['APP_LOCALE' => 'af']))->installation->language(), 'A language without a region.');
+        self::assertSame('en-GB', (new Foundations(['APP_LOCALE' => 'not a locale']))->installation->language());
+    }
 }

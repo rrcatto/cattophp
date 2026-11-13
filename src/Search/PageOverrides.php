@@ -114,4 +114,10 @@ final class PageOverrides
 
         return ['title' => $title, 'description' => $description];
     }
+
+    /** An account being deleted: the words it gave the pages stay, no longer saying who gave them. Returns how many pages. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_search_pages SET updated_by = NULL WHERE updated_by = :account', ['account' => $account]);
+    }
 }

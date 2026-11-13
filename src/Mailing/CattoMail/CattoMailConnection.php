@@ -22,7 +22,7 @@ use Symfony\Component\Clock\ClockInterface;
  * connect page (OAuth 2 authorisation code with PKCE, S256), whose code is exchanged for the key and the webhook secret,
  * saved encrypted in Settings > Mailing with the transport switched to catto-mail; the sending domain made ready there
  * (asked again every five minutes while it is not); and a real test email. Then Check the connection (a probe: 404 is a
- * key accepted), Disconnect (the key revoked at catto-mail) and Forget it here. What is known of it besides the secrets
+ * key accepted), Drop connection (the key revoked at catto-mail) and Forget it here. What is known of it besides the secrets
  * (catto-mail's names for it, the sending domains, the last check and problem, a quota used up until when, the test) is
  * kept in cattophp_cattomail_connection. News waits while the domain cannot send or the quota is used up.
  */
@@ -181,11 +181,11 @@ final class CattoMailConnection
     }
 
     /** Ends the connection at catto-mail and forgets it here. */
-    public function disconnect(string $actor = ''): void
+    public function dropConnection(string $actor = ''): void
     {
-        $this->client->disconnect();
+        $this->client->dropConnection();
         $this->forget($actor);
-        $this->record('mailing.cattomail_disconnected', [], $actor);
+        $this->record('mailing.cattomail_connection_dropped', [], $actor);
     }
 
     /** Forgets the key, the webhook secrets and what is known of the connection, here only. */

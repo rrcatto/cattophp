@@ -63,6 +63,31 @@ final class DatabaseKernelTest extends DatabaseTestCase
         }
     }
 
+    /** A project's own schema steps are found by autoconfiguration and applied by cattophp:migrate with CattoPHP's, in order. */
+    public function testTheProjectsOwnStepsAreAppliedWithCattoPHPs(): void
+    {
+        $this->connection->executeStatement('DROP SCHEMA public CASCADE');
+        $this->connection->executeStatement('CREATE SCHEMA public');
+        $folder = Foundations::folder();
+        $kernel = new TestKernel($folder, (string) getenv('CATTOPHP_TEST_DATABASE_URL'), projectStep: true);
+        try {
+            $kernel->boot();
+            $command = new CommandTester((new Application($kernel))->find('cattophp:migrate'));
+            $command->execute(['--dry-run' => true]);
+            self::assertStringContainsString('9 steps would be applied', $command->getDisplay());
+            self::assertStringContainsString("202611131200-example-notes  The project's notes", $command->getDisplay(), 'Listed with CattoPHP\'s.');
+            $command->execute([]);
+            self::assertStringContainsString('Done: 9 steps applied.', $command->getDisplay());
+            self::assertSame(['202611091000-settings', '202611131200-example-notes'], [$this->connection->fetchOne('SELECT id FROM cattophp_schema_steps ORDER BY id LIMIT 1'), $this->connection->fetchOne('SELECT id FROM cattophp_schema_steps ORDER BY id DESC LIMIT 1')], 'In the order of their ids.');
+            $this->connection->executeStatement('INSERT INTO example_notes (words) VALUES (?)', ['The project\'s own table.']);
+            self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM example_notes'));
+        } finally {
+            $kernel->shutdown();
+            Foundations::remove($folder);
+            restore_exception_handler();
+        }
+    }
+
     /** A project with a database and the scheduler on keeps its runs in cattophp_scheduled_jobs. */
     public function testTheSchedulersRunsAreKeptInTheDatabase(): void
     {

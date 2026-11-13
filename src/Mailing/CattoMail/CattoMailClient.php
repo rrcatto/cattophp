@@ -111,7 +111,7 @@ final class CattoMailClient
     }
 
     /** Ends this site's connection at catto-mail: its key is revoked and its webhook removed. False when it was ended already. */
-    public function disconnect(): bool
+    public function dropConnection(): bool
     {
         return $this->status('DELETE', '/connection') === 204;
     }

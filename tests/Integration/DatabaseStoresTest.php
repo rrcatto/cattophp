@@ -16,6 +16,7 @@ use CattoPHP\Settings\DbalSettingsStore;
 use CattoPHP\Links\DbalLinkStore;
 use CattoPHP\Sessions\DbalSessionStore;
 use CattoPHP\Tests\Support\SessionStoreContract;
+use CattoPHP\Tests\Support\ActivityStoreContract;
 use CattoPHP\Tests\Support\LinkStoreContract;
 use CattoPHP\SignIn\SignInAccount;
 use CattoPHP\Tests\Support\DatabaseTestCase;
@@ -58,6 +59,16 @@ final class DatabaseStoresTest extends DatabaseTestCase
         self::assertSame(['how' => 'link'], $mine[1]->details);
         self::assertSame([], $mine[0]->details);
         self::assertSame('2026-11-09 10:00:00', $mine[1]->at->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'));
+    }
+
+    public function testTheActivityLogIsReadAPageAtATimeCountedAndListsTheActionsItHolds(): void
+    {
+        ActivityStoreContract::pages(new DbalActivityStore($this->connection), 'database');
+    }
+
+    public function testAnAccountForgottenIsNamedNowhereInTheLog(): void
+    {
+        ActivityStoreContract::forgets(new DbalActivityStore($this->connection), 'database');
     }
 
     public function testEntriesFromBeforeAMomentAreRemovedAndTheRestKept(): void

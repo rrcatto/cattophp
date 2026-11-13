@@ -22,7 +22,7 @@ final class SignupRiskTest extends TestCase
         self::assertSame([0, RiskAssessment::LOW, [], false, null, false], [$risk->score, $risk->band, $risk->signals, $risk->holds(), $risk->refusal, $risk->trapped]);
     }
 
-    /** Being abroad is a warning sign, never a hold (owner, 2026-10-27, 6A); a blocked country is held, never told why. */
+    /** Being abroad is a warning sign, never a hold; a blocked country is held, never told why. */
     public function testACountryOnTheBlockedListIsHeldAndOneOutsideTheAllowedListIsAWarningSign(): void
     {
         $abroad = SignupRisk::assess($this->facts(network: new NetworkFacts('GB', address: '81.2.69.142', kind: 'home')), ['ZA'], ['RU']);

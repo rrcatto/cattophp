@@ -52,4 +52,29 @@ final class RedactorTest extends TestCase
             'name' => 'kept',
         ]));
     }
+
+    public function testHowManySecretsThereAreIsNoSecret(): void
+    {
+        self::assertSame([
+            'recovery_codes' => 8,
+            'tokens_left' => 2,
+            'secret_count' => 3,
+            'recovery_code' => '••••',
+            'one_time_code' => '••••',
+            'recovery_codes_typed' => '••••',
+            'passwords' => '••••',
+            'password' => '••••',
+            'access' => 'kept',
+        ], Redactor::data([
+            'recovery_codes' => 8,
+            'tokens_left' => 2,
+            'secret_count' => 3,
+            'recovery_code' => 'ABCD-EFGH',
+            'one_time_code' => 123456,
+            'recovery_codes_typed' => 'ABCD-EFGH',
+            'passwords' => ['hunter2'],
+            'password' => 1234,
+            'access' => 'kept',
+        ]), 'a count under a plural name, or one ending _count or _left, is kept; a code, even a number, never is');
+    }
 }

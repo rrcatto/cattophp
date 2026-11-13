@@ -91,6 +91,30 @@ final class MemoryRoleStore implements RoleStore
         unset($this->held[$accountId][$roleKey]);
     }
 
+    public function revokeUnlessLast(string $accountId, string $roleKey): bool
+    {
+        $this->writable();
+        if (!isset($this->held[$accountId][$roleKey]) || count($this->holders($roleKey)) <= 1) {
+            return false;
+        }
+        unset($this->held[$accountId][$roleKey]);
+
+        return true;
+    }
+
+    public function lockHolders(string $roleKey): array
+    {
+        return $this->holders($roleKey);
+    }
+
+    public function forgetAccount(string $accountId): int
+    {
+        $held = count($this->held[$accountId] ?? []);
+        unset($this->held[$accountId]);
+
+        return $held;
+    }
+
     public function isWritable(): bool
     {
         return $this->writable;

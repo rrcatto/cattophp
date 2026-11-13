@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoPHP\Tests\Integration;
 
 use CattoPHP\Http\FormStamp;
+use CattoPHP\Inbox\ImapMailbox;
 use CattoPHP\Inbox\Inbox;
 use CattoPHP\Inbox\InboxDocuments;
 use CattoPHP\Inbox\InboxMailbox;
@@ -19,6 +20,7 @@ use CattoPHP\Signup\SignupCountries;
 use CattoPHP\Tests\Support\DatabaseTestCase;
 use CattoPHP\Tests\Support\Foundations;
 use InvalidArgumentException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -215,9 +217,9 @@ final class InboxTest extends DatabaseTestCase
         self::assertFalse($mailbox->file(MimeMessage::parse("From: someone@example.org\nSubject: Newsletter\n\nHello.")), 'Mail answering no conversation is left alone.');
         self::assertSame('No mailbox is set in Inbox settings.', $mailbox->run());
         $this->store->saveMailboxState(['validity' => 1730000000, 'uid' => 42, 'checked_at' => '2026-11-12T16:51:00+02:00', 'error' => '']);
-        self::assertSame(['checked_at' => '2026-11-12T16:51:00+02:00', 'error' => ''], $mailbox->status());
+        self::assertSame(['state' => 'none', 'checked_at' => '2026-11-12T16:51:00+02:00', 'error' => ''], $mailbox->status());
         $mailbox->forget();
-        self::assertSame(['checked_at' => '', 'error' => ''], $mailbox->status());
+        self::assertSame(['state' => 'none', 'checked_at' => '', 'error' => ''], $mailbox->status());
     }
 
     public function testRowsWrittenBeforeReadTheSame(): void
@@ -232,6 +234,68 @@ final class InboxTest extends DatabaseTestCase
         self::assertSame(['message'], array_column($this->store->itemsOf(43), 'kind'));
         self::assertSame(43, $this->inbox->idByReference('MSG-000043'));
         self::assertSame('MSG-000044', $this->inbox->keep(['reason' => 'other', 'sender_name' => 'Next', 'sender_email' => 'next@example.org', 'message' => 'Next.'])['reference'], 'The numbers go on from where they were.');
+    }
+
+    public function testTheMailboxShowsTheOutcomeOfItsLastTry(): void
+    {
+        $server = new class extends ImapMailbox {
+            public bool $accepts = false;
+            public int $reads = 0;
+
+            public function check(array $mailbox): string
+            {
+                if (!$this->accepts) throw new RuntimeException('The mail server did not accept the mailbox user and password.');
+
+                return 'Connected: 3 messages in the mailbox.';
+            }
+
+            public function newMessages(array $mailbox, array $state): array
+            {
+                $this->reads++;
+                if (!$this->accepts) throw new RuntimeException('The mail server did not accept the mailbox user and password.');
+
+                return ['messages' => [], 'state' => ['validity' => 7, 'last' => 3]];
+            }
+        };
+        $mailbox = new InboxMailbox($this->settings, $this->store, $server);
+        self::assertSame('none', $mailbox->status()['state']);
+        $this->settings->saveAll(['inbox_imap_host' => 'imap.example.com', 'inbox_imap_user' => 'answers@example.com', 'inbox_imap_password' => 'not-made-yet'], null);
+        self::assertSame('unchecked', $mailbox->status()['state'], 'Set but never tried: not connected.');
+        self::assertSame('The mailbox is not connected: Check the connection in Inbox settings connects it.', $mailbox->run());
+        self::assertSame(0, $server->reads, 'Details never checked are not read.');
+        try {
+            $mailbox->check();
+            self::fail('A refused sign-in is an error.');
+        } catch (RuntimeException $refused) {
+            self::assertSame('The mail server did not accept the mailbox user and password.', $refused->getMessage());
+        }
+        $status = $mailbox->status();
+        self::assertSame(['failed', 'The mail server did not accept the mailbox user and password.'], [$status['state'], $status['error']], 'A failed check shows as failed, never as connected.');
+        self::assertNotSame('', $status['checked_at']);
+        $mailbox->run();
+        self::assertSame(0, $server->reads, 'A mailbox that refused is not tried again every minute: a connection exists only once a real try made it.');
+        $before = $this->settings->mailbox();
+        $mailbox->detailsSaved($before);
+        self::assertSame('failed', $mailbox->status()['state'], 'Saved with the same details: as it was.');
+        $this->settings->saveAll(['inbox_imap_host' => 'imap.example.com', 'inbox_imap_user' => 'answers@example.com', 'inbox_imap_password' => 'made-now'], null);
+        $mailbox->detailsSaved($before);
+        self::assertSame(['unchecked', '', ''], array_values($mailbox->status()), 'New details: not checked yet.');
+        $server->accepts = true;
+        self::assertSame('Connected: 3 messages in the mailbox.', $mailbox->check());
+        self::assertSame('connected', $mailbox->status()['state']);
+        $mailbox->run();
+        self::assertSame(1, $server->reads, 'Connected: read.');
+        $server->accepts = false;
+        $mailbox->run();
+        self::assertSame([2, 'failed'], [$server->reads, $mailbox->status()['state']], 'A read that fails later shows too.');
+        $server->accepts = true;
+        $mailbox->run();
+        self::assertSame(2, $server->reads, 'And it is not read again until a check works.');
+        $mailbox->check();
+        $mailbox->run();
+        self::assertSame([3, 'connected', ''], [$server->reads, $mailbox->status()['state'], $mailbox->status()['error']]);
+        $this->settings->forgetMailbox();
+        self::assertSame('none', $mailbox->status()['state']);
     }
 
     public function testTheSettingsAreReadSavedAndReset(): void

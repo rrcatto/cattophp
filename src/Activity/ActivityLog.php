@@ -55,10 +55,30 @@ final class ActivityLog
         ));
     }
 
-    /** @return list<ActivityEntry> */
-    public function recent(int $limit = 50, ?string $action = null, ?string $subjectType = null, ?string $subjectId = null, ?string $actorId = null): array
+    /**
+     * The newest entries first, narrowed by what is given, from the $offset-th on: a page of the log.
+     *
+     * @return list<ActivityEntry>
+     */
+    public function recent(int $limit = 50, ?string $action = null, ?string $subjectType = null, ?string $subjectId = null, ?string $actorId = null, int $offset = 0): array
     {
-        return $this->store->recent($limit, $action, $subjectType, $subjectId, $actorId);
+        return $this->store->recent($limit, $action, $subjectType, $subjectId, $actorId, max(0, $offset));
+    }
+
+    /** How many entries there are, narrowed as recent() narrows them. */
+    public function count(?string $action = null, ?string $subjectType = null, ?string $subjectId = null, ?string $actorId = null): int
+    {
+        return $this->store->count($action, $subjectType, $subjectId, $actorId);
+    }
+
+    /**
+     * Every action the log holds, in alphabetical order: what a page may filter it by.
+     *
+     * @return list<string>
+     */
+    public function actions(): array
+    {
+        return $this->store->actions();
     }
 
     /** Removes every entry from before a moment, for a log kept only so long; returns how many went. */

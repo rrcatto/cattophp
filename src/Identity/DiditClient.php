@@ -45,13 +45,50 @@ final class DiditClient
     }
 
     /**
+     * The application's workflows, by a call Didit documents as a pure read (GET /v3/workflows/): what a key may use, so
+     * Check the connection proves the key and finds the workflow without creating anything.
+     *
+     * @return list<array{workflow_id:string,label:string,status:string,is_default:bool}>
+     */
+    public function workflows(): array
+    {
+        $body = $this->call('GET', '/v3/workflows/', [], false);
+        // A list of workflows, or (Didit's documentation is of two minds) a page of them under results.
+        $rows = is_array($body['results'] ?? null) ? $body['results'] : array_values($body);
+        $found = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !is_string($row['workflow_id'] ?? null)) continue;
+            $found[] = ['workflow_id' => $row['workflow_id'], 'label' => is_string($row['workflow_label'] ?? null) ? $row['workflow_label'] : '',
+                'status' => is_string($row['status'] ?? null) ? $row['status'] : '', 'is_default' => ($row['is_default'] ?? false) === true];
+        }
+
+        return $found;
+    }
+
+    /**
+     * Registers the site's webhook address with Didit (POST /v3/webhook/destinations/, version 3, the format this site
+     * reads) and answers the signing secret Didit makes for it, which Didit shows only now.
+     */
+    public function registerWebhook(string $url): string
+    {
+        $body = $this->call('POST', '/v3/webhook/destinations/', ['json' => ['label' => 'This site', 'url' => $url, 'enabled' => true, 'webhook_version' => 'v3']], false);
+        $secret = is_string($body['secret_shared_key'] ?? null) ? $body['secret_shared_key'] : '';
+        if ($secret === '') {
+            throw new RuntimeException('Didit registered the webhook but gave no signing secret: copy it from Didit\'s Business Console, under API & Webhooks.');
+        }
+
+        return $secret;
+    }
+
+    /**
      * @param array<string,mixed> $options
+     * @param bool $needsAll whether all three keys are needed (a verification), or the API key alone (a check, the webhook)
      * @return array<string,mixed>
      */
-    private function call(string $method, string $path, array $options): array
+    private function call(string $method, string $path, array $options, bool $needsAll = true): array
     {
-        if (!$this->settings->available()) {
-            throw new RuntimeException('Identity verification is not available at the moment.');
+        if ($needsAll ? !$this->settings->available() : $this->settings->apiKey() === '') {
+            throw new RuntimeException($needsAll ? 'Identity verification is not available at the moment.' : 'Enter Didit\'s API key first.');
         }
         try {
             $response = $this->http->request($method, self::API . $path, $options + [
@@ -62,6 +99,9 @@ final class DiditClient
             $body = $response->toArray(false);
         } catch (Throwable $failed) {
             throw new RuntimeException('The identity verification service could not be reached. Please try again in a few minutes.', 0, $failed);
+        }
+        if ($status === 401 || $status === 403) {
+            throw new RuntimeException('Didit did not accept the API key (' . $status . '). Check it in Didit\'s Business Console, under API & Webhooks.');
         }
         if ($status < 200 || $status >= 300) {
             throw new RuntimeException('The identity verification service refused the request (' . $status . '). Please try again in a few minutes.');

@@ -41,4 +41,9 @@ final class DbalSetupMarkStore implements SetupMarkStore
     {
         $this->connection->executeStatement('DELETE FROM cattophp_setup_steps WHERE step_key = :step', ['step' => $key]);
     }
+
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_setup_steps SET marked_by = NULL WHERE marked_by = :account', ['account' => $account]);
+    }
 }

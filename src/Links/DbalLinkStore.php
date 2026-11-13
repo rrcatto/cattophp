@@ -72,6 +72,14 @@ final class DbalLinkStore implements LinkStore
         $this->connection->executeStatement('DELETE FROM cattophp_links WHERE token_hash = ? AND used_at IS NULL', [$hash]);
     }
 
+    public function forgetAccount(string $accountId, ?string $email): int
+    {
+        return (int) $this->connection->executeStatement(
+            "DELETE FROM cattophp_links WHERE account_id = :account OR (account_id IS NULL AND :email <> '' AND lower(email) = :email)",
+            ['account' => $accountId, 'email' => mb_strtolower(trim((string) $email))],
+        );
+    }
+
     public function countForEmail(string $email, DateTimeImmutable $since, array $except = []): int
     {
         return $this->count('email', $email, $since, $except);

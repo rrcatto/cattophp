@@ -23,9 +23,14 @@ final class SignInRules
         return $account->administrator || ($this->roles?->isAdministrator($account->id) ?? false);
     }
 
+    /**
+     * Whether an account may sign in: an administrator always, and so the installation's administrator's address
+     * (APP_ADMIN_EMAIL) too, which may always join, whether or not the project flags its account; everyone when sign-in is
+     * not limited; else a listed address.
+     */
     public function maySignIn(SignInAccount $account): bool
     {
-        return $this->mayUse($account->email, $this->isAdministrator($account));
+        return $this->mayUse($account->email, $this->isAdministrator($account) || $this->isAdministratorAddress($account->email));
     }
 
     /**
@@ -50,11 +55,34 @@ final class SignInRules
 
     public function mustUseTwoStep(SignInAccount $account): bool
     {
+        return $this->twoStepRequired($this->isAdministrator($account));
+    }
+
+    /** Whether two-step sign-in is required of an administrator, or of anyone else: AUTH_TWO_STEP. */
+    public function twoStepRequired(bool $administrator): bool
+    {
         return match (strtoupper($this->settings->get('AUTH_TWO_STEP'))) {
             'EVERYONE' => true,
             'CHOICE' => false,
-            default => $this->isAdministrator($account),
+            default => $administrator,
         };
+    }
+
+    /**
+     * Whether an address with no account may join by signing in, where the project lets people join (JoiningAccounts):
+     * the installation's administrator always, everyone when sign-in is not limited, else a listed address.
+     */
+    public function mayJoin(string $email): bool
+    {
+        return $this->isAdministratorAddress($email) || $this->mayUse($email, false);
+    }
+
+    /** Whether an address is the installation's administrator's (APP_ADMIN_EMAIL). */
+    public function isAdministratorAddress(string $email): bool
+    {
+        $administrator = mb_strtolower(trim($this->settings->get('APP_ADMIN_EMAIL')));
+
+        return $administrator !== '' && hash_equals($administrator, mb_strtolower(trim($email)));
     }
 
     /** @return list<string> the listed addresses, in small letters, each once */

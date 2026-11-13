@@ -53,6 +53,31 @@ final class ComponentTemplatesTest extends TestCase
         self::assertStringContainsString('<div class="cl-ui-table" data-density="normal" data-column-fit="off">', UiHarness::render('data.table', ['fit' => false]));
     }
 
+    /**
+     * stack: each row a card of label and value on a narrow screen, by the stylesheet alone: the table says so with
+     * data-stack="narrow" and is otherwise the same table, its head and cells as written. Without it nothing changes.
+     */
+    public function testATableCanBeCardsOnANarrowScreen(): void
+    {
+        self::assertSame('<div class="cl-ui-table" data-density="normal"><table><thead></thead><tbody></tbody></table><div class="cl-ui-table-tip" role="tooltip" hidden></div></div>', trim(UiHarness::render('data.table')), 'Without stack the table is drawn exactly as before.');
+        $source = "{% embed ui_template('data.table') with {props: ui_props('data.table', {stack: true, caption: 'Tools'})} %}{% block header %}<tr><th scope=\"col\">Name</th><th scope=\"col\">Where</th></tr>{% endblock %}{% block body %}<tr><td data-label=\"Name\">Pressure washer</td><td data-label=\"Where\">Shed</td></tr>{% endblock %}{% endembed %}";
+        $html = UiHarness::source($source);
+        self::assertStringContainsString('<div class="cl-ui-table" data-density="normal" data-stack="narrow"><table><caption>Tools</caption><thead><tr><th scope="col">Name</th>', $html, 'The same table, head and all, for a screen reader.');
+        self::assertStringContainsString('<td data-label="Name">Pressure washer</td>', $html);
+        self::assertStringNotContainsString('style=', $html);
+        $css = (string) file_get_contents(dirname(__DIR__, 3) . '/public/css/cattophp.css');
+        self::assertStringContainsString('@media (max-width:767.98px){' . "\n" . '.cl-ui-table[data-stack="narrow"]>table,', $css, 'Cards below a tablet\'s width.');
+        self::assertStringContainsString('content:attr(data-label) / ""', $css, 'The label is drawn from the cell and not read out twice.');
+        foreach (['yes', 1] as $broken) {
+            try {
+                UiHarness::components()->properties('data.table', ['stack' => $broken]);
+                self::fail('Accepted stack ' . var_export($broken, true));
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString('data.table.stack', $refused->getMessage());
+            }
+        }
+    }
+
     /** A link that changes the page in place carries what a GET form does, aimed at its own address; one that opens something says whether it is open. */
     public function testALinkCanChangeThePageInPlaceAndSayWhetherItOpensSomething(): void
     {
@@ -113,6 +138,9 @@ final class ComponentTemplatesTest extends TestCase
         self::assertStringContainsString('<li class="cl-ui-card" data-picture="round">', $card);
         self::assertStringContainsString('<h3 class="cl-ui-card-title"><a href="/people/CL202610200001X">&lt;Ada&gt;</a></h3>', $card);
         self::assertStringContainsString('<h3 class="cl-ui-card-title">Example Trading</h3>', UiHarness::render('data.card', ['title' => 'Example Trading', 'picture' => 'square']), 'No page: the name alone.');
+        $plain = UiHarness::render('data.card', ['title' => 'Firefox on Linux', 'picture' => 'none']);
+        self::assertStringContainsString('<li class="cl-ui-card" data-picture="none">', $plain, 'A card a picture would not help: its words keep to the start.');
+        self::assertStringContainsString('<div class="cl-ui-card-picture"></div>', $plain, 'Its picture is empty, which the stylesheet hides.');
         foreach ([['data.card-grid', ['columns' => 6], 'columns'], ['data.card-grid', ['columns' => 'auto'], 'columns'], ['data.card', ['title' => 'x', 'picture' => 'oval'], 'picture']] as [$component, $properties, $key]) {
             try {
                 UiHarness::render($component, $properties);

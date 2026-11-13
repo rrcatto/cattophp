@@ -7,6 +7,7 @@ namespace CattoPHP\Settings;
 use CattoPHP\Activity\ActivityLog;
 use CattoPHP\Activity\Actor;
 use CattoPHP\Foundation\Duration;
+use CattoPHP\Installation\Installation;
 use CattoPHP\Security\SecretCipher;
 use InvalidArgumentException;
 use Psr\Clock\ClockInterface;
@@ -238,6 +239,31 @@ final class Settings
         $this->activity->record('settings.reset', $setting->secret ? ['setting' => $name] : ['setting' => $name, 'old' => $before, 'new' => $this->inherited($setting)], 'setting', $name, $actor);
     }
 
+    /**
+     * Saves the setting as empty on purpose, whatever .env says: a connection dropped stays dropped, even where .env holds
+     * keys, until new ones are saved or reset() lets .env apply again (Settings override every .env value). Where .env
+     * and the default give nothing, the override is simply removed.
+     */
+    public function clear(string $name, ?Actor $actor = null): void
+    {
+        if (!$this->store->isWritable()) {
+            throw new SettingsRefused(['' => 'This installation keeps its settings in .env: change them there.']);
+        }
+        $setting = $this->catalogue->setting($name);
+        $before = $this->safely($name);
+        if ($this->inherited($setting) === '') {
+            if (isset($this->overrides()[$name])) {
+                $this->store->remove($name);
+            }
+        } else {
+            $this->store->save($name, $setting->secret ? $this->cipher->encrypt('') : '', $setting->secret, $this->clock->now(), $actor !== null ? $actor->id : null);
+        }
+        $this->forget();
+        if ($before !== '') {
+            $this->activity->record('settings.changed', $setting->secret ? ['setting' => $name, 'secret_changed' => true] : ['setting' => $name, 'old' => $before, 'new' => ''], 'setting', $name, $actor);
+        }
+    }
+
     /** Removes every override of a group. */
     public function resetGroup(string $groupKey, ?Actor $actor = null): void
     {
@@ -262,7 +288,7 @@ final class Settings
         $value = $typed === null ? '' : (string) $typed;
         $value = $setting->type === SettingType::Paragraph ? trim(str_replace("\r\n", "\n", $value)) : trim((string) preg_replace('/\s+/u', ' ', $value));
         if ($value === '') {
-            if ($setting->secret && $this->get($setting->name) !== '') {
+            if ($setting->secret && $this->secretIsSet($setting->name)) {
                 return null;
             }
             if ($setting->optional) {
@@ -286,15 +312,19 @@ final class Settings
             SettingType::Address => self::address($setting, $value),
             SettingType::Number => self::number($setting, $value),
             SettingType::Duration => self::lengthOfTime($setting, $value),
-            SettingType::Choice => isset($setting->choices[$value]) ? $value
-                : throw new InvalidArgumentException(sprintf('%s: choose one of %s.', $setting->label, implode(', ', $setting->choices))),
-            SettingType::TimeZone => in_array($value, timezone_identifiers_list(), true) ? $value
-                : throw new InvalidArgumentException(sprintf('%s must be a time zone by its name, such as Africa/Johannesburg or Europe/London.', $setting->label)),
+            SettingType::Choice => self::choiceKey($setting, $value) ?? ($this->isInForce($setting, $value) ? $value
+                : throw new InvalidArgumentException(sprintf('%s: choose one of %s.', $setting->label, implode(', ', $setting->choices)))),
+            SettingType::TimeZone => Installation::timeZoneName($value) ?? ($this->isInForce($setting, $value) ? $value
+                : throw new InvalidArgumentException(sprintf('%s must be a time zone by its name, such as Africa/Johannesburg or Europe/London.', $setting->label))),
             SettingType::MailTransport => self::mailTransport($setting, $value),
         };
     }
 
-    /** What applies without an override: .env, else the setting's own default. */
+    /**
+     * What applies without an override: .env, else the setting's own default. A switch is true or false; a choice or a
+     * time zone written in another case is the one it names (.env's AUTH_TWO_STEP=everyone is EVERYONE, APP_SITE_MODE=LIVE
+     * is live, APP_TIMEZONE=africa/johannesburg is Africa/Johannesburg), as those who read them have always read them.
+     */
     private function inherited(Setting $setting): string
     {
         $env = $this->environment->get($setting->name);
@@ -302,7 +332,49 @@ final class Settings
             return $setting->default;
         }
 
-        return $setting->type === SettingType::Switch ? (in_array(strtolower($env), self::TRUE, true) ? 'true' : 'false') : $env;
+        return match ($setting->type) {
+            SettingType::Switch => in_array(strtolower($env), self::TRUE, true) ? 'true' : 'false',
+            SettingType::Choice => self::choiceKey($setting, $env) ?? $env,
+            SettingType::TimeZone => Installation::timeZoneName($env) ?? $env,
+            default => $env,
+        };
+    }
+
+    /** The choice a value names, whatever its case and spaces around it, as the choice's own key; null for none. */
+    public static function choiceKey(Setting $setting, string $value): ?string
+    {
+        $value = trim($value);
+        foreach (array_keys($setting->choices) as $key) {
+            if (strcasecmp((string) $key, $value) === 0) {
+                return (string) $key;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether a value is exactly the one in force now: a choice or a time zone that is in no option (.env's spelling of
+     * something unknown, say) is kept as it stands when the form sends it back unchanged, and is refused only once someone
+     * picks it on purpose. Saving a group never quietly puts another value in its place.
+     */
+    private function isInForce(Setting $setting, string $value): bool
+    {
+        try {
+            return $value === $this->get($setting->name);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** Whether a secret is set, saved or from .env; one saved that can no longer be read counts as set, and is kept. */
+    private function secretIsSet(string $name): bool
+    {
+        try {
+            return $this->get($name) !== '';
+        } catch (RuntimeException) {
+            return true;
+        }
     }
 
     private static function address(Setting $setting, string $value): string

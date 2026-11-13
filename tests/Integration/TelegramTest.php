@@ -243,8 +243,8 @@ final class TelegramTest extends DatabaseTestCase
         self::assertSame([true, false, true, false], [$setup->view()['on_register'], $setup->view()['on_sale'], $setup->view()['connected'], $setup->view()['sign_in']]);
         self::assertSame(TelegramStandIn::KEY, $this->bot->key(), 'A choice named like the key changes nothing.');
         self::assertFalse($this->bot->choice('unknown', false), 'A choice the page does not offer is not kept.');
-        $setup->disconnect(new Actor('1', 'Ada'));
-        self::assertSame([true, false, false, true, false, '', ''], [$setup->view()['on_register'], $setup->view()['on_sale'], $setup->view()['connected'], $setup->view()['disconnected'], $setup->view()['has_key'], $setup->view()['username'], $this->bot->key()]);
+        $setup->dropConnection(new Actor('1', 'Ada'));
+        self::assertSame([true, false, false, true, false, '', ''], [$setup->view()['on_register'], $setup->view()['on_sale'], $setup->view()['connected'], $setup->view()['connection_dropped'], $setup->view()['has_key'], $setup->view()['username'], $this->bot->key()]);
     }
 
     public function testAPersonConnectsTheirTelegramByTheBotsStart(): void
@@ -262,9 +262,9 @@ final class TelegramTest extends DatabaseTestCase
         self::assertTrue($this->connections->test('41'));
         self::assertSame('Test message from example.com', $this->telegram->textsTo('777001')[1] ?? null);
         $this->refusedWith('connected already', fn() => $this->connections->start('41', 'thandi@example.com'));
-        $this->connections->disconnect('41');
+        $this->connections->dropConnection('41');
         self::assertSame(['off', null], [$this->connections->view('41')['state'], $this->accounts->forAccount('41')]);
-        self::assertCount(1, $this->site->activity->recent(5, 'telegram.disconnected'));
+        self::assertCount(1, $this->site->activity->recent(5, 'telegram.connection_dropped'));
     }
 
     public function testAChatConnectsToOneAccountOnlyAndTheBotSaysSo(): void
@@ -365,7 +365,7 @@ final class TelegramTest extends DatabaseTestCase
     {
         $encrypted = $this->site->cipher->encrypt(TelegramStandIn::KEY);
         $this->state->set(TelegramState::BOT, (string) json_encode(['key' => $encrypted, 'bot_name' => 'site_alerts_bot', 'username' => 'your_username', 'chat_id' => self::OWNER_CHAT,
-            'on_register' => true, 'on_order' => false, 'on_sale' => true, 'sign_in' => true, 'disconnected' => false]), '1');
+            'on_register' => true, 'on_order' => false, 'on_sale' => true, 'sign_in' => true, 'connection_dropped' => false]), '1');
         $this->connection->executeStatement("INSERT INTO cattophp_telegram_accounts (account_id, chat_id, username) VALUES ('12', '5551001', 'thandi_m')");
         $this->connection->executeStatement("INSERT INTO cattophp_telegram_messages (id, reference, kind, body, to_account) VALUES (310, 'money_report:2026-10', 'money_report', 'October: R12,500 in 4 orders', NULL)");
         $this->connection->executeStatement("SELECT setval(pg_get_serial_sequence('cattophp_telegram_messages', 'id'), 310)");

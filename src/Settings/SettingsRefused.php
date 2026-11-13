@@ -4,20 +4,17 @@ declare(strict_types=1);
 
 namespace CattoPHP\Settings;
 
-use InvalidArgumentException;
+use CattoPHP\Http\FieldsRefused;
 
-/** Settings that could not be saved, each with why in plain words. Nothing of the group was saved. */
-final class SettingsRefused extends InvalidArgumentException
+/**
+ * Settings that could not be saved, each with why in plain words. Nothing of the group was saved. A refusal of several
+ * fields (Http\FieldsRefused), so `TypedForm::keep(..., errors: $refused)` takes it as it is.
+ */
+final class SettingsRefused extends FieldsRefused
 {
     /** @param array<string,string> $errors setting name => why; '' for the whole group */
-    public function __construct(private readonly array $errors)
+    public function __construct(array $errors)
     {
-        parent::__construct($errors === [] ? 'The settings were not saved.' : implode(' ', array_values($errors)));
-    }
-
-    /** @return array<string,string> */
-    public function errors(): array
-    {
-        return $this->errors;
+        parent::__construct($errors, array_filter($errors, static fn (string $why): bool => trim($why) !== '') === [] ? 'The settings were not saved.' : '');
     }
 }

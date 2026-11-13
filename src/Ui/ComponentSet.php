@@ -13,8 +13,6 @@ namespace CattoPHP\Ui;
  */
 interface ComponentSet
 {
-    public const TAG = 'cattophp.ui_component_set';
-
     /**
      * The components by name, none of them one of CattoPHP's: each its full template name (such as
      * `@app/ui/catalogue/course-grid.html.twig`), its properties' defaults and, for the component gallery, the values

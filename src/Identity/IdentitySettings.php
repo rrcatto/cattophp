@@ -7,11 +7,13 @@ namespace CattoPHP\Identity;
 use CattoPHP\Installation\Installation;
 use CattoPHP\Runtime\SiteMode;
 use CattoPHP\Settings\EnvironmentValues;
+use CattoPHP\Settings\Settings;
 
 /**
- * Identity verification's settings. Verification uses Didit's hosted page; its keys come from .env (DIDIT_API_KEY,
- * DIDIT_WORKFLOW_ID, DIDIT_WEBHOOK_SECRET) and are never written by the site. Without all three, verification is not
- * available, and whatever waits for it waits. Verification is never skipped.
+ * Identity verification's settings. Verification uses Didit's hosted page; its keys (DIDIT_API_KEY, DIDIT_WORKFLOW_ID,
+ * DIDIT_WEBHOOK_SECRET, IdentitySettingGroup) start from .env and are overridden in Settings, with a Reset, the secrets
+ * stored encrypted (before 1.0 they came from .env alone). Without all three,
+ * verification is not available, and whatever waits for it waits. Verification is never skipped.
  *
  * Didit tells its keys apart by their start: sk_test_ is a sandbox key, whose checks are mocked and can be forced to
  * pass, and sk_live_ a live one. A live site with a sandbox key has no verification, rather than trust a mocked check. A
@@ -19,7 +21,7 @@ use CattoPHP\Settings\EnvironmentValues;
  */
 final class IdentitySettings
 {
-    /** The .env keys verification needs. */
+    /** The keys verification needs, named as in .env. */
     public const KEYS = ['DIDIT_API_KEY', 'DIDIT_WORKFLOW_ID', 'DIDIT_WEBHOOK_SECRET'];
 
     /** Didit's key prefixes: a sandbox key and a live one. */
@@ -36,7 +38,22 @@ final class IdentitySettings
         private readonly ?Installation $installation = null,
         private readonly string $returnPath = '/identity/return',
         private readonly string $webhookPath = '/webhooks/didit',
+        private readonly ?Settings $settings = null,
     ) {
+    }
+
+    /**
+     * A key as Settings has it (over .env); .env's alone for a project without Settings, or whose settings have no identity
+     * group. A key saved in Settings that cannot be read (APP_KEY changed since) or a database that cannot be reached is an
+     * error, never a quiet fallback to .env's: a connection dropped stays dropped, and a secret replaced is never used again.
+     */
+    public function value(string $key): string
+    {
+        if ($this->settings !== null && $this->settings->catalogue()->has($key)) {
+            return $this->settings->get($key);
+        }
+
+        return $this->environment->get($key);
     }
 
     /** Whether the keys verification needs are all in .env, and a live site does not hold a sandbox key. */
@@ -71,26 +88,26 @@ final class IdentitySettings
         return $this->site !== null && !$this->site->isDemo();
     }
 
-    /** @return list<string> the .env keys still missing */
+    /** @return list<string> the keys still missing */
     public function missingKeys(): array
     {
         // An example file's placeholders start with replace-with-: a copied example is not a configured site.
-        return array_values(array_filter(self::KEYS, fn(string $key): bool => $this->environment->get($key) === '' || str_starts_with($this->environment->get($key), 'replace-with-')));
+        return array_values(array_filter(self::KEYS, fn(string $key): bool => $this->value($key) === '' || str_starts_with($this->value($key), 'replace-with-')));
     }
 
     public function apiKey(): string
     {
-        return $this->environment->get('DIDIT_API_KEY');
+        return $this->value('DIDIT_API_KEY');
     }
 
     public function workflowId(): string
     {
-        return $this->environment->get('DIDIT_WORKFLOW_ID');
+        return $this->value('DIDIT_WORKFLOW_ID');
     }
 
     public function webhookSecret(): string
     {
-        return $this->environment->get('DIDIT_WEBHOOK_SECRET');
+        return $this->value('DIDIT_WEBHOOK_SECRET');
     }
 
     /** The site's own address, without a closing slash. */

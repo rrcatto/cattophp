@@ -117,9 +117,9 @@ final class MailingLists
     }
 
     /** Forgets who made the lists a person made (their account is gone). */
-    public function forget(string $account): void
+    public function forget(string $account): int
     {
-        $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
+        return (int) $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
     }
 
     /**

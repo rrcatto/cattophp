@@ -9,7 +9,8 @@ use Psr\Clock\ClockInterface;
 
 /**
  * Each task's last runs in words, and whether it has stopped, for a project's Settings, dashboard and setup checklist.
- * A task is overdue when it has gone longer than its own overdue time without a successful run.
+ * A task is overdue when it has gone longer than its own overdue time without a successful run. Its last trial (a run as
+ * if it were another moment, `--now`) is shown apart, and never counts as a run or keeps a task from being overdue.
  */
 final class TaskStatus
 {
@@ -20,7 +21,9 @@ final class TaskStatus
     /**
      * Every task, in the scheduler's order, with its last runs.
      *
-     * @return list<array{key:string,label:string,description:string,last_run:string,last_success:string,last_failure:?string,error:string,summary:string,overdue:bool,run_count:int}>
+     * @return list<array{key:string,label:string,description:string,last_run:string,last_success:string,last_failure:?string,error:string,summary:string,overdue:bool,run_count:int,last_trial:?string,trial_summary:string,trial_failed:bool}>
+     *     last_trial is when the last trial ran in words (null for none), trial_summary what it said (starting "As at" and
+     *     the moment it was given), trial_failed whether it failed
      */
     public function tasks(): array
     {
@@ -42,6 +45,9 @@ final class TaskStatus
                 'summary' => (string) ($record['last_summary'] ?? ''),
                 'overdue' => Schedule::isOverdue($task, $this->now(), $succeeded),
                 'run_count' => (int) ($record['run_count'] ?? 0),
+                'last_trial' => $this->words(self::time($record['last_trial_at'] ?? null)),
+                'trial_summary' => (string) ($record['last_trial_summary'] ?? ''),
+                'trial_failed' => ($record['last_trial_ok'] ?? null) === false,
             ];
         }
         return $tasks;

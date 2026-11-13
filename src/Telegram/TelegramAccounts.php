@@ -71,7 +71,7 @@ class TelegramAccounts
     }
 
     /** Forgets a person's Telegram account. Whether there was one. */
-    public function disconnect(string $account): bool
+    public function dropConnection(string $account): bool
     {
         return $this->connection->executeStatement('DELETE FROM cattophp_telegram_accounts WHERE account_id = :account', ['account' => $account]) > 0;
     }
@@ -93,5 +93,11 @@ class TelegramAccounts
         if ($row === false) return null;
 
         return ['account' => (string) $row['account_id'], 'chat_id' => (string) $row['chat_id'], 'username' => is_string($row['username'] ?? null) ? $row['username'] : null, 'connected_at' => (string) $row['connected_at']];
+    }
+
+    /** An account being deleted: the Telegram account it connected goes. Returns how many (one or none). */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('DELETE FROM cattophp_telegram_accounts WHERE account_id = :account', ['account' => $account]);
     }
 }

@@ -21,19 +21,19 @@ class TelegramBot
     public const TELEGRAM = 'https://api.telegram.org';
 
     /** The connection's own values; anything else saved beside them is a project's choice. */
-    private const CORE = ['key', 'bot_name', 'username', 'chat_id', 'sign_in', 'disconnected'];
+    private const CORE = ['key', 'bot_name', 'username', 'chat_id', 'sign_in', 'connection_dropped'];
 
     public function __construct(private readonly TelegramState $state, private readonly SecretCipher $cipher)
     {
     }
 
-    /** @return array{key:string,bot_name:string,username:string,chat_id:string,sign_in:bool,disconnected:bool} what is saved, the key still encrypted */
+    /** @return array{key:string,bot_name:string,username:string,chat_id:string,sign_in:bool,connection_dropped:bool} what is saved, the key still encrypted */
     public function saved(): array
     {
         $saved = $this->raw();
 
         return ['key' => (string) ($saved['key'] ?? ''), 'bot_name' => (string) ($saved['bot_name'] ?? ''), 'username' => (string) ($saved['username'] ?? ''), 'chat_id' => (string) ($saved['chat_id'] ?? ''),
-            'sign_in' => (bool) ($saved['sign_in'] ?? false), 'disconnected' => (bool) ($saved['disconnected'] ?? false)];
+            'sign_in' => (bool) ($saved['sign_in'] ?? false), 'connection_dropped' => (bool) ($saved['connection_dropped'] ?? false)];
     }
 
     /** A project's choice, such as whether a sale sends the owner a message: on until it is turned off. */
@@ -80,7 +80,7 @@ class TelegramBot
     public function setKey(string $key, string $botName, ?Actor $actor = null): void
     {
         // Another bot has another chat with the owner, so it is found again.
-        $this->write(['key' => $this->cipher->encrypt($key), 'bot_name' => $botName, 'chat_id' => '', 'disconnected' => false] + $this->raw(), $actor);
+        $this->write(['key' => $this->cipher->encrypt($key), 'bot_name' => $botName, 'chat_id' => '', 'connection_dropped' => false] + $this->raw(), $actor);
     }
 
     /** @param array<string,bool> $choices a project's choices by name */
@@ -106,11 +106,11 @@ class TelegramBot
         $this->write(['chat_id' => $id] + $this->raw(), $actor);
     }
 
-    /** The key and the account go; the choices and sign-in stay. The page then says Disconnected. */
+    /** Drop connection: the key and the account go; the choices and sign-in stay. The page then says Not connected. */
     public function forget(?Actor $actor = null): void
     {
         $kept = array_diff_key($this->raw(), array_flip(self::CORE));
-        $this->write(['sign_in' => $this->saved()['sign_in']] + $kept + ['disconnected' => true], $actor);
+        $this->write(['sign_in' => $this->saved()['sign_in']] + $kept + ['connection_dropped' => true], $actor);
     }
 
     /** @return array<string,mixed> */

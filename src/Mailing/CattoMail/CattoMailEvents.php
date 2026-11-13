@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Mailing\CattoMail;
 
+use CattoPHP\Account\AccountRecords;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -75,6 +76,27 @@ final class CattoMailEvents
     public function retry(int $id): bool
     {
         return $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET processed_at = NULL, outcome = NULL WHERE id = :id', ['id' => $id]) > 0;
+    }
+
+    /**
+     * A person whose account is gone: every event that names their address keeps it no more, in what catto-mail sent or
+     * the outcome kept beside it, whatever its case; it says AccountRecords::FORGOTTEN_EMAIL instead. Returns how many.
+     */
+    public function forget(string $email): int
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return 0;
+        }
+        // The address standing on its own, never inside a longer one (anna@example.com is not in hanna@example.com).
+        $pattern = '(?<![[:alnum:]_.%+@-])' . preg_quote($email) . '(?![[:alnum:]_@]|[.-][[:alnum:]])';
+
+        return (int) $this->connection->executeStatement(
+            'UPDATE ' . self::TABLE . " SET payload = CAST(regexp_replace(CAST(payload AS text), :pattern, :forgotten, 'gi') AS jsonb),
+                    outcome = regexp_replace(outcome, :pattern, :forgotten, 'gi')
+              WHERE CAST(payload AS text) ~* :pattern OR outcome ~* :pattern",
+            ['pattern' => $pattern, 'forgotten' => AccountRecords::FORGOTTEN_EMAIL]
+        );
     }
 
     /** How many are waiting to be processed. */

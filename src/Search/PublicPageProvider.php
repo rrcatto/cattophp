@@ -7,9 +7,6 @@ namespace CattoPHP\Search;
 /** A project's public pages (PublicPage), each with its own description and the words an administrator may give it. */
 interface PublicPageProvider
 {
-    /** Its own name, so one class may also be a SitemapSource (whose is TAG). */
-    public const PAGES_TAG = 'cattophp.public_pages';
-
     /** @return iterable<PublicPage> */
     public function pages(): iterable;
 }

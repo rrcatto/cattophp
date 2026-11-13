@@ -11,8 +11,11 @@ use Psr\Clock\ClockInterface;
 /**
  * Applies the schema steps that have not been applied yet, in the order of their ids, each in its own transaction, and
  * records each one when it is done. Two runs at the same moment cannot both apply a step: the run holds a lock in the
- * database until it ends. A project's own tables are its own business (Phinx, Doctrine Migrations or anything else):
- * this runner touches only CattoPHP's.
+ * database until it ends. The steps are CattoPHP's (the foundations' and those of the modules switched on) and the
+ * project's own: a class of the project's that implements SchemaStep is tagged by autoconfiguration (or by hand with
+ * ServiceTags::SCHEMA_STEP) and applied by `cattophp:migrate` with CattoPHP's, all in the order of their ids. A project
+ * may keep its own tables in it this way, or leave them to another tool (Phinx, Doctrine Migrations or anything else),
+ * which then never touches CattoPHP's.
  */
 final class SchemaRunner
 {

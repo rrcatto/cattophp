@@ -7,6 +7,7 @@ namespace CattoPHP\Module;
 use CattoPHP\Schema\FoundationSteps;
 use CattoPHP\Schema\SchemaStep;
 use CattoPHP\Schema\Steps\Step202611120900ScheduledJobs;
+use CattoPHP\Schema\Steps\Step202611130300ScheduledJobTrials;
 use CattoPHP\Schema\Steps\Step202611121400SetupSteps;
 use CattoPHP\Schema\Steps\Step202611121600SiteProtection;
 use CattoPHP\Schema\Steps\Step202611121800Telegram;
@@ -14,6 +15,8 @@ use CattoPHP\Schema\Steps\Step202611122000SearchPages;
 use CattoPHP\Schema\Steps\Step202611122100ApiTokens;
 use CattoPHP\Schema\Steps\Step202611122200SignupAttempts;
 use CattoPHP\Schema\Steps\Step202611122201IdentityChecks;
+use CattoPHP\Schema\Steps\Step202611130100IdentityConnection;
+use CattoPHP\Schema\Steps\Step202611130200Connections;
 use CattoPHP\Schema\Steps\Step202611122300Inbox;
 use CattoPHP\Schema\Steps\Step202611122310CattoMail;
 use CattoPHP\Schema\Steps\Step202611122320MailingLists;
@@ -36,7 +39,7 @@ final class Modules
     {
         $modules = [
             new Module('scheduler', 'The scheduler', 'Background work: tasks on a timetable, each run recorded, and the nightly log archive.',
-                schemaSteps: [Step202611120900ScheduledJobs::class]),
+                schemaSteps: [Step202611120900ScheduledJobs::class, Step202611130300ScheduledJobTrials::class]),
             new Module('setup', 'The setup checklist', 'The steps a new installation needs, checked automatically or marked by a person.',
                 database: true, schemaSteps: [Step202611121400SetupSteps::class]),
             new Module('protection', 'Site protection', 'The Site Log, flagged addresses, time-outs and lockouts, the form guard and the link to a server firewall.',
@@ -52,13 +55,13 @@ final class Modules
             new Module('signup', 'The sign-up check', 'Each registration judged and recorded, and the countries a registration is allowed from and held from.',
                 database: true, usesIfOn: ['scheduler' => 'fetches the Tor, VPN, hosting and throwaway email lists every day'], schemaSteps: [Step202611122200SignupAttempts::class]),
             new Module('identity', 'Identity verification', 'Checks on Didit\'s hosted page, their result by webhook or on the person\'s return.',
-                database: true, packages: self::HTTP_CLIENT, schemaSteps: [Step202611122201IdentityChecks::class]),
+                database: true, packages: self::HTTP_CLIENT, schemaSteps: [Step202611122201IdentityChecks::class, Step202611130100IdentityConnection::class, Step202611130200Connections::class]),
             new Module('inbox', 'The Inbox', 'A contact form\'s messages as conversations: the spam check, folders, replies and answers from a mailbox.',
                 database: true, usesIfOn: ['scheduler' => 'reads answers from the mailbox every minute'], schemaSteps: [Step202611122300Inbox::class]),
             new Module('mailing', 'Mailing', 'Lists and who agreed to them, campaigns and each person\'s copy, the sender, the addresses never emailed, and a mail server or catto-mail.',
                 database: true, packages: self::HTTP_CLIENT, schemaSteps: [Step202611122310CattoMail::class, Step202611122320MailingLists::class, Step202611122330MailingCampaigns::class, Step202611122340MailingForwards::class]),
-            new Module('payments', 'Payments', 'Payment gateways through Omnipay, each one\'s keys in Settings.',
-                packages: ['Omnipay\Common\GatewayFactory' => 'omnipay/common']),
+            new Module('payments', 'Payments', 'Payment gateways through Omnipay, each one\'s keys in Settings, and each one\'s connection from its last check.',
+                packages: ['Omnipay\Common\GatewayFactory' => 'omnipay/common'], schemaSteps: [Step202611130200Connections::class]),
             new Module('theme', 'Themes', 'Theme packages checked, installed, chosen and previewed, and the page renderer.'),
         ];
         $byKey = [];
@@ -153,6 +156,8 @@ final class Modules
                 $steps = [...$steps, ...$module->schemaSteps];
             }
         }
+        // A step two modules share (the connections' table) is given once.
+        $steps = array_values(array_unique($steps));
         usort($steps, static fn(string $a, string $b): int => strcmp((string) preg_replace('/^.*Step(\d+).*$/', '$1', $a), (string) preg_replace('/^.*Step(\d+).*$/', '$1', $b)));
 
         return $steps;

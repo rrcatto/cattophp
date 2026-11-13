@@ -7,7 +7,10 @@ namespace CattoPHP\Scheduler;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 
-/** The runs in the table cattophp_scheduled_jobs (an application's own table of runs moves into it unchanged). */
+/**
+ * The runs in the table cattophp_scheduled_jobs (an application's own table of runs moves into it unchanged), each task's
+ * last trial beside them (schema step 202611130300-scheduled-job-trials).
+ */
 final class DbalRunStore implements RunStore
 {
     public function __construct(private readonly Connection $connection)
@@ -39,6 +42,15 @@ final class DbalRunStore implements RunStore
         );
     }
 
+    public function tried(string $key, DateTimeImmutable $at, bool $ok, string $summary): void
+    {
+        $this->connection->executeStatement(
+            'INSERT INTO cattophp_scheduled_jobs (job_key, last_trial_at, last_trial_ok, last_trial_summary) VALUES (:job, :at, :ok, :summary)
+             ON CONFLICT (job_key) DO UPDATE SET last_trial_at = EXCLUDED.last_trial_at, last_trial_ok = EXCLUDED.last_trial_ok, last_trial_summary = EXCLUDED.last_trial_summary',
+            ['job' => $key, 'at' => $at->format(DATE_ATOM), 'ok' => $ok ? 'true' : 'false', 'summary' => mb_substr($summary, 0, self::LONGEST)]
+        );
+    }
+
     public function all(): array
     {
         $records = [];
@@ -48,6 +60,9 @@ final class DbalRunStore implements RunStore
                 'last_started_at' => $text($row['last_started_at']), 'last_finished_at' => $text($row['last_finished_at']),
                 'last_succeeded_at' => $text($row['last_succeeded_at']), 'last_failed_at' => $text($row['last_failed_at']),
                 'last_summary' => (string) ($row['last_summary'] ?? ''), 'last_error' => (string) ($row['last_error'] ?? ''), 'run_count' => (int) $row['run_count'],
+                'last_trial_at' => $text($row['last_trial_at'] ?? null),
+                'last_trial_ok' => ($row['last_trial_ok'] ?? null) === null ? null : in_array($row['last_trial_ok'], [true, 1, '1', 't', 'true'], true),
+                'last_trial_summary' => (string) ($row['last_trial_summary'] ?? ''),
             ];
         }
         return $records;

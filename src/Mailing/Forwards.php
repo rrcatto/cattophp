@@ -104,8 +104,8 @@ final class Forwards
     }
 
     /** A person whose account is gone: what they forwarded goes. */
-    public function forget(string $account): void
+    public function forget(string $account): int
     {
-        $this->connection->executeStatement('DELETE FROM ' . self::TABLE . ' WHERE account = :account', ['account' => $account]);
+        return (int) $this->connection->executeStatement('DELETE FROM ' . self::TABLE . ' WHERE account = :account', ['account' => $account]);
     }
 }

@@ -1,0 +1,16 @@
+# Only the package's own files go into an archive of it: GitHub's release zips (git archive) and a Composer path
+# repository's mirror, which reads these lines too. Everything at the top is left out, then what ships is let back in.
+# The tests and their settings stay in the repository, not in an installed package.
+/*              export-ignore
+/.*             export-ignore
+/bin            -export-ignore
+/config         -export-ignore
+/public         -export-ignore
+/resources      -export-ignore
+/src            -export-ignore
+/templates      -export-ignore
+/composer.json  -export-ignore
+/README.md      -export-ignore
+/CHANGELOG.md   -export-ignore
+/GUIDE-v*.md    -export-ignore
+/LICENSE        -export-ignore

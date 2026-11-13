@@ -1,12 +1,17 @@
-{% extends cattophp.layout %}
-{% block body %}
-<main class="cl-error-page">
-<h1>{{ title }}</h1>
-<p>{{ message }}</p>
-<p>
-{% if retry_url %}<a href="{{ retry_url }}">Try again</a> · {% endif %}
-<a href="/">Go to the home page</a>
-</p>
+{#
+	CattoPHP's error page: what happened in plain words, what to do next, and the reference that finds it in the log. In the
+	project's look (page/stock.html.twig); should the theme itself be the fault, it is drawn in the plain frame instead.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section cl-error-page">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'error-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'What happened', heading_id: 'error-heading', summary: message}) }}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+{% if retry_url %}{{ ui('action.link', {label: 'Try again', href: retry_url, icon: 'action-reset', variant: 'primary'}) }}{% endif %}
+{{ ui('action.link', {label: 'Go to the home page', href: '/', icon: 'action-back', variant: retry_url ? 'secondary' : 'primary'}) }}
+{% endblock %}{% endembed %}
 <p class="cl-error-reference"><small>{{ status }} · Reference {{ reference }}</small></p>
-</main>
+{% endblock %}{% endembed %}
+</section>
 {% endblock %}

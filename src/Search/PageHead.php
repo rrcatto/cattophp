@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace CattoPHP\Search;
 
 use CattoPHP\Installation\Installation;
-use CattoPHP\Settings\EnvironmentValues;
 
 /**
  * What a public page's head tells search engines, AI assistants and the sites it is shared on, beyond what the page sets
@@ -24,7 +23,6 @@ final class PageHead
     public function __construct(
         private readonly PublicPages $pages,
         private readonly Installation $installation,
-        private readonly EnvironmentValues $environment,
         private readonly ?PageOverrides $overrides = null,
         private readonly ?DefaultSharePicture $picture = null,
     ) {
@@ -36,10 +34,10 @@ final class PageHead
         return StructuredData::base($this->installation->address());
     }
 
-    /** The pages' language, from APP_LOCALE (en_ZA is en-ZA). */
+    /** The pages' language, from the installation's locale, a setting (APP_LOCALE: en_ZA is en-ZA). */
     public function language(): string
     {
-        return StructuredData::language($this->environment->get('APP_LOCALE'));
+        return $this->installation->language();
     }
 
     /**

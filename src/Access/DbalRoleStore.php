@@ -84,6 +84,34 @@ final class DbalRoleStore implements RoleStore
         $this->connection->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = ? AND role_key = ?', [$accountId, $roleKey]);
     }
 
+    public function revokeUnlessLast(string $accountId, string $roleKey): bool
+    {
+        return $this->connection->transactional(function (Connection $connection) use ($accountId, $roleKey): bool {
+            $holders = $this->lockHolders($roleKey);
+            if (!in_array($accountId, $holders, true) || count($holders) <= 1) {
+                return false;
+            }
+
+            return $connection->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = ? AND role_key = ?', [$accountId, $roleKey]) > 0;
+        });
+    }
+
+    public function lockHolders(string $roleKey): array
+    {
+        /** @var list<string> $accounts */
+        $accounts = $this->connection->fetchFirstColumn('SELECT account_id FROM cattophp_account_roles WHERE role_key = ? ORDER BY account_id FOR UPDATE', [$roleKey]);
+
+        return $accounts;
+    }
+
+    public function forgetAccount(string $accountId): int
+    {
+        $held = (int) $this->connection->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = ?', [$accountId]);
+        $this->connection->executeStatement('UPDATE cattophp_account_roles SET granted_by = NULL WHERE granted_by = ?', [$accountId]);
+
+        return $held;
+    }
+
     public function isWritable(): bool
     {
         return true;

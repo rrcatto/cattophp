@@ -1,0 +1,19 @@
+{# Setting up two-step sign-in by one's own choice: the QR code, or the key typed, then a code to prove the phone holds it. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'set-up-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Scan this with your phone', heading_id: 'set-up-heading', summary: 'In the authenticator app on your phone, add an account and scan this QR code. Then type the 6 digits it shows, to prove it holds the key. Until then nothing is kept, and two-step sign-in stays off.'}) }}
+<div class="cl-two-step-qr">{{ qr_code|raw }}</div>
+<details class="cl-disclosure"><summary>Cannot scan it? Type a key instead</summary><p class="cl-two-step-key" data-two-step-key>{{ secret }}</p></details>
+<form method="post" action="{{ path('cattophp_account_two_step_set_up') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The 6 digits it shows now', for: 'set-up-code', required: true})} %}{% block control %}<input class="cl-input cl-input-code" id="set-up-code" type="text" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="7" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Turn two-step sign-in on', type: 'submit', icon: 'action-enable', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Not now', href: path('cattophp_account_security'), icon: 'action-back'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

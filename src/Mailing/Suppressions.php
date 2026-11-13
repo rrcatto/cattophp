@@ -50,9 +50,9 @@ final class Suppressions
     }
 
     /** Forgets who added the addresses a person added (their account is gone). */
-    public function forget(string $account): void
+    public function forget(string $account): int
     {
-        $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
+        return (int) $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
     }
 
     /** Forgets the copy that caused it, when the project deletes that copy. */

@@ -26,7 +26,7 @@ final class InboxMailboxTask implements ScheduledTask
 
     public function description(): string
     {
-        return 'Every minute: with a mailbox set in Inbox settings, reads what is new there and puts each answer into its conversation, leaving everything else in the mailbox as it is.';
+        return 'Every minute: with a mailbox connected in Inbox settings (by Check the connection), reads what is new there and puts each answer into its conversation, leaving everything else in the mailbox as it is.';
     }
 
     public function interval(): int

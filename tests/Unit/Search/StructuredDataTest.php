@@ -93,8 +93,8 @@ final class StructuredDataTest extends TestCase
         self::assertNull(StructuredData::base('example.com'), 'Not a web address: nothing is marked up.');
         self::assertSame('en-ZA', StructuredData::language('en_ZA'));
         self::assertSame('fr', StructuredData::language('fr'));
-        self::assertSame('en-ZA', StructuredData::language(''));
-        self::assertSame('en-ZA', StructuredData::language('not a locale'));
+        self::assertSame('en-GB', StructuredData::language(''), 'Plain British English when the installation names none.');
+        self::assertSame('en-GB', StructuredData::language('not a locale'));
     }
 
     public function testPlainWordsAndExcerpts(): void

@@ -63,6 +63,11 @@ final class DbalSessionStore implements SessionStore
         $this->connection->executeStatement('UPDATE cattophp_sessions SET ended_at = ? WHERE token_hash = ? AND ended_at IS NULL', [self::time($now), $hash]);
     }
 
+    public function forgetAccount(string $accountId): int
+    {
+        return (int) $this->connection->executeStatement('DELETE FROM cattophp_sessions WHERE account_id = ?', [$accountId]);
+    }
+
     public function forgetOld(DateTimeImmutable $before): int
     {
         return (int) $this->connection->executeStatement('DELETE FROM cattophp_sessions WHERE expires_at < :before OR ended_at < :before', ['before' => self::time($before)]);

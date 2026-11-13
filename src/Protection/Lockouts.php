@@ -179,4 +179,15 @@ class Lockouts
             ['before' => $before->format(DATE_ATOM)]
         );
     }
+
+    /** An account being deleted: the lockouts it made or lifted no longer say who did. Returns how many lockouts. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement(
+            'UPDATE cattophp_site_lockouts SET created_by = CASE WHEN created_by = :account THEN NULL ELSE created_by END,
+                lifted_by = CASE WHEN lifted_by = :account THEN NULL ELSE lifted_by END
+             WHERE created_by = :account OR lifted_by = :account',
+            ['account' => $account],
+        );
+    }
 }

@@ -9,9 +9,11 @@ use CattoPHP\Http\ContentSecurityPolicy;
 use CattoPHP\Http\ErrorPageListener;
 use CattoPHP\Http\RequestReference;
 use CattoPHP\Http\Throttle;
+use CattoPHP\Http\FieldsRefused;
 use CattoPHP\Http\TypedForm;
 use CattoPHP\Http\TypedFormListener;
 use CattoPHP\Foundation\Duration;
+use CattoPHP\Settings\SettingsRefused;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
@@ -117,6 +119,92 @@ final class HttpTest extends TestCase
         $later = Request::create('/roles');
         $later->setSession($session);
         self::assertSame([], TypedForm::take($later, '/roles/new'), 'it shows once');
+    }
+
+    /**
+     * Why each field was refused waits with what was typed, for the form that sent it alone, for form.field's error beside
+     * its field; it is taken with the values, so either may be read first, and shows once.
+     */
+    public function testWhyEachFieldWasRefusedWaitsWithWhatWasTypedForItsOwnForm(): void
+    {
+        $session = new Session(new MockArraySessionStorage());
+        $sent = Request::create('/account/name', 'POST', ['name' => '1234', '_token' => 'secret-token']);
+        $sent->setSession($session);
+        TypedForm::keep($sent, errors: ['name' => 'A name needs at least one letter.', 'blank' => '  ']);
+
+        $page = Request::create('/account');
+        $page->setSession($session);
+        self::assertSame([], TypedForm::errors($page, '/elsewhere'), 'another form on the page is not blamed');
+        self::assertSame(['name' => 'A name needs at least one letter.'], TypedForm::errors($page, '/account/name'), 'an error with no words is none');
+        self::assertSame(['name' => '1234'], TypedForm::take($page, '/account/name'), 'the words typed come back with it');
+        $later = Request::create('/account');
+        $later->setSession($session);
+        self::assertSame([], TypedForm::errors($later, '/account/name'), 'it shows once');
+
+        self::assertSame(['action' => '/x', 'values' => ['a' => '1'], 'errors' => ['a' => 'Why.']], TypedForm::kept('/x', ['a' => '1'], [], ['a' => 'Why.']));
+        self::assertSame(['action' => '/x', 'values' => ['a' => '1']], TypedForm::kept('/x', ['a' => '1']), 'without errors the kept form is as it was');
+        $quiet = Request::create('/account');
+        $quiet->setSession(new Session(new MockArraySessionStorage()));
+        self::assertSame([], TypedForm::errors($quiet, '/account/name'), 'nothing refused: no errors');
+    }
+
+    /**
+     * A form refused for several fields at once: the FieldsRefused a service throws carries why for each by its name, and
+     * TypedForm::keep() takes it as it is, so each shows beside its own field; one about the whole form is not kept.
+     */
+    public function testARefusalOfSeveralFieldsIsKeptAsItIs(): void
+    {
+        $refused = new FieldsRefused(['name' => ' Type the tool\'s name. ', 'category' => 'Choose its category.', 'notes' => '', '' => 'The tool was not added.']);
+        self::assertInstanceOf(\InvalidArgumentException::class, $refused, 'Caught where a plain refusal is.');
+        self::assertSame(['name' => 'Type the tool\'s name.', 'category' => 'Choose its category.', '' => 'The tool was not added.'], $refused->errors(), 'An error with no words is none.');
+        self::assertSame('Choose its category.', $refused->error('category'));
+        self::assertNull($refused->error('notes'));
+        self::assertSame('Type the tool\'s name. Choose its category. The tool was not added.', $refused->getMessage(), 'Every reason in one sentence.');
+        self::assertSame('See why beside each field.', (new FieldsRefused(['name' => 'Why.'], 'See why beside each field.'))->getMessage());
+        self::assertSame('The form was not accepted.', (new FieldsRefused([]))->getMessage());
+
+        $session = new Session(new MockArraySessionStorage());
+        $sent = Request::create('/tools', 'POST', ['name' => '', 'category' => 'nowhere', '_token' => 'secret-token']);
+        $sent->setSession($session);
+        TypedForm::keep($sent, errors: $refused);
+        $page = Request::create('/tools/new');
+        $page->setSession($session);
+        self::assertSame(['name' => 'Type the tool\'s name.', 'category' => 'Choose its category.'], TypedForm::errors($page, '/tools'), 'Each field\'s why, for its own field.');
+        self::assertSame(['name' => '', 'category' => 'nowhere'], TypedForm::take($page, '/tools'));
+        self::assertSame(TypedForm::kept('/x', ['a' => '1'], [], ['a' => 'Why.']), TypedForm::kept('/x', ['a' => '1'], [], new FieldsRefused(['a' => 'Why.'])));
+
+        // The Settings page's refusal is one too.
+        $settings = new SettingsRefused(['APP_NAME' => 'Give the site a name.', '' => 'This installation keeps its settings in .env.']);
+        self::assertInstanceOf(FieldsRefused::class, $settings);
+        self::assertSame(['APP_NAME' => 'Give the site a name.', '' => 'This installation keeps its settings in .env.'], $settings->errors());
+        self::assertSame('Give the site a name. This installation keeps its settings in .env.', $settings->getMessage());
+        self::assertSame('The settings were not saved.', (new SettingsRefused([]))->getMessage());
+    }
+
+    public function testAFieldTheControllerNamesASecretIsNeverKeptWhateverItIsCalled(): void
+    {
+        $session = new Session(new MockArraySessionStorage());
+        $sent = Request::create('/admin/settings/payments', 'POST', ['STITCH_CLIENT_ID' => 'client-1', 'STITCH_CLIENT_SECRET' => 'never', 'STITCH_HOOK' => 'whsec_never', 'note' => 'kept']);
+        $sent->setSession($session);
+        TypedForm::keep($sent, ['STITCH_HOOK']);
+
+        $page = Request::create('/admin/settings');
+        $page->setSession($session);
+        self::assertSame(['STITCH_CLIENT_ID' => 'client-1', 'note' => 'kept'], TypedForm::take($page, '/admin/settings/payments'), 'a secret by its name, and one the controller names, are both left out');
+        self::assertSame(['action' => '/x', 'values' => ['a' => '1']], TypedForm::kept('/x', ['a' => '1', 'b' => '2'], ['b']));
+    }
+
+    /**
+     * Review finding 17: a field is judged a secret by its name as Security\Redactor judges one, so a token, an API key, a
+     * private or signing key, a DSN, a cookie or an authorisation a form holds is never kept to be drawn again, even where
+     * the controller does not name it; a field called code is still kept.
+     */
+    public function testAFieldNamedAsRedactorNamesASecretIsNeverKept(): void
+    {
+        $posted = ['name' => 'Example', 'api_token' => 'token-1', 'WEBHOOK_TOKEN' => 'token-2', 'api_key' => 'key-1', 'private_key' => 'key-2', 'signing_key' => 'key-3',
+            'MAILER_DSN' => 'smtp://user:password@mail.example.com', 'dsn' => 'pgsql://example', 'session_cookie' => 'cookie', 'authorization' => 'Bearer abc', 'code' => 'SD4JR2UH'];
+
+        self::assertSame(['action' => '/x', 'values' => ['name' => 'Example', 'code' => 'SD4JR2UH']], TypedForm::kept('/x', $posted));
     }
 
     public function testWhatTheNextPageDidNotUseIsForgottenOnceItIsSent(): void

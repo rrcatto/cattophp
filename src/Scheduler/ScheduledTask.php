@@ -7,13 +7,11 @@ namespace CattoPHP\Scheduler;
 use DateTimeImmutable;
 
 /**
- * One piece of a project's background work, found by its service tag (ScheduledTask::TAG, given by autoconfiguration to
- * every service that implements this). The scheduler runs it when it is due and records each run.
+ * One piece of a project's background work, found by its service tag (ServiceTags::SCHEDULED_TASK, given by
+ * autoconfiguration to every service that implements this). The scheduler runs it when it is due and records each run.
  */
 interface ScheduledTask
 {
-    public const TAG = 'cattophp.scheduled_task';
-
     /** Its key, which its runs are recorded under: lower-case letters, digits and underscores, such as orders or log_archive. */
     public function key(): string;
 

@@ -84,6 +84,14 @@ final class MemorySessionStore implements SessionStore
         }
     }
 
+    public function forgetAccount(string $accountId): int
+    {
+        $gone = array_filter($this->sessions, static fn (array $kept): bool => $kept['session']->accountId === $accountId);
+        $this->sessions = array_diff_key($this->sessions, $gone);
+
+        return count($gone);
+    }
+
     public function forgetOld(DateTimeImmutable $before): int
     {
         $old = array_filter($this->sessions, static fn (array $kept): bool => $kept['session']->expiresAt < $before || ($kept['session']->endedAt !== null && $kept['session']->endedAt < $before));

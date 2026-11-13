@@ -7,6 +7,7 @@ namespace CattoPHP\Tests\Unit\Module;
 use CattoPHP\Module\Modules;
 use CattoPHP\Schema\FoundationSteps;
 use CattoPHP\Schema\Steps\Step202611122300Inbox;
+use CattoPHP\Schema\Steps\Step202611130200Connections;
 use PHPUnit\Framework\TestCase;
 
 /** Each module declares what it needs, and a project is told plainly what stops one it switched on. */
@@ -36,25 +37,35 @@ final class ModulesTest extends TestCase
     {
         self::assertSame(FoundationSteps::foundationClasses(), Modules::schemaSteps([]));
         $steps = Modules::schemaSteps(['inbox', 'scheduler']);
-        self::assertSame([...FoundationSteps::foundationClasses(), 'CattoPHP\Schema\Steps\Step202611120900ScheduledJobs', Step202611122300Inbox::class], $steps, 'In the order they were written.');
+        self::assertSame([...FoundationSteps::foundationClasses(), 'CattoPHP\Schema\Steps\Step202611120900ScheduledJobs', Step202611122300Inbox::class, 'CattoPHP\Schema\Steps\Step202611130300ScheduledJobTrials'], $steps, 'In the order they were written.');
         self::assertSame(['cattophp_inbox_conversations', 'cattophp_inbox_items', 'cattophp_inbox_spam_tokens', 'cattophp_inbox_spam_training', 'cattophp_inbox_blocked_senders', 'cattophp_inbox_mailbox'],
             Modules::get('inbox')?->tables());
         self::assertSame([], Modules::get('documents')?->tables());
     }
 
-    public function testEveryStepBelongsToTheFoundationsOrToExactlyOneModule(): void
+    public function testEveryStepBelongsToTheFoundationsOrToTheModulesThatNeedIt(): void
     {
+        // The connections' table is the one step two modules share: identity verification and payments each connect to a
+        // service, and either may be switched on alone.
+        $shared = [Step202611130200Connections::class];
         $owned = FoundationSteps::foundationClasses();
         foreach (Modules::all() as $key => $module) {
             self::assertSame($key, $module->key);
             foreach ($module->schemaSteps as $step) {
-                self::assertNotContains($step, $owned, $step . ' belongs to one place only.');
+                if (!in_array($step, $shared, true)) self::assertNotContains($step, $owned, $step . ' belongs to one place only.');
                 $owned[] = $step;
             }
         }
         $all = FoundationSteps::classes();
+        $owned = array_values(array_unique($owned));
         sort($all);
         sort($owned);
         self::assertSame($all, $owned, 'Every step CattoPHP has is the foundations\' or a module\'s.');
+        self::assertContains(Step202611130200Connections::class, Modules::get('identity')->schemaSteps ?? []);
+        self::assertContains(Step202611130200Connections::class, Modules::get('payments')->schemaSteps ?? []);
+        $both = Modules::schemaSteps(['identity', 'payments']);
+        self::assertSame(1, count(array_keys($both, Step202611130200Connections::class, true)), 'A shared step is given once.');
+        self::assertSame(['cattophp_connections'], Modules::get('payments')?->tables(), 'Payments alone: the connections\' table.');
+        self::assertNotContains('cattophp_identity_connection', Modules::get('identity')?->tables() ?? [], 'Identity verification\'s own table moved into it.');
     }
 }

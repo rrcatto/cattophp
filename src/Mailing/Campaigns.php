@@ -152,10 +152,14 @@ final class Campaigns
     }
 
     /** Forgets who made or approved the campaigns a person made or approved (their account is gone). */
-    public function forget(string $account): void
+    public function forget(string $account): int
     {
-        $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET created_by = NULL WHERE created_by = :account', ['account' => $account]);
-        $this->connection->executeStatement('UPDATE ' . self::TABLE . ' SET approved_by = NULL WHERE approved_by = :account', ['account' => $account]);
+        return (int) $this->connection->executeStatement(
+            'UPDATE ' . self::TABLE . ' SET created_by = CASE WHEN created_by = :account THEN NULL ELSE created_by END,
+                approved_by = CASE WHEN approved_by = :account THEN NULL ELSE approved_by END
+             WHERE created_by = :account OR approved_by = :account',
+            ['account' => $account],
+        );
     }
 
     /**

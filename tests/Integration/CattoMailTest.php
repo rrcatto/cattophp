@@ -118,7 +118,7 @@ final class CattoMailTest extends DatabaseTestCase
         self::assertStringContainsString('does not accept the key', (string) $connection->state()['last_problem']);
 
         $this->answers[] = new MockResponse('', ['http_code' => 204]);
-        $connection->disconnect('1');
+        $connection->dropConnection('1');
         self::assertSame('DELETE', $this->requests[count($this->requests) - 1]['method']);
         self::assertStringEndsWith('/v1/connection', $this->requests[count($this->requests) - 1]['url']);
         self::assertFalse($connection->connected(), 'Forgotten here.');

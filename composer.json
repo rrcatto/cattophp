@@ -53,6 +53,23 @@
             "CattoPHP\\Tests\\": "tests/"
         }
     },
+    "archive": {
+        "exclude": [
+            "/*",
+            "/.*",
+            "!/bin",
+            "!/config",
+            "!/public",
+            "!/resources",
+            "!/src",
+            "!/templates",
+            "!/composer.json",
+            "!/README.md",
+            "!/CHANGELOG.md",
+            "!/GUIDE-v*.md",
+            "!/LICENSE"
+        ]
+    },
     "config": {
         "sort-packages": true,
         "allow-plugins": {

@@ -83,6 +83,16 @@ final class MemoryLinkStore implements LinkStore
         }
     }
 
+    public function forgetAccount(string $accountId, ?string $email): int
+    {
+        $email = mb_strtolower(trim((string) $email));
+        $gone = array_filter($this->links, static fn (array $kept): bool => $kept['link']->accountId === $accountId
+            || ($kept['link']->accountId === null && $email !== '' && $kept['link']->email !== null && mb_strtolower($kept['link']->email) === $email));
+        $this->links = array_diff_key($this->links, $gone);
+
+        return count($gone);
+    }
+
     public function forget(string $hash): void
     {
         foreach ($this->links as $id => $kept) {

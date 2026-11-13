@@ -45,6 +45,18 @@ final class FileRunStore implements RunStore
         });
     }
 
+    public function tried(string $key, DateTimeImmutable $at, bool $ok, string $summary): void
+    {
+        $this->change(static function (array $records) use ($key, $at, $ok, $summary): array {
+            $record = $records[$key] ?? self::blank();
+            $record['last_trial_at'] = $at->format(DATE_ATOM);
+            $record['last_trial_ok'] = $ok;
+            $record['last_trial_summary'] = mb_substr($summary, 0, self::LONGEST);
+            $records[$key] = $record;
+            return $records;
+        });
+    }
+
     public function all(): array
     {
         if (!is_file($this->path)) return [];
@@ -53,13 +65,14 @@ final class FileRunStore implements RunStore
         return $records;
     }
 
-    /** @return array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int} */
+    /** @return array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int,last_trial_at:?string,last_trial_ok:?bool,last_trial_summary:string} */
     private static function blank(): array
     {
-        return ['last_started_at' => null, 'last_finished_at' => null, 'last_succeeded_at' => null, 'last_failed_at' => null, 'last_summary' => '', 'last_error' => '', 'run_count' => 0];
+        return ['last_started_at' => null, 'last_finished_at' => null, 'last_succeeded_at' => null, 'last_failed_at' => null, 'last_summary' => '', 'last_error' => '', 'run_count' => 0,
+            'last_trial_at' => null, 'last_trial_ok' => null, 'last_trial_summary' => ''];
     }
 
-    /** @param callable(array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int}>):array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int}> $change */
+    /** @param callable(array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int,last_trial_at:?string,last_trial_ok:?bool,last_trial_summary:string}>):array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int,last_trial_at:?string,last_trial_ok:?bool,last_trial_summary:string}> $change */
     private function change(callable $change): void
     {
         $folder = dirname($this->path);
@@ -83,7 +96,7 @@ final class FileRunStore implements RunStore
         }
     }
 
-    /** @return array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int}> */
+    /** @return array<string,array{last_started_at:?string,last_finished_at:?string,last_succeeded_at:?string,last_failed_at:?string,last_summary:string,last_error:string,run_count:int,last_trial_at:?string,last_trial_ok:?bool,last_trial_summary:string}> */
     private static function decode(string $json): array
     {
         $data = json_decode($json, true);
@@ -96,6 +109,8 @@ final class FileRunStore implements RunStore
                 'last_succeeded_at' => $text($row['last_succeeded_at'] ?? null), 'last_failed_at' => $text($row['last_failed_at'] ?? null),
                 'last_summary' => is_string($row['last_summary'] ?? null) ? $row['last_summary'] : '', 'last_error' => is_string($row['last_error'] ?? null) ? $row['last_error'] : '',
                 'run_count' => is_int($row['run_count'] ?? null) ? $row['run_count'] : 0,
+                'last_trial_at' => $text($row['last_trial_at'] ?? null), 'last_trial_ok' => is_bool($row['last_trial_ok'] ?? null) ? $row['last_trial_ok'] : null,
+                'last_trial_summary' => is_string($row['last_trial_summary'] ?? null) ? $row['last_trial_summary'] : '',
             ];
         }
         return $records;

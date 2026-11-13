@@ -83,6 +83,12 @@ final class IdentityChecks
         );
     }
 
+    /** @return list<string> the session id of every check the account made, which an activity log entry may still name */
+    public function sessionsOf(string $account): array
+    {
+        return array_map('strval', $this->connection->fetchFirstColumn('SELECT session_id FROM cattophp_identity_verifications WHERE account = :account ORDER BY id', ['account' => $account]));
+    }
+
     /** Declined checks that count towards the tries: those since an administrator last allowed another try. */
     public function declinedTries(string $account): int
     {
@@ -149,5 +155,20 @@ final class IdentityChecks
         return $this->connection->fetchAllAssociative(
             "SELECT id, account, session_id, started_at, decided_at FROM cattophp_identity_verifications WHERE status = 'in_review' ORDER BY started_at, id",
         );
+    }
+
+    /**
+     * An account being deleted: its identity checks and the record of its last allowed try go, and the checks it revoked
+     * no longer say who did.
+     *
+     * @return array{checks:int,retries:int,revoked:int}
+     */
+    public function forget(string $account): array
+    {
+        return [
+            'checks' => (int) $this->connection->executeStatement('DELETE FROM cattophp_identity_verifications WHERE account = :account', ['account' => $account]),
+            'retries' => (int) $this->connection->executeStatement('DELETE FROM cattophp_identity_retries WHERE account = :account', ['account' => $account]),
+            'revoked' => (int) $this->connection->executeStatement('UPDATE cattophp_identity_verifications SET revoked_by = NULL WHERE revoked_by = :account', ['account' => $account]),
+        ];
     }
 }

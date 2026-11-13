@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CattoPHP\Tests\Kernel;
 
+use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Http\AfterResponse;
 use CattoPHP\Security\TwoStep\OneTimeCode;
 use CattoPHP\Tests\Kernel\App\TestKernel;
 use CattoPHP\Tests\Support\Foundations;
@@ -11,7 +13,11 @@ use CattoPHP\Tests\Support\RecordingLogger;
 use CattoPHP\Tests\Support\RecordingTransport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 /** The whole sign-in, in an application with CattoPHP in it and its records in files, as a page without a database keeps them. */
 final class SignInFlowTest extends TestCase
@@ -67,7 +73,8 @@ final class SignInFlowTest extends TestCase
         $page = $this->browser->request('GET', '/sign-in/code');
         self::assertStringContainsString('Set up your one-time code', $page->filter('h1')->text());
         self::assertCount(1, $page->filter('svg[role="img"][aria-label]'), 'the QR code is drawn here');
-        $secret = str_replace(' ', '', $page->filter('.cl-two-step-key')->text());
+        $secret = str_replace(' ', '', $page->filter('[data-two-step-key]')->text());
+        self::assertSame($page->filter('[data-two-step-key]')->text(), $page->filter('.cl-two-step-key')->text(), 'The key by its hook, the one a project\'s checks find in any theme.');
 
         $this->browser->submit($page->filter('form')->form(['code' => '000000']));
         self::assertStringContainsString('That code is not right', $this->browser->followRedirect()->text());
@@ -113,6 +120,42 @@ final class SignInFlowTest extends TestCase
 
         self::assertSame('/sign-in/sent', $this->browser->getResponse()->headers->get('Location'));
         self::assertSame([], $this->transport()->sent);
+    }
+
+    /**
+     * Review finding 18: the link is asked for once the answer has gone (kernel.terminate), for an address with an account
+     * and for any other alike, so how long the page takes never tells which: when the answer goes nothing has been sent or
+     * looked up for either, and the email goes after it, its activity entry still giving the network address it came from.
+     */
+    public function testTheLinkIsAskedForOnceTheAnswerHasGoneForEveryAddressAlike(): void
+    {
+        $dispatcher = $this->kernel->getContainer()->get('event_dispatcher');
+        self::assertInstanceOf(EventDispatcherInterface::class, $dispatcher);
+        $whenAnswered = [];
+        $dispatcher->addListener(KernelEvents::RESPONSE, function (ResponseEvent $event) use (&$whenAnswered): void {
+            if ($event->getRequest()->isMethod('POST')) {
+                $whenAnswered[] = count($this->transport()->sent);
+            }
+        }, -1024);
+
+        foreach (['owner@example.com' => 1, 'stranger@example.org' => 0] as $email => $emails) {
+            $whenAnswered = [];
+            $sentBefore = count($this->transport()->sent);
+            $page = $this->browser->request('GET', '/sign-in');
+            $this->browser->submit($page->filter('form')->form(['email' => $email]), [], ['HTTP_USER_AGENT' => self::BROWSER, 'REMOTE_ADDR' => '203.0.113.9']);
+
+            self::assertSame('/sign-in/sent', $this->browser->getResponse()->headers->get('Location'), $email);
+            self::assertSame([$sentBefore], $whenAnswered, $email . ': when the answer went, nothing had been sent.');
+            self::assertSame($sentBefore + $emails, count($this->transport()->sent), $email . ': after it, what that address gets.');
+        }
+        $later = $this->kernel->getContainer()->get(AfterResponse::class);
+        self::assertInstanceOf(AfterResponse::class, $later);
+        self::assertSame(0, $later->waiting(), 'Nothing left waiting.');
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(ContainerInterface::class, $container);
+        $log = $container->get(ActivityLog::class);
+        self::assertInstanceOf(ActivityLog::class, $log);
+        self::assertSame(['sign_in.link_sent', '203.0.113.9'], [$log->recent(1)[0]->action, $log->recent(1)[0]->ipAddress], 'Recorded after the answer, from where it was asked.');
     }
 
     public function testABotIsShownTheUsualPageAndSentNothing(): void

@@ -32,4 +32,7 @@ interface SessionStore
 
     /** Removes the sign-ins that ran out or were ended before a moment. Returns how many went. */
     public function forgetOld(DateTimeImmutable $before): int;
+
+    /** An account being deleted: every sign-in it has, going or ended, goes. Returns how many went. */
+    public function forgetAccount(string $accountId): int;
 }

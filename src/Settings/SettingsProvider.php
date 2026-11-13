@@ -10,8 +10,6 @@ namespace CattoPHP\Settings;
  */
 interface SettingsProvider
 {
-    public const TAG = 'cattophp.settings';
-
     /** @return iterable<SettingGroup> */
     public function settingGroups(): iterable;
 }

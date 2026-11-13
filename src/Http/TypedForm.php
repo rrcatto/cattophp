@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoPHP\Http;
 
+use CattoPHP\Security\Redactor;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -12,7 +13,16 @@ use Symfony\Component\HttpFoundation\Request;
  * page drawn takes it: its form reads it by that address (`typed_for(path('…'))` in a template), so it shows only in
  * the form that sent it, and whatever that page did not use is forgotten once the page is sent (TypedFormListener), so
  * nothing typed comes back later. Never the form's token, a password, a secret or a sign-in code; a long value is cut
- * short.
+ * short. A field is judged a secret by its name, as Security\Redactor judges one (a token, an API key or a DSN among
+ * them), and the controller names any other secret field the form holds
+ * (`TypedForm::keep($request, ['STITCH_CLIENT_ID'])`, as a Settings form does with each setting that is a secret
+ * whatever it is called), which is then never kept either.
+ *
+ * Why each field was refused can wait with them (`TypedForm::keep($request, errors: ['name' => 'A name needs at least one
+ * letter.'])`, or the FieldsRefused a service threw, `errors: $refused`, for a form refused for several fields at once),
+ * for the form to show beside its field: `typed_errors_for(path('…'))` in a template, or `errors()`, gives them by the
+ * field's name, and form.field's `error` (or form.picture-choice's) draws one under its field (with aria-describedby and
+ * aria-invalid on the control through `ui_field_attrs(props)`). They are taken and forgotten with the values.
  *
  * The values wait in Symfony's session, or in the PHP session a project runs itself when Symfony's is off.
  */
@@ -23,9 +33,12 @@ final class TypedForm
     /** Where the values taken by the page being drawn are held for the rest of its request. */
     private const TAKEN = '_cattophp_typed_form_taken';
 
-    /** Fields never kept: form tokens, passwords, secrets and sign-in codes. A field called code (a course's, a
-     * promotion's) is kept. */
-    private const NEVER = '/^_token$|^csrf$|password|passphrase|secret|one_time_code|recovery_code/i';
+    /**
+     * Fields never kept beside those whose names Security\Redactor takes for a secret's (a password, a passphrase, a
+     * secret, a token or an API key, a private or signing key, a DSN, a cookie, an authorisation, a one-time or recovery
+     * code): form tokens. A field called code (a course's, a promotion's) is kept.
+     */
+    private const NEVER = '/^_token$|^csrf$/i';
 
     /** The longest value kept, in characters. */
     private const LONGEST = 200_000;
@@ -33,9 +46,14 @@ final class TypedForm
     /** The most values kept in one list. */
     private const MOST = 1000;
 
-    public static function keep(Request $request): void
+    /**
+     * @param list<string> $secret the form's other secret fields, by name, never kept whatever they are called
+     * @param array<string,string>|FieldsRefused $errors why each field was refused, by its name, for the form to show
+     *     beside it: a map, or the FieldsRefused a service threw (its errors(); one about the whole form is not kept)
+     */
+    public static function keep(Request $request, array $secret = [], array|FieldsRefused $errors = []): void
     {
-        self::store($request, self::kept($request->getPathInfo(), $request->request->all()));
+        self::store($request, self::kept($request->getPathInfo(), $request->request->all(), $secret, $errors));
     }
 
     /**
@@ -67,6 +85,23 @@ final class TypedForm
         return self::forAction($request->attributes->get(self::TAKEN), $action);
     }
 
+    /**
+     * Why each field of the form sent to $action was refused, by the field's name, taken for the page being drawn as
+     * take() takes the values: empty when the form was not refused, or was refused without a field to blame.
+     *
+     * @return array<string,string>
+     */
+    public static function errors(Request $request, string $action): array
+    {
+        if (!$request->attributes->has(self::TAKEN)) {
+            $request->attributes->set(self::TAKEN, self::stored($request));
+            self::store($request, null);
+        }
+        $kept = self::valid($request->attributes->get(self::TAKEN));
+
+        return $kept !== null && $kept['action'] === self::path($action) ? ($kept['errors'] ?? []) : [];
+    }
+
     /** Forgets whatever is kept: done once a page has been drawn after the refusal. */
     public static function forget(Request $request): void
     {
@@ -77,13 +112,18 @@ final class TypedForm
 
     /**
      * @param array<array-key,mixed> $posted
-     * @return array{action:string,values:array<string,mixed>}
+     * @param list<string> $secret the form's other secret fields, by name
+     * @param array<string,string>|FieldsRefused $errors why each field was refused, by its name
+     * @return array{action:string,values:array<string,mixed>,errors?:array<string,string>}
      */
-    public static function kept(string $action, array $posted): array
+    public static function kept(string $action, array $posted, array $secret = [], array|FieldsRefused $errors = []): array
     {
+        if ($errors instanceof FieldsRefused) {
+            $errors = $errors->errors();
+        }
         $values = [];
         foreach ($posted as $name => $value) {
-            if (!is_string($name) || preg_match(self::NEVER, $name) === 1) {
+            if (!is_string($name) || preg_match(self::NEVER, $name) === 1 || preg_match(Redactor::SECRET_NAMES, $name) === 1 || in_array($name, $secret, true)) {
                 continue;
             }
             $kept = self::value($value, 0);
@@ -92,7 +132,10 @@ final class TypedForm
             }
         }
 
-        return ['action' => self::path($action), 'values' => $values];
+        $kept = ['action' => self::path($action), 'values' => $values];
+        $errors = self::errorList($errors);
+
+        return $errors === [] ? $kept : $kept + ['errors' => $errors];
     }
 
     /** @return array<string,mixed> */
@@ -103,7 +146,7 @@ final class TypedForm
         return $kept !== null && $kept['action'] === self::path($action) ? $kept['values'] : [];
     }
 
-    /** @return array{action:string,values:array<string,mixed>}|null */
+    /** @return array{action:string,values:array<string,mixed>,errors?:array<string,string>}|null */
     private static function stored(Request $request): ?array
     {
         if ($request->hasSession()) {
@@ -113,7 +156,7 @@ final class TypedForm
         return self::phpSession() ? self::valid($_SESSION[self::SESSION] ?? null) : null;
     }
 
-    /** @param array{action:string,values:array<string,mixed>}|null $kept null removes */
+    /** @param array{action:string,values:array<string,mixed>,errors?:array<string,string>}|null $kept null removes */
     private static function store(Request $request, ?array $kept): void
     {
         if ($request->hasSession()) {
@@ -133,7 +176,7 @@ final class TypedForm
         return isset($_SESSION);
     }
 
-    /** @return array{action:string,values:array<string,mixed>}|null */
+    /** @return array{action:string,values:array<string,mixed>,errors?:array<string,string>}|null */
     private static function valid(mixed $kept): ?array
     {
         if (!is_array($kept) || !is_string($kept['action'] ?? null) || !is_array($kept['values'] ?? null)) {
@@ -145,8 +188,28 @@ final class TypedForm
                 $values[$name] = $value;
             }
         }
+        $valid = ['action' => $kept['action'], 'values' => $values];
+        $errors = self::errorList(is_array($kept['errors'] ?? null) ? $kept['errors'] : []);
 
-        return ['action' => $kept['action'], 'values' => $values];
+        return $errors === [] ? $valid : $valid + ['errors' => $errors];
+    }
+
+    /**
+     * Each field's error as words, by the field's name; an error with no words is none.
+     *
+     * @param array<array-key,mixed> $errors
+     * @return array<string,string>
+     */
+    private static function errorList(array $errors): array
+    {
+        $list = [];
+        foreach ($errors as $name => $why) {
+            if (is_string($name) && $name !== '' && is_scalar($why) && trim((string) $why) !== '') {
+                $list[$name] = mb_substr(trim((string) $why), 0, 1000);
+            }
+        }
+
+        return $list;
     }
 
     /** A form's action as it is compared: its path, without a query or a place on the page. */

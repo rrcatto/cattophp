@@ -21,7 +21,7 @@ use Throwable;
  * When the bot is sent /start <token> (TelegramInbox), the account is connected to that private chat, with its username if
  * it has one, and the bot says so. One Telegram account belongs to one person: a chat connected to someone else is refused,
  * with a plain answer from the bot and a plain message on the page. The token's words are kept in this browser's session
- * only, encrypted, so the page can show the button again until it is used. Disconnect forgets the account. Every change
+ * only, encrypted, so the page can show the button again until it is used. Drop connection forgets the account. Every change
  * goes into the activity log.
  */
 class TelegramConnections
@@ -31,8 +31,8 @@ class TelegramConnections
     private const SESSION = 'telegram_connect';
 
     /** What the page says when a connection did not happen. */
-    public const TAKEN = 'That Telegram account is already connected to another account here. Disconnect it there first, or use another Telegram account.';
-    public const OTHER = 'Your account is already connected to another Telegram account. Disconnect it first.';
+    public const TAKEN = 'That Telegram account is already connected to another account here. Drop its connection there first, or use another Telegram account.';
+    public const OTHER = 'Your account is already connected to another Telegram account. Drop that connection first.';
     public const EXPIRED = 'The link ran out before Telegram was started. Press Connect Telegram to try again.';
     public const NOT_OFFERED = 'Signing in with Telegram is not offered on this site.';
 
@@ -140,8 +140,8 @@ class TelegramConnections
         $domain = $this->words->domain();
         $words = match ($what) {
             'connected' => 'Your Telegram account is now connected to ' . $domain,
-            'taken' => 'This Telegram account is already connected to another account on ' . $domain . '. Disconnect it there first.',
-            'other' => 'Your account on ' . $domain . ' is already connected to another Telegram account. Disconnect that one first.',
+            'taken' => 'This Telegram account is already connected to another account on ' . $domain . '. Drop its connection there first.',
+            'other' => 'Your account on ' . $domain . ' is already connected to another Telegram account. Drop that connection first.',
             default => 'That link has run out or was used already. Go back to ' . $domain . ' and press Connect Telegram again.',
         };
         // The log names whose chat it is now: the person just connected, whoever holds it already, or nobody.
@@ -165,10 +165,10 @@ class TelegramConnections
         return $this->messenger->send('test', $connected['chat_id'], $account, $connected['username'], $this->words->demo() . 'Test message from ' . $this->words->domain());
     }
 
-    public function disconnect(string $account): void
+    public function dropConnection(string $account): void
     {
         $this->cancel($account);
-        if ($this->accounts->disconnect($account)) $this->activity?->record('telegram.disconnected', ['account_id' => $account], actor: new Actor($account, $account));
+        if ($this->accounts->dropConnection($account)) $this->activity?->record('telegram.connection_dropped', ['account_id' => $account], actor: new Actor($account, $account));
     }
 
     /** A token a link carries: 32 random bytes, URL-safe. */

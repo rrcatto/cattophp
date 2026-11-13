@@ -88,11 +88,12 @@ final class Subscriptions
                 ['account' => $account, 'list' => $listId]));
     }
 
-    /** Forgets a person whose account is gone: their answers and their history. */
-    public function forget(string $account): void
+    /** Forgets a person whose account is gone: their answers and their history. Returns how many answers went. */
+    public function forget(string $account): int
     {
         $this->connection->executeStatement('DELETE FROM ' . self::EVENTS . ' WHERE account = :account', ['account' => $account]);
-        $this->connection->executeStatement('DELETE FROM ' . self::TABLE . ' WHERE account = :account', ['account' => $account]);
+
+        return (int) $this->connection->executeStatement('DELETE FROM ' . self::TABLE . ' WHERE account = :account', ['account' => $account]);
     }
 
     /** @param list<string> $values */

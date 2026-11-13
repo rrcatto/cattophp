@@ -43,6 +43,7 @@ final class CattoPHPExtension extends AbstractExtension implements GlobalsInterf
             new TwigFunction('csp_nonce', $this->policy->nonce(...)),
             new TwigFunction('form_token', $this->tokens->value(...)),
             new TwigFunction('typed_for', $this->typedFor(...)),
+            new TwigFunction('typed_errors_for', $this->typedErrorsFor(...)),
         ];
     }
 
@@ -72,6 +73,19 @@ final class CattoPHPExtension extends AbstractExtension implements GlobalsInterf
         $request = $this->requests->getMainRequest();
 
         return $request === null ? [] : TypedForm::take($request, $action);
+    }
+
+    /**
+     * Why each field of a refused form sent to $action was refused, by the field's name, for form.field's error beside
+     * it; nothing for any other form (TypedForm::errors).
+     *
+     * @return array<string,string>
+     */
+    public function typedErrorsFor(string $action): array
+    {
+        $request = $this->requests->getMainRequest();
+
+        return $request === null ? [] : TypedForm::errors($request, $action);
     }
 
     /** A moment in the installation's time zone, such as "9 November 2026, 14:05". */

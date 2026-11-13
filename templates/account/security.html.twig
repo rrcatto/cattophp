@@ -1,0 +1,62 @@
+{#
+	A person's Sign-in and security: two-step sign-in by their own choice where the site does not require it of them (set it
+	up, turn it off with a current code, new recovery codes), and, where the project keeps them, where they are signed in,
+	each with End, and End all others. Every form works without JavaScript.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section" id="two-step">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'two-step-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Two-step sign-in', heading_id: 'two-step-heading', summary: two_step.why}) }}
+{{ ui('data.key-value-list', {items: [{label: 'Two-step sign-in', value: two_step.state}, {label: 'Who decides', value: two_step.required ? 'This site requires it of you' : 'You do'}]|merge(two_step.on and two_step.recovery_codes ? [{label: 'Recovery codes left', value: two_step.codes_left ~ ''}] : [])}) }}
+{% if not two_step.on %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Set up two-step sign-in', href: path('cattophp_account_two_step'), icon: 'action-enable', variant: 'primary'}) }}{% endblock %}{% endembed %}
+{% else %}
+{% if two_step.recovery_codes %}
+<form class="cl-card-form" method="post" action="{{ path('cattophp_account_recovery_codes_renew') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'A code from your app, for new recovery codes', for: 'renew-code', required: true, help: 'New codes replace the ones you have: those stop working.'})} %}{% block control %}<input class="cl-input cl-input-code" id="renew-code" type="text" name="code" required autocomplete="one-time-code" maxlength="12" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make new recovery codes', type: 'submit', icon: 'action-generate'}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% if not two_step.required %}
+<form class="cl-card-form" method="post" action="{{ path('cattophp_account_two_step_off') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'A code from your app, or a recovery code, to turn it off', for: 'off-code', required: true})} %}{% block control %}<input class="cl-input cl-input-code" id="off-code" type="text" name="code" required autocomplete="one-time-code" maxlength="12" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Turn two-step sign-in off', type: 'submit', icon: 'action-disable', confirm: 'Turn two-step sign-in off? Signing in will need only the emailed link.'}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% if keeps_sign_ins %}
+<section class="cl-page-section" id="sign-ins">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'sign-ins-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Where you are signed in', heading_id: 'sign-ins-heading', summary: 'Each browser you are signed in on. End one you do not recognise: that browser is signed out at once.'}) }}
+{% if sign_ins %}
+{#
+	A card for each sign-in, this browser's first and marked so in its title: a few to a row on a wide screen and one on a
+	phone, every word in full at any width, where a table's columns would be cut short.
+#}
+{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {label: 'Your sign-ins, this browser first'})} %}{% block body %}
+{% for sign_in in sign_ins %}
+{% embed ui_template('data.card') with {props: ui_props('data.card', {title: sign_in.browser, picture: 'none'})} %}
+{% block title %}{{ sign_in.browser }}{% if sign_in.current %} {{ ui('feedback.badge', {label: 'This browser', tone: 'info'}) }}{% endif %}{% endblock %}
+{% block details %}{{ ui('data.key-value-list', {items: [{label: 'Began', value: sign_in.started}, {label: 'Last seen', value: sign_in.last_seen}, {label: 'Runs out', value: sign_in.ends}]}) }}{% endblock %}
+{% block actions %}{% if sign_in.current %}<p class="cl-ui-card-line cl-ui-card-quiet">Sign out to end it</p>{% else %}<form method="post" action="{{ path('cattophp_account_sign_in_end') }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="sign_in" value="{{ sign_in.id }}">{{ ui('action.button', {label: 'End', type: 'submit', icon: 'action-revoke', size: 'small'}) }}</form>{% endif %}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% if sign_ins|length > 1 %}
+<form method="post" action="{{ path('cattophp_account_sign_ins_end_others') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'End all others', type: 'submit', icon: 'action-revoke', confirm: 'Sign out every browser but this one?'}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nowhere', summary: 'No sign-in of yours is going: this one began before this site kept them. Sign out and in again to see it here.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

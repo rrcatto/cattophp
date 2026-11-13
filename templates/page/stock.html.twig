@@ -1,0 +1,39 @@
+{#
+	The frame of CattoPHP's own pages: signing in, the error page, Administration's Settings, Roles and Activity log, and a
+	person's Sign-in and security. In a project with themes, whose page renderer gives the page its `layout`, the page wears
+	the theme: CattoPHP's page head (the page's only h1 and its lead, with the identity band), what the reader's last form
+	did, then the page's own rows. In any other it extends the project's layout (`cattophp.layout`) and fills its block body.
+	A page extends this and fills stock_main, and may put its own main actions in stock_actions (they sit in the page head);
+	its data gives title and lead, and cattophp_notices (tone and text) say what the reader's last form did. A project that wants its own look for one of them replaces that template under
+	templates/bundles/CattoPHPBundle/.
+#}
+{% extends layout is defined ? layout : cattophp.layout %}
+{% block page_body %}
+{% set ph_title = title %}
+{% set ph_lead = lead|default('') %}
+{% set ph_actions %}{{ block('stock_actions') }}{% endset %}
+{% include '@CattoPHP/page/head.html.twig' %}
+{{ block('stock_notices') }}
+{{ block('stock_main') }}
+{% endblock %}
+{% block body %}
+<main class="cl-stock-page">
+<h1>{{ title }}</h1>
+{% if lead|default('') %}<p class="cl-lead">{{ lead }}</p>{% endif %}
+{% set stock_actions_drawn %}{{ block('stock_actions') }}{% endset %}
+{% if stock_actions_drawn|trim %}<div class="cl-page-head-actions">{{ stock_actions_drawn }}</div>{% endif %}
+{{ block('stock_notices') }}
+{{ block('stock_main') }}
+</main>
+{% endblock %}
+{% block stock_notices %}
+{% if cattophp_notices|default([]) %}
+<div class="cl-flash-stack">
+{% for notice in cattophp_notices %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: notice.tone})} %}{% block body %}<p>{{ notice.text }}</p>{% endblock %}{% endembed %}
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block stock_actions %}{% endblock %}
+{% block stock_main %}{% endblock %}

@@ -149,4 +149,10 @@ class Flags
             ['before' => $before->format(DATE_ATOM)]
         );
     }
+
+    /** An account being deleted: the flags it decided on no longer say who did. Returns how many. */
+    public function forget(string $account): int
+    {
+        return (int) $this->connection->executeStatement('UPDATE cattophp_site_flags SET decided_by = NULL WHERE decided_by = :account', ['account' => $account]);
+    }
 }

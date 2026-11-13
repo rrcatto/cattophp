@@ -1,0 +1,38 @@
+{#
+	Administration > Activity log: the newest entries first, a page at a time, filtered by any action the log holds. The
+	choice and the pager change the page in place (htmx), or load it without JavaScript, and the page refreshes itself every
+	15 seconds, with Pause. What an entry is about links to its record where the project's SubjectLinks give an address.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'log-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: filtered ? action_words : 'What happened', heading_id: 'log-heading', summary: (filtered ? 'Only this kind, ' : 'Everything, ') ~ total ~ (total == 1 ? ' entry' : ' entries') ~ ': who did it, what it was about, its details and the request it came from. A secret is never written here.'}) }}
+<form method="get" action="{{ base }}" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What happened', for: 'activity-action', help: 'Only what the log holds is listed.'})} %}{% block control %}<select class="cl-select" id="activity-action" name="action" {{ ui_field_attrs(props) }}>
+{% for choice in actions %}
+<option value="{{ choice.value }}"{% if choice.selected %} selected{% endif %}>{{ choice.label }}</option>
+{% endfor %}
+</select>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show them', type: 'submit', icon: 'action-filter', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 15} %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'activity', pagination: entries ? pagination : null})} %}{% block results %}
+{% if entries %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The activity log, newest first', stack: true})} %}
+{% block header %}<tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">About</th><th scope="col">Details</th><th scope="col">From</th></tr>{% endblock %}
+{% block body %}
+{% for entry in entries %}
+<tr><td data-label="When">{{ entry.at }}</td><td data-label="Who">{{ entry.who }}</td><td class="cell-text" data-label="What">{{ entry.what }}</td><td class="cell-text" data-label="About">{% if entry.about_href %}<a href="{{ entry.about_href }}">{{ entry.about }}</a>{% else %}{{ entry.about }}{% endif %}</td><td class="cell-text" data-label="Details">{% for line in entry.details %}<div>{{ line }}</div>{% endfor %}</td><td data-label="From">{{ entry.from }}{% if entry.reference %}<div><small>{{ entry.reference }}</small></div>{% endif %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing yet', summary: filtered ? 'The log holds nothing of that kind.' : 'The log holds nothing yet.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

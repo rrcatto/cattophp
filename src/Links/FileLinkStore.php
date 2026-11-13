@@ -98,6 +98,23 @@ final class FileLinkStore implements LinkStore
         });
     }
 
+    public function forgetAccount(string $accountId, ?string $email): int
+    {
+        $email = mb_strtolower(trim((string) $email));
+
+        return $this->change(static function (array &$file) use ($accountId, $email): int {
+            $gone = 0;
+            foreach ($file['links'] as $id => $row) {
+                if ($row['account'] === $accountId || ($row['account'] === null && $email !== '' && is_string($row['email']) && mb_strtolower($row['email']) === $email)) {
+                    unset($file['links'][$id]);
+                    ++$gone;
+                }
+            }
+
+            return $gone;
+        });
+    }
+
     public function forget(string $hash): void
     {
         $this->change(static function (array &$file) use ($hash): void {

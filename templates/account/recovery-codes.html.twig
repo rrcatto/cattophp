@@ -1,0 +1,11 @@
+{# New recovery codes, shown once. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'codes-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Keep these somewhere safe', heading_id: 'codes-heading', summary: 'If you lose your phone, each of these codes signs you in once in place of the code from your app. Keep them somewhere safe now: they are not shown again, and any you had before no longer work.'}) }}
+<ul class="cl-recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'I have kept them: continue', href: path('cattophp_account_security'), icon: 'action-done', variant: 'primary'}) }}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

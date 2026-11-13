@@ -13,6 +13,7 @@ use CattoPHP\Settings\SettingsCatalogue;
 use CattoPHP\Settings\SettingsProvider;
 use CattoPHP\Settings\SettingsRefused;
 use CattoPHP\Settings\SettingType;
+use CattoPHP\SignIn\SignInRules;
 use CattoPHP\Tests\Support\Foundations;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -97,6 +98,65 @@ final class SettingsTest extends TestCase
         self::assertNotNull($this->site->settings->secretProblem('MAILER_DSN'));
         $this->expectException(\RuntimeException::class);
         $this->site->settings->get('MAILER_DSN');
+    }
+
+    /**
+     * Review finding 13: a saved secret that can no longer be read (APP_KEY changed since), left blank as the page leaves
+     * it, is kept as it is and the rest of its group is saved: never an error page, and never a secret quietly dropped.
+     */
+    public function testASecretThatCannotBeReadLeftBlankIsKeptAndTheRestOfItsGroupSaved(): void
+    {
+        $unreadable = 'v1:' . base64_encode(random_bytes(40));
+        $this->store->save('MAILER_DSN', $unreadable, true, $this->site->clock->now(), null);
+
+        self::assertSame(['MAIL_FROM_ADDRESS'], $this->site->settings->save('mail', ['MAILER_DSN' => '', 'MAIL_FROM_ADDRESS' => 'news@example.com']));
+        self::assertSame($unreadable, $this->store->all()['MAILER_DSN']->value, 'Kept as it was.');
+        self::assertNotNull($this->site->settings->secretProblem('MAILER_DSN'), 'Still said to be unreadable, for the page to say so.');
+        self::assertSame('news@example.com', $this->site->settings->get('MAIL_FROM_ADDRESS'));
+    }
+
+    /**
+     * Review findings 1 and 9: a choice .env writes in another case is the choice it names, as its readers have always
+     * read it, and a time zone PHP knows (by any name it knows, older ones too, in any case) is that time zone; the page
+     * sends back the option it shows selected, and saving the group for another reason keeps each as .env gives it.
+     */
+    public function testAChoiceOrTimeZoneFromEnvInAnyCaseIsTheOneItNamesAndASaveKeepsIt(): void
+    {
+        $site = new Foundations(['AUTH_TWO_STEP' => 'everyone', 'AUTH_SIGNIN' => ' Everyone ', 'APP_SITE_MODE' => 'LIVE', 'APP_TIMEZONE' => 'asia/calcutta']);
+        $settings = $site->settings;
+        self::assertSame(['EVERYONE', 'EVERYONE', 'live', 'Asia/Calcutta'], [$settings->get('AUTH_TWO_STEP'), $settings->get('AUTH_SIGNIN'), $settings->get('APP_SITE_MODE'), $settings->get('APP_TIMEZONE')]);
+
+        self::assertSame(['AUTH_SESSION_TTL'], $settings->save('sign_in', self::groupAsShown($site, 'sign_in', ['AUTH_SESSION_TTL' => '2d'])), 'Only what changed.');
+        self::assertSame([], $settings->save('installation', self::groupAsShown($site, 'installation', [])));
+        self::assertSame([], $settings->save('site_mode', self::groupAsShown($site, 'site_mode', [])));
+        foreach (['AUTH_TWO_STEP', 'AUTH_SIGNIN', 'APP_SITE_MODE', 'APP_TIMEZONE'] as $name) {
+            self::assertFalse($settings->isOverridden($name), $name . ': still .env\'s.');
+        }
+        self::assertTrue((new SignInRules($settings))->twoStepRequired(false), 'Two-step is still required of everyone.');
+        self::assertSame('Asia/Calcutta', $site->installation->timeZone()->getName());
+
+        // Typed in another case on purpose: saved as the choice's own key.
+        self::assertTrue($settings->set('AUTH_TWO_STEP', 'admins'));
+        self::assertSame('ADMINS', $settings->get('AUTH_TWO_STEP'));
+        self::assertSame('Europe/Kiev', $settings->checked($site->catalogue->setting('APP_TIMEZONE'), 'europe/kiev'), 'An older name PHP still knows is a time zone.');
+    }
+
+    /** Review finding 1: a value that is no choice at all is kept as it stands when it is sent back unchanged, and refused once something else is picked that is no choice either. */
+    public function testAValueThatIsNoChoiceIsKeptAsItStandsNeverReplacedQuietly(): void
+    {
+        $site = new Foundations(['AUTH_TWO_STEP' => 'sometimes', 'APP_TIMEZONE' => 'Mars/Olympus_Mons']);
+        $settings = $site->settings;
+
+        self::assertSame(['AUTH_SESSION_TTL'], $settings->save('sign_in', self::groupAsShown($site, 'sign_in', ['AUTH_SESSION_TTL' => '2d'])));
+        self::assertSame([], $settings->save('installation', self::groupAsShown($site, 'installation', [])));
+        self::assertSame(['sometimes', 'Mars/Olympus_Mons'], [$settings->get('AUTH_TWO_STEP'), $settings->get('APP_TIMEZONE')]);
+        self::assertFalse($settings->isOverridden('AUTH_TWO_STEP'));
+        try {
+            $settings->set('AUTH_TWO_STEP', 'never');
+            self::fail('A value that is no choice was saved.');
+        } catch (SettingsRefused $refused) {
+            self::assertStringContainsString('choose one of', $refused->errors()['AUTH_TWO_STEP'] ?? '');
+        }
     }
 
     public function testNothingOfAGroupIsSavedWhenOneValueIsRefused(): void
@@ -259,6 +319,24 @@ final class SettingsTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('A default is given for APP_DEMO_NOTCE, which is no setting.');
         new SettingsCatalogue([new \CattoPHP\Settings\FoundationSettings()], ['APP_DEMO_NOTCE' => 'A typing mistake.']);
+    }
+
+    /**
+     * A group's form as the page sends it: each value as the page shows it (the one in force), with the changes typed.
+     *
+     * @param array<string,string> $changes
+     * @return array<string,string>
+     */
+    private static function groupAsShown(Foundations $site, string $group, array $changes): array
+    {
+        $form = [];
+        foreach ($site->catalogue->group($group)->settings as $name => $setting) {
+            if (!$setting->secret) {
+                $form[$name] = $site->settings->get($name);
+            }
+        }
+
+        return array_merge($form, $changes);
     }
 
     /**

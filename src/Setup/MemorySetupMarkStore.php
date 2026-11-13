@@ -25,4 +25,17 @@ final class MemorySetupMarkStore implements SetupMarkStore
     {
         unset($this->marks[$key]);
     }
+
+    public function forget(string $account): int
+    {
+        $changed = 0;
+        foreach ($this->marks as $key => $mark) {
+            if ($mark->by === $account) {
+                $this->marks[$key] = new SetupMark($mark->state, $mark->at, null, $mark->note);
+                ++$changed;
+            }
+        }
+
+        return $changed;
+    }
 }

@@ -1,8 +1,10 @@
-{% extends cattophp.layout %}
-{% block body %}
-<main class="cl-sign-in">
-<h1>{{ title }}</h1>
-<p>If that address may sign in here, a link is on its way to it. Open it on this device to sign in.</p>
-<p><a href="{{ path('cattophp_sign_in') }}">Ask for another link</a></p>
-</main>
+{# The same answer for every address: a link is on its way if the address may sign in, or join, here. #}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_main %}
+<section class="cl-page-section cl-sign-in">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'sent-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'A link is on its way', heading_id: 'sent-heading', summary: 'If that address may sign in here, a link is on its way to it. Open it on this device to sign in.'}) }}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Ask for another link', href: path('cattophp_sign_in'), icon: 'action-back'}) }}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
 {% endblock %}

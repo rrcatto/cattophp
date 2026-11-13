@@ -1,6 +1,8 @@
-{#- The plainest page frame, used until a project names its own (`cattophp.layout`). Its pages fill the block body. -#}
+{#- The plainest page frame, used until a project names its own (`cattophp.layout`). Its pages fill the block body, or
+    page_body as a theme's frame has it, so a page written for a theme is drawn here too (the error page's last resort).
+    Its language is the installation's (APP_LOCALE, en_ZA as en-ZA). -#}
 <!doctype html>
-<html lang="en-GB">
+<html lang="{{ cattophp.installation.language }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +10,6 @@
 </head>
 <body>
 {% if cattophp.site_mode.isDemo %}<div class="cl-site-demo" role="note"><strong>{{ cattophp.site_mode.heading }}</strong> {{ cattophp.site_mode.notice }}</div>{% endif %}
-{% block body %}{% endblock %}
+{% block body %}{% block page_body %}{% endblock %}{% endblock %}
 </body>
 </html>

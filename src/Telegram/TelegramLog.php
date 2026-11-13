@@ -136,4 +136,19 @@ class TelegramLog
 
         return $username === '' ? null : $username;
     }
+
+    /**
+     * An account being deleted: the messages sent to it stay in the Telegram log, to nobody named now: neither its account,
+     * nor its Telegram username, nor its chat. Those sent to its account, to its chat ($chatId, the Telegram account it
+     * connected) or to its username, whatever its case, as the owner's own messages are once they have gone. A person's
+     * chat is left empty, never null, which is the owner's own still to send. Returns how many.
+     */
+    public function forget(string $account, ?string $chatId = null, ?string $username = null): int
+    {
+        return (int) $this->connection->executeStatement(
+            "UPDATE cattophp_telegram_messages SET to_account = NULL, to_username = NULL, chat_id = CASE WHEN chat_id IS NULL THEN NULL ELSE '' END
+              WHERE to_account = :account OR (:chat <> '' AND chat_id = :chat) OR (:username <> '' AND LOWER(to_username) = LOWER(:username))",
+            ['account' => $account, 'chat' => trim((string) $chatId), 'username' => self::username($username) ?? '']
+        );
+    }
 }

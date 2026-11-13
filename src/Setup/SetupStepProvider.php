@@ -10,8 +10,6 @@ namespace CattoPHP\Setup;
  */
 interface SetupStepProvider
 {
-    public const TAG = 'cattophp.setup_steps';
-
     /**
      * @param SetupMarks $marks what people have marked, for words such as "A test email was sent."
      * @return iterable<SetupStep>

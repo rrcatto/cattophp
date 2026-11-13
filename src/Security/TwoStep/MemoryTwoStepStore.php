@@ -23,8 +23,11 @@ final class MemoryTwoStepStore implements TwoStepStore
         }
     }
 
-    public function forget(string $accountId): void
+    public function forget(string $accountId): bool
     {
+        $had = isset($this->records[$accountId]);
         unset($this->records[$accountId]);
+
+        return $had;
     }
 }

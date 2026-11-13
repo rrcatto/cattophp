@@ -11,8 +11,6 @@ namespace CattoPHP\Mailing\CattoMail;
  */
 interface CattoMailEventHandler
 {
-    public const TAG = 'cattophp.cattomail_event_handler';
-
     /** @return list<string> the event types it handles, such as message.hard_bounced */
     public function types(): array;
 

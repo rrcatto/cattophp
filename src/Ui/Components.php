@@ -48,18 +48,23 @@ final class Components
         // list: the cards share one field, list[], each sent as its value. tick_value is what a named card sends when
         // ticked, for a field that reads something other than 1. required makes every control required, an item's
         // disabled greys out that one, legend_hidden keeps the legend for screen readers when the card's own title says
-        // it all, and columns 1 stacks the cards in a narrow place.
-        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => '', 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => '', 'multiple' => false, 'list' => '', 'tick_value' => '1', 'required' => false, 'legend_hidden' => false], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 1, 4]]],
+        // it all, and columns 1 stacks the cards in a narrow place. error: why the choice was refused, drawn as form.field
+        // draws one (under the legend and help), the fieldset described by it and every control aria-invalid; its id is
+        // <id>-error, else <name or list>-error (ticks named by their values need an id for it).
+        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => '', 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'error' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => '', 'multiple' => false, 'list' => '', 'tick_value' => '1', 'required' => false, 'legend_hidden' => false], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 1, 4]]],
         // form (field mode): the choice belongs to a form elsewhere on the page (a row edited in place).
         'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit', 'form' => '']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
-        'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '', 'fit' => true]],
+        // stack: each row a card of label and value on a narrow screen (data-stack="narrow"), each cell giving its column's
+        // heading in data-label; for a table of more columns than a phone holds. fit: false keeps the columns' natural
+        // widths and lets the table scroll sideways in its box instead.
+        'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '', 'fit' => true, 'stack' => false]],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
         'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto', 'density' => 'normal'], 'props' => ['columns' => ['auto', 1, 2, 3, 4, 5]]],
         // A list shown as cards: the grid holds whole rows of cards, 4 or 5 to a row at full width, fewer on a narrow
         // screen; each card a picture, its title, details and actions.
         'data.card-grid' => ['template' => 'data/card-grid', 'defaults' => ['columns' => 4, 'label' => ''], 'props' => ['columns' => [4, 5]]],
-        'data.card' => ['template' => 'data/card', 'defaults' => ['title' => '', 'href' => '', 'picture' => 'square'], 'props' => ['picture' => ['round', 'square', 'wide']]],
+        'data.card' => ['template' => 'data/card', 'defaults' => ['title' => '', 'href' => '', 'picture' => 'square'], 'props' => ['picture' => ['round', 'square', 'wide', 'none']]],
         'data.stat-card' => ['template' => 'data/stat-card', 'defaults' => ['value' => null, 'label' => null, 'note' => '', 'href' => '', 'size' => 'normal', 'icon' => ''], 'props' => ['size' => ['normal', 'large', 'small']]],
         'data.list' => ['template' => 'data/item-list', 'defaults' => []],
         'data.list-item' => ['template' => 'data/list-item', 'defaults' => []],
@@ -253,7 +258,10 @@ final class Components
             throw new InvalidArgumentException('Invalid semantic UI value: ' . $component . '.hook');
         }
         if ($component === 'data.card') {
-            $enums['picture'] = ['round', 'square', 'wide'];
+            $enums['picture'] = ['round', 'square', 'wide', 'none'];
+        }
+        if ($component === 'data.table') {
+            $enums['stack'] = [true, false];
         }
         foreach ($enums as $key => $allowed) {
             if (array_key_exists($key, $values) && !in_array($values[$key], $allowed, true)) {
@@ -286,9 +294,13 @@ final class Components
         }
         if ($component === 'layout.tabs') {
             if (!is_array($values['items']) || $values['items'] === [] || !is_string($values['current'])) throw new InvalidArgumentException('Tabs need a non-empty item list and a current key.');
-            foreach ($values['items'] as $item) {
-                if (!is_array($item) || array_keys($item) !== ['key', 'label', 'href'] || array_filter($item, static fn(mixed $value): bool => !is_string($value) || $value === '') !== []) {
-                    throw new InvalidArgumentException('Each tab has exactly a key, label and href.');
+            foreach (array_values($values['items']) as $position => $item) {
+                $problem = self::keyProblem($item, ['key', 'label', 'href']);
+                if ($problem === null && array_filter((array) $item, static fn(mixed $value): bool => !is_string($value) || $value === '') !== []) {
+                    $problem = 'each of them must be words';
+                }
+                if ($problem !== null) {
+                    throw new InvalidArgumentException('Each tab has exactly a key, label and href, in any order: tab ' . ($position + 1) . ' ' . $problem . '.');
                 }
             }
         }
@@ -318,22 +330,49 @@ final class Components
             || ($multiple && ($values['name'] !== '' || !is_array($values['selected']) || !array_is_list($values['selected']) || array_filter($values['selected'], static fn(mixed $value): bool => !is_string($value) && ($list === '' || !is_int($value))) !== []))
             || !is_string($values['legend']) || $values['legend'] === ''
             || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)
-            || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)) {
+            || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)
+            || !is_string($values['error'])) {
             throw new InvalidArgumentException('A picture choice needs a field name, a legend and a selected value.');
         }
+        // Why it was refused, under the legend and help: the element ids that describe the fieldset, from its id, else its
+        // field's name ("slide[build]" is slide-build).
+        [$values['error_id'], $values['help_id'], $values['described_by']] = ['', '', ''];
+        if (trim($values['error']) !== '') {
+            $base = $values['id'] !== '' ? $values['id'] : trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($multiple ? $list : (is_string($values['name']) ? $values['name'] : ''))), '-');
+            if ($base === '' || preg_match('/^[a-z]/', $base) !== 1) {
+                throw new InvalidArgumentException('A picture choice of ticks named by their values, or whose field name starts with no letter, needs an id to show its error: give it id.');
+            }
+            $values['error_id'] = $base . '-error';
+            $values['help_id'] = is_string($values['help']) && trim($values['help']) !== '' ? $base . '-help' : '';
+            $values['described_by'] = trim($values['help_id'] . ' ' . $values['error_id']);
+        }
         if (!is_array($values['items']) || $values['items'] === []) throw new InvalidArgumentException('A picture choice needs at least one option.');
-        foreach ($values['items'] as $item) {
-            $keys = is_array($item) ? array_values(array_diff(array_keys($item), ['disabled'])) : [];
-            $picture = in_array($keys, [['value', 'label', 'image'], ['value', 'label', 'image', 'note']], true);
-            $icon = in_array($keys, [['value', 'label', 'icon'], ['value', 'label', 'icon', 'note']], true);
-            $drawing = in_array($keys, [['value', 'label', 'drawing'], ['value', 'label', 'drawing', 'note']], true);
-            if ((!$picture && !$icon && !$drawing) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '') || !is_bool($item['disabled'] ?? false)
-                // A checkbox is named by its value: a field name.
-                || ($multiple && $list === '' && (!is_string($item['value']) || preg_match(self::FIELD_NAME, $item['value']) !== 1))
-                || ($picture && (!is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1))
-                || ($icon && !self::pictureOnly($item['icon']))
-                || ($drawing && !$this->drawingAllowed($item['drawing']))) {
-                throw new InvalidArgumentException('Each picture choice option has a value, a label, a picture on this site, an SVG icon or a drawn slide, and an optional note.');
+        foreach (array_values($values['items']) as $position => $item) {
+            // Its keys as a set, in any order: value, label, one of image, icon or drawing, then note and disabled if wanted.
+            $kinds = is_array($item) ? array_values(array_intersect(['image', 'icon', 'drawing'], array_map('strval', array_keys($item)))) : [];
+            $problem = match (true) {
+                !is_array($item) => 'is not a list of keys',
+                count($kinds) > 1 => 'has ' . implode(' and ', $kinds) . ', where it takes one of them',
+                $kinds === [] => 'has none of image, icon or drawing',
+                default => self::keyProblem($item, ['value', 'label', $kinds[0]], ['note', 'disabled']),
+            };
+            [$picture, $icon, $drawing] = [$kinds === ['image'], $kinds === ['icon'], $kinds === ['drawing']];
+            if ($problem === null && is_array($item)) {
+                $problem = match (true) {
+                    !(is_string($item['value']) || is_int($item['value'])) => 'has a value that is neither words nor a whole number',
+                    !is_string($item['label']) || $item['label'] === '' => 'has no label in words',
+                    !is_string($item['note'] ?? '') => 'has a note that is not words',
+                    !is_bool($item['disabled'] ?? false) => 'has a disabled that is not true or false',
+                    // A checkbox is named by its value: a field name.
+                    $multiple && $list === '' && (!is_string($item['value']) || preg_match(self::FIELD_NAME, $item['value']) !== 1) => 'has a value that is not a field name, which a tick card is named by',
+                    $picture && (!is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1) => 'has an image that is not a path on this site',
+                    $icon && !self::pictureOnly($item['icon']) => 'has an icon that is not an SVG picture free of scripts and outside links',
+                    $drawing && !$this->drawingAllowed($item['drawing']) => 'has a drawing the project does not allow',
+                    default => null,
+                };
+            }
+            if ($problem !== null) {
+                throw new InvalidArgumentException('Each picture choice option has a value, a label, one of image (a picture on this site), icon (an SVG icon) or drawing (a drawn slide), and optionally a note and disabled, in any order: option ' . ($position + 1) . ' ' . $problem . '.');
             }
         }
         return $values;
@@ -350,15 +389,21 @@ final class Components
     {
         $found = null;
         foreach ($items as $item) {
-            $keys = is_array($item) ? array_keys($item) : [];
-            // An option may carry an icon, always after its path.
-            $keys = array_values(array_filter($keys, static fn(int|string $key): bool => $key !== 'icon'));
-            if (($keys !== ['value', 'label', 'depth', 'path'] && $keys !== ['value', 'label', 'depth', 'path', 'children'])
-                || (array_key_exists('icon', (array) $item) && !is_string($item['icon']))
+            // Its keys as a set, in any order: an option may carry an icon and children.
+            $problem = self::keyProblem($item, ['value', 'label', 'depth', 'path'], ['icon', 'children']);
+            if ($problem !== null) {
+                throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path, a depth from 0 to 3 one deeper than its parent, an optional icon and optional children, in any order: "' . (is_array($item) && is_scalar($item['label'] ?? null) ? (string) $item['label'] : '?') . '" ' . $problem . '.');
+            }
+            if (!is_array($item)
+                || (array_key_exists('icon', $item) && !is_string($item['icon']))
                 || !is_string($item['value']) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['path'])
                 || !in_array($item['depth'], [0, 1, 2, 3], true)
                 || ($parentDepth === null ? $item['depth'] > 1 : $item['depth'] !== $parentDepth + 1)) {
                 throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path, a depth from 0 to 3 one deeper than its parent, an optional icon and optional children.');
+            }
+            // Its icon is drawn inline, as a feature card's is: an SVG picture with nothing that runs and no outside link.
+            if (($item['icon'] ?? '') !== '' && !self::pictureOnly($item['icon'])) {
+                throw new InvalidArgumentException('A tree select option\'s icon is an SVG picture free of scripts and outside links: "' . $item['label'] . '" has one that is not.');
             }
             if ($item['value'] === $selected) {
                 $found = $item['path'];
@@ -371,6 +416,32 @@ final class Components
             }
         }
         return $found;
+    }
+
+    /**
+     * What is wrong with an item's keys, compared as a set, so their order never matters: the keys it lacks and the keys
+     * it does not take, in words; null when they are right.
+     *
+     * @param list<string> $required
+     * @param list<string> $optional
+     */
+    private static function keyProblem(mixed $item, array $required, array $optional = []): ?string
+    {
+        if (!is_array($item)) {
+            return 'is not a list of keys';
+        }
+        $keys = array_map('strval', array_keys($item));
+        $missing = array_values(array_diff($required, $keys));
+        $unknown = array_values(array_diff($keys, $required, $optional));
+        $said = [];
+        if ($missing !== []) {
+            $said[] = 'lacks ' . implode(', ', $missing);
+        }
+        if ($unknown !== []) {
+            $said[] = 'has ' . implode(', ', $unknown) . ', which it does not take';
+        }
+
+        return $said === [] ? null : implode(' and ', $said);
     }
 
     /** One of the project's own drawings, as a DrawingCheck it registered recognises. */
