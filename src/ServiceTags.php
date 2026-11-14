@@ -14,8 +14,14 @@ use CattoPHP\Scheduler\ScheduledTask;
 use CattoPHP\Schema\SchemaStep;
 use CattoPHP\Search\PublicPageProvider;
 use CattoPHP\Search\SitemapSource;
+use CattoPHP\Settings\FactsProvider;
+use CattoPHP\Settings\FixedSettingsProvider;
 use CattoPHP\Settings\SettingsProvider;
 use CattoPHP\Setup\SetupStepProvider;
+use CattoPHP\Marketing\Landing\PictureSource;
+use CattoPHP\Marketing\Landing\SectionKind;
+use CattoPHP\Marketing\Landing\TemplateProvider;
+use CattoPHP\Theme\MenuProvider;
 use CattoPHP\Ui\ComponentSet;
 use CattoPHP\Ui\DrawingCheck;
 
@@ -32,6 +38,12 @@ final class ServiceTags
 {
     /** A `Settings\SettingsProvider`: its groups are on the Settings page, each setting named as in `.env`. */
     public const SETTINGS = 'cattophp.settings';
+
+    /** A `Settings\FixedSettingsProvider`: settings the installation holds fixed, shown or left off the Settings page. */
+    public const FIXED_SETTINGS = 'cattophp.fixed_settings';
+
+    /** A `Settings\FactsProvider`: groups of facts the Settings page shows and never changes, by its tag's priority. */
+    public const SETTINGS_FACTS = 'cattophp.settings_facts';
 
     /** An `Access\PermissionProvider`: its permissions are in the catalogue roles grant from. */
     public const PERMISSIONS = 'cattophp.permissions';
@@ -72,9 +84,23 @@ final class ServiceTags
     /** A `Search\PublicPageProvider`: the project's public pages and their words (search engines and AI). */
     public const PUBLIC_PAGES = 'cattophp.public_pages';
 
+    /** A `Theme\MenuProvider`: its sections and pages join the project's menu (`Theme\Menus`), by its tag's priority. */
+    public const MENU = 'cattophp.menu';
+
+    /** A `Marketing\Landing\SectionKind`: a kind of section landing pages can hold (the marketing module). */
+    public const LANDING_SECTION = 'cattophp.marketing_landing_section';
+
+    /** A `Marketing\Landing\PictureSource`: where landing pages' pictures come from (the marketing module). */
+    public const LANDING_PICTURE_SOURCE = 'cattophp.marketing_landing_picture_source';
+
+    /** A `Marketing\Landing\TemplateProvider`: built-in templates landing pages start from (the marketing module). */
+    public const LANDING_TEMPLATES = 'cattophp.marketing_landing_templates';
+
     /** Each extension interface with its tag, as autoconfiguration gives it. */
     public const EXTENSION_POINTS = [
         SettingsProvider::class => self::SETTINGS,
+        FixedSettingsProvider::class => self::FIXED_SETTINGS,
+        FactsProvider::class => self::SETTINGS_FACTS,
         PermissionProvider::class => self::PERMISSIONS,
         SchemaStep::class => self::SCHEMA_STEP,
         ComponentSet::class => self::COMPONENT_SET,
@@ -88,6 +114,10 @@ final class ServiceTags
         CattoMailEventHandler::class => self::CATTOMAIL_EVENT_HANDLER,
         SitemapSource::class => self::SITEMAP_SOURCES,
         PublicPageProvider::class => self::PUBLIC_PAGES,
+        MenuProvider::class => self::MENU,
+        SectionKind::class => self::LANDING_SECTION,
+        PictureSource::class => self::LANDING_PICTURE_SOURCE,
+        TemplateProvider::class => self::LANDING_TEMPLATES,
     ];
 
     private function __construct()

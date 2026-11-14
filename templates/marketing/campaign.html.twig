@@ -1,0 +1,221 @@
+{#
+	One campaign, everything about it on one page: its head facts as badges and its actions (Activate or Pause, Edit,
+	Copy, Archive or Restore, Delete while it has never been published or opened), its figures and clicks over time, its
+	own tracking link, its landing page (its status, address, visits and buttons pressed, with Edit and View, or Make the
+	landing page from a template), its publications (each tracking link ready to copy, with its QR code), its adverts,
+	what it promotes (each viewed, favourited, sold and its net revenue), its customers and their orders, its details, its
+	budget and costs (add one, remove one) and its history. Its sales and money follow "A sale counts for" (the setting,
+	or the other touch chosen here as feature cards). Someone who may only look sees no buttons.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{{ ui('feedback.badge', {label: campaign.status, tone: campaign.tone}) }}
+{{ ui('feedback.badge', {label: campaign.runs}) }}
+{% if campaign.left %}{{ ui('feedback.badge', {label: campaign.left, tone: 'info'}) }}{% endif %}
+{% if campaign.budget %}{{ ui('feedback.badge', {label: 'Budget ' ~ campaign.budget}) }}{% endif %}
+{{ ui('feedback.badge', {label: 'Code ' ~ campaign.code}) }}
+{% endblock %}
+{% block stock_actions %}
+{% if may_manage %}
+{% if campaign.may_activate %}<form method="post" action="{{ path('cattophp_marketing_campaign_activate', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Activate', type: 'submit', icon: 'action-play', variant: 'primary'}) }}</form>{% endif %}
+{% if campaign.may_pause %}<form method="post" action="{{ path('cattophp_marketing_campaign_pause', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Pause', type: 'submit', icon: 'action-pause'}) }}</form>{% endif %}
+{{ ui('action.link', {label: 'Edit', href: path('cattophp_marketing_campaign_edit', {code: campaign.code}), icon: 'action-edit'}) }}
+<form method="post" action="{{ path('cattophp_marketing_campaign_copy', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Copy', type: 'submit', icon: 'action-copy'}) }}</form>
+{% if campaign.may_restore %}<form method="post" action="{{ path('cattophp_marketing_campaign_restore', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Restore', type: 'submit', icon: 'action-enable'}) }}</form>{% endif %}
+{% if campaign.may_delete %}
+<form method="post" action="{{ path('cattophp_marketing_campaign_delete', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Delete', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: 'Delete ' ~ campaign.name ~ '? Its adverts and costs go with it. This cannot be undone.'}) }}</form>
+{% elseif campaign.may_archive %}
+<form method="post" action="{{ path('cattophp_marketing_campaign_archive', {code: campaign.code}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Archive', type: 'submit', icon: 'action-archive', confirm: 'Archive ' ~ campaign.name ~ '? Everything it holds is kept, and its links still lead where they did.'}) }}</form>
+{% endif %}
+{% endif %}
+{{ ui('action.link', {label: 'Every campaign', href: path('cattophp_marketing_campaigns'), icon: 'action-back'}) }}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="figures">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'figures-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Its figures', heading_id: 'figures-heading', summary: 'Since it was made. Link previews, robots and openings while it was not running are not clicks. Revenue counts only once an order is paid.'}) }}
+{% if model_cards %}
+<form method="get" action="{{ path('cattophp_marketing_campaign', {code: campaign.code}) }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: path('cattophp_marketing_campaign', {code: campaign.code})} only %}>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'counts', legend: 'A sale counts for', id: 'campaign-counts', items: model_cards, selected: model, size: 'small', help: 'Each sale counts for one campaign at a time. This changes only what you see here.'}) }}
+{% endblock %}{% endembed %}
+<noscript>{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Count them so', type: 'submit', icon: 'action-filter'}) }}{% endblock %}{% endembed %}</noscript>
+</form>
+{% endif %}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}{% block body %}
+{% for figure in figures %}{{ ui('data.stat-card', {label: figure.label, value: figure.value, note: figure.note}) }}{% endfor %}
+{% endblock %}{% endembed %}
+{% if left_out %}<p class="cl-marketing-note">{{ left_out }}</p>{% endif %}
+{{ ui('data.column-chart', {label: 'Clicks each day', columns: columns, label_heading: 'Day', value_heading: 'Clicks', empty: 'Nobody has followed its links yet.'}) }}
+{% include '@CattoPHP/marketing/copy-field.html.twig' with {cf_id: 'campaign-link', cf_label: 'Its own tracking link', cf_value: campaign.link, cf_help: 'For anywhere without a publication of its own. Add ?src= and a word, such as ?src=radio, to tell the places apart.'} only %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="landing-page">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'landing-page-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Landing page', heading_id: 'landing-page-heading', summary: landing.exists ? 'The page its tracking links open while it is published, at the campaign\'s own address.' : 'Without one, its links lead to ' ~ campaign.destination ~ '.'})} %}
+{% block section_actions %}{% if landing.exists %}{{ ui('action.link', {label: landing.leads ? 'View' : 'Preview', href: landing.view_href, icon: landing.leads ? 'action-view' : 'action-preview', new_window: true}) }}{{ ui('action.link', {label: may_manage ? 'Edit' : 'Open', href: landing.edit_href, icon: may_manage ? 'action-edit' : 'action-open', variant: 'primary'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if landing.exists %}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Status', value: landing.status},
+	{label: 'Address', value: landing.address},
+	{label: 'Visits', value: landing.visits|number_format},
+	{label: 'Buttons pressed', value: landing.pressed|number_format},
+]}) }}
+{% elseif may_manage and landing.template_cards %}
+<form method="post" action="{{ path('cattophp_marketing_landing_make') }}">
+<input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="for" value="campaign"><input type="hidden" name="campaign" value="{{ campaign.code }}"><input type="hidden" name="back" value="campaign">
+{{ ui('form.picture-choice', {name: 'template', legend: 'Start from', id: 'campaign-landing-template', items: landing.template_cards, selected: landing.template, size: 'small'}) }}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the landing page', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% else %}
+{{ ui('feedback.empty', {heading: 'No landing page', summary: may_manage ? 'Make one from the landing pages list.' : 'Someone who manages campaigns makes one.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="publications">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'publications-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Publications', heading_id: 'publications-heading', summary: 'Each place the campaign was published has its own tracking link, so you can tell them apart.'})} %}
+{% block section_actions %}{% if may_manage %}{{ ui('action.link', {label: 'Add a publication', href: path('cattophp_marketing_publication_new', {code: campaign.code}), icon: 'action-add', variant: 'primary'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if publications %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Where the campaign was published, each with its tracking link, clicks and cost', stack: true})} %}
+{% block header %}<tr><th scope="col">Publication</th><th scope="col">Advert</th><th scope="col">Tracking link</th><th scope="col" class="text-end">Clicks</th><th scope="col" class="text-end">Unique visitors</th><th scope="col" class="text-end">Cost</th><th scope="col" class="text-end">Paid</th><th scope="col" class="text-end">Net revenue</th><th scope="col" class="cell-actions">Actions</th></tr>{% endblock %}
+{% block body %}
+{% for publication in publications %}
+<tr><td class="cell-text" data-label="Publication"><span class="cl-marketing-channel" aria-hidden="true">{{ publication.icon|authored }}</span> <a href="{{ publication.href }}">{{ publication.channel }}{% if publication.place %}, {{ publication.place }}{% endif %}</a>{% if publication.retired %} {{ ui('feedback.badge', {label: 'Retired', size: 'small'}) }}{% endif %}<small class="cl-marketing-line">{{ publication.day }}, {{ publication.code }}</small>{% if publication.source %}<small class="cl-marketing-line">{% if publication.source_href %}<a href="{{ publication.source_href }}">{{ publication.source }}</a>{% else %}{{ publication.source }}{% endif %}</small>{% endif %}</td><td class="cell-text" data-label="Advert">{{ publication.advert ?: 'None' }}</td><td class="cell-text" data-label="Tracking link">{% include '@CattoPHP/marketing/copy-field.html.twig' with {cf_id: 'link-' ~ publication.code, cf_label: 'Tracking link of ' ~ publication.code, cf_label_hidden: true, cf_value: publication.link} only %}</td><td class="text-end" data-label="Clicks">{{ publication.clicks }}</td><td class="text-end" data-label="Unique visitors">{{ publication.unique_visitors }}</td><td class="text-end" data-label="Cost">{{ publication.cost }}</td><td class="text-end" data-label="Paid">{{ publication.paid }}</td><td class="text-end" data-label="Net revenue">{{ publication.net }}</td><td class="cell-actions" data-label="Actions">{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, label: 'Actions', aria_label: 'Actions for ' ~ publication.code, icon: 'action-open'})} %}{% block body %}{% if may_manage %}{{ ui('action.link', {label: 'Edit', href: publication.href, icon: 'action-edit', size: 'small'}) }}{% endif %}{{ ui('action.link', {label: 'Download the QR code', href: publication.qr_href, icon: 'action-download', size: 'small'}) }}{% if may_manage %}<form method="post" action="{{ publication.retire_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{% if publication.retired %}{{ ui('action.button', {label: 'Restore', type: 'submit', icon: 'action-enable', size: 'small'}) }}{% else %}{{ ui('action.button', {label: 'Retire', type: 'submit', icon: 'action-disable', size: 'small'}) }}{% endif %}</form>{% endif %}{% endblock %}{% endembed %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Not published anywhere yet', summary: may_manage ? 'Press Add a publication for each place you put it: a group, an email, a stack of flyers. Each gets its own tracking link.' : 'Someone who manages campaigns adds where it is published.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="adverts">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'adverts-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Adverts', heading_id: 'adverts-heading', summary: 'The words, pictures and videos this campaign uses. One already published is retired, never deleted, so its history stays.'})} %}
+{% block section_actions %}{% if may_manage %}{{ ui('action.link', {label: 'Add an advert', href: path('cattophp_marketing_advert_new', {code: campaign.code}), icon: 'action-add'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if adverts %}
+{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {label: 'The campaign\'s adverts'})} %}{% block body %}
+{% for advert in adverts %}
+{% embed ui_template('data.card') with {props: ui_props('data.card', {title: advert.name, href: advert.href, picture: advert.picture ? 'wide' : 'none'})} %}
+{% block picture %}{% if advert.picture %}<img src="{{ advert.picture }}" alt="The picture of the advert {{ advert.name }}" loading="lazy">{% endif %}{% endblock %}
+{% block details %}<p>{{ ui('feedback.badge', {label: advert.kind, size: 'small'}) }}{% if advert.retired %} {{ ui('feedback.badge', {label: 'Retired', size: 'small'}) }}{% endif %}</p>{% if advert.headline %}<p><strong>{{ advert.headline }}</strong></p>{% endif %}{% if advert.words %}<p>{{ advert.words }}</p>{% endif %}<p><small>{{ advert.used }}</small></p><p><small>{{ advert.revenue }}</small></p>{% endblock %}
+{% block actions %}{% if may_manage %}{{ ui('action.link', {label: 'Edit', href: advert.href, icon: 'action-edit', size: 'small'}) }}<form method="post" action="{{ advert.retire_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{% if advert.retired %}{{ ui('action.button', {label: 'Restore', type: 'submit', icon: 'action-enable', size: 'small'}) }}{% else %}{{ ui('action.button', {label: 'Retire', type: 'submit', icon: 'action-disable', size: 'small'}) }}{% endif %}</form>{% endif %}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No adverts yet', summary: may_manage ? 'Press Add an advert to keep its words or picture here, so each publication can say which it showed.' : 'Someone who manages campaigns adds its adverts.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% if has_offers or offers %}
+<section class="cl-page-section" id="offers">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'offers-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: offers_heading ~ ' it promotes', heading_id: 'offers-heading', summary: 'Prices are the ones on sale now. The figures count only people who came by this campaign before they did it; sold is how many, each of a company\'s places counted.'})} %}
+{% block section_actions %}{% if may_manage %}{{ ui('action.link', {label: 'Change', href: path('cattophp_marketing_campaign_edit', {code: campaign.code}), icon: 'action-edit'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if offers %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: offers_heading ~ ' the campaign promotes', stack: true})} %}
+{% block header %}<tr><th scope="col">{{ offers_heading }}</th><th scope="col">Kind</th><th scope="col" class="text-end">Price now</th><th scope="col" class="text-end">Viewed</th><th scope="col" class="text-end">Favourited</th><th scope="col" class="text-end">Sold</th><th scope="col" class="text-end">Net revenue</th></tr>{% endblock %}
+{% block body %}
+{% for offer in offers %}
+<tr><td class="cell-text" data-label="{{ offers_heading }}">{% if offer.href %}<a href="{{ offer.href }}">{{ offer.label }}</a>{% else %}{{ offer.label }}{% endif %}{% if not offer.available %} {{ ui('feedback.badge', {label: 'Not on sale now', tone: 'warning', size: 'small'}) }}{% endif %}{% if not offer.promoted %} {{ ui('feedback.badge', {label: 'Sold through it, not promoted', size: 'small'}) }}{% endif %}</td><td data-label="Kind">{{ offer.kind }}</td><td class="text-end" data-label="Price now">{% if offer.was %}<s><span class="visually-hidden">Was </span>{{ offer.was }}</s> {% endif %}{{ offer.price }}</td><td class="text-end" data-label="Viewed">{{ offer.viewed }}</td><td class="text-end" data-label="Favourited">{{ offer.favourited }}</td><td class="text-end" data-label="Sold">{{ offer.sold }}</td><td class="text-end" data-label="Net revenue">{{ offer.net }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing in particular', summary: may_manage ? 'Press Change to tick what it promotes.' : 'It promotes nothing in particular.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section" id="orders">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'orders-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Customers and their orders', heading_id: 'orders-heading', summary: 'Newest first. An order counts as revenue only once it is paid. A name opens that person\'s journey.'})} %}
+{% block section_actions %}{% if orders.rows %}{{ ui('action.link', {label: 'See all its sales', href: orders.all_href, icon: 'action-view-all'}) }}{{ ui('action.link', {label: 'Download as CSV', href: orders.csv_href, icon: 'action-download'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if orders.rows %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The campaign\'s latest orders, newest first: when, who, the order, what was bought, the amount, its state and what it came through', stack: true})} %}
+{% block header %}<tr><th scope="col">When</th><th scope="col">Customer</th><th scope="col">Order</th><th scope="col">Bought</th><th scope="col" class="text-end">Amount</th><th scope="col">State</th><th scope="col">Came through</th></tr>{% endblock %}
+{% block body %}
+{% for order in orders.rows %}
+<tr><td data-label="When">{{ order.when }}{% if not order.paid %}<small class="cl-marketing-line">{{ order.when_words }}</small>{% endif %}</td><td class="cell-text" data-label="Customer">{% if order.customer_href %}<a href="{{ order.customer_href }}">{{ order.customer }}</a>{% else %}{{ order.customer }}{% endif %}</td><td class="cell-text" data-label="Order"><a href="{{ order.href }}">{{ order.reference }}</a></td><td class="cell-text" data-label="Bought">{{ order.bought }}</td><td class="text-end" data-label="Amount">{{ order.paid ? order.gross : order.to_pay }}</td><td data-label="State">{{ ui('feedback.badge', {label: order.state, tone: order.tone, size: 'small'}) }}{% if order.sold_on %} {{ ui('feedback.badge', {label: order.sold_on, tone: 'info', size: 'small'}) }}{% endif %}</td><td class="cell-text" data-label="Came through">{{ order.through }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+<p class="cl-marketing-note">{{ orders.summary }}</p>
+{% else %}
+{{ ui('feedback.empty', {heading: 'No orders yet', summary: 'An order is here once someone who came by this campaign places one, counted for the touch chosen above.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'details', labelledby: 'details-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Details', heading_id: 'details-heading'})} %}
+{% block section_actions %}{% if may_manage %}{{ ui('action.link', {label: 'Edit', href: path('cattophp_marketing_campaign_edit', {code: campaign.code}), icon: 'action-edit'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Objective', value: campaign.objective ?: 'None given'},
+	{label: 'Runs', value: campaign.runs},
+	{label: 'Its links lead to', value: campaign.destination},
+	{label: 'Promotion', value: campaign.promotion ? campaign.promotion ~ ': ' ~ campaign.promotion_words : 'None'},
+	{label: 'Made', value: campaign.made},
+	{label: 'Last changed', value: campaign.changed},
+]}) }}
+{% if campaign.promotion_href %}<p>{{ ui('action.link', {label: 'Open the promotion', href: campaign.promotion_href, icon: 'action-open', size: 'small'}) }}</p>{% endif %}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'spend', labelledby: 'spend-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Budget and spend', heading_id: 'spend-heading', summary: spend.words}) }}
+{% if spend.used is not null %}{{ ui('feedback.progress', {value: spend.used, label: 'Budget spent'}) }}{% endif %}
+{% if spend.over %}{{ ui('feedback.badge', {label: 'Over budget', tone: 'danger'}) }}{% endif %}
+{{ ui('data.key-value-list', {items: [{label: 'Publications\' costs', value: spend.publications}, {label: 'Spend in all', value: spend.total}]}) }}
+{% if spend.other %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Other costs, newest first', stack: true, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Spent on</th><th scope="col">What</th><th scope="col" class="text-end">Amount</th>{% if may_manage %}<th scope="col" class="cell-actions">Remove</th>{% endif %}</tr>{% endblock %}
+{% block body %}
+{% for item in spend.other %}
+<tr><td data-label="Spent on">{{ item.day }}</td><td class="cell-text" data-label="What">{{ item.note ?: 'No note' }}</td><td class="text-end" data-label="Amount">{{ item.amount }}</td>{% if may_manage %}<td class="cell-actions" data-label="Remove"><form method="post" action="{{ path('cattophp_marketing_spend_remove', {code: campaign.code, reference: item.reference}) }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Remove', type: 'submit', icon: 'action-remove', size: 'small', confirm: item.remove_confirm}) }}</form></td>{% endif %}</tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endif %}
+{% if may_manage %}
+<details class="cl-disclosure"{% if cost.open %} open{% endif %}>
+<summary>Add a cost</summary>
+<form method="post" action="{{ cost.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Spent on', for: 'cost-spent-on', required: true, error: cost.errors.spent_on|default('')})} %}{% block control %}<input class="cl-input" id="cost-spent-on" type="date" name="spent_on" value="{{ cost.spent_on }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount' ~ (currency ? ' (' ~ currency ~ ')' : ''), for: 'cost-amount', required: true, help: 'Such as 500 or 499.99.', error: cost.errors.amount|default('')})} %}{% block control %}<input class="cl-input" id="cost-amount" type="text" name="amount" value="{{ cost.amount }}" maxlength="24" inputmode="decimal" required autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it was for', for: 'cost-note', full_width: true, help: 'Such as Designing the flyer. A publication\'s own cost is on the publication.', error: cost.errors.note|default('')})} %}{% block control %}<input class="cl-input" id="cost-note" type="text" name="note" value="{{ cost.note }}" maxlength="300" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add the cost', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+</details>
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="history">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'history-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'History', heading_id: 'history-heading', summary: 'Every change to the campaign, its publications, adverts and costs, newest first.'}) }}
+{% if history %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The campaign\'s history, newest first', stack: true})} %}
+{% block header %}<tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Details</th></tr>{% endblock %}
+{% block body %}
+{% for entry in history %}
+<tr><td data-label="When">{{ entry.at }}</td><td class="cell-text" data-label="Who">{{ entry.who }}</td><td class="cell-text" data-label="What">{{ entry.what }}</td><td class="cell-text" data-label="Details">{% for line in entry.details %}<span class="cl-marketing-line">{{ line }}</span>{% endfor %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing yet', summary: 'Its changes are written here as they are made.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

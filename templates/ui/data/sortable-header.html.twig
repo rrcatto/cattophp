@@ -4,11 +4,13 @@
 	are written as literal markup with only their values interpolated: built as a string by an expression, Twig would
 	escape the quotes and the browser would receive the width as text.
 
+	sh.end (optional) puts the heading at the column's end, over numbers set right.
+
 	sh.wide marks a column a phone does not show (data-phone="hide"): Core hides the whole column
 	at 700px and narrower, and the row's tooltip still shows its value.
 #}
 {% if sh.sortable %}
-	<th class="sortable-header {{ sh.active ? 'is-sorted' : '' }}"
+	<th class="sortable-header {{ sh.active ? 'is-sorted' : '' }}{{ sh.end|default(false) ? ' text-end' : '' }}"
 	    {% if sh.width %}style="width:{{ sh.width }}%"{% endif %}
 	    {% if sh.wide|default(false) %}data-phone="hide"{% endif %}
 	    {% if sh.active %}aria-sort="{{ sh.direction == 'desc' ? 'descending' : 'ascending' }}"{% endif %}>
@@ -19,7 +21,7 @@
 		</a>
 	</th>
 {% else %}
-	<th {% if sh.width %}style="width:{{ sh.width }}%"{% endif %} {% if sh.wide|default(false) %}data-phone="hide"{% endif %}>
+	<th{% if sh.end|default(false) %} class="text-end"{% endif %} {% if sh.width %}style="width:{{ sh.width }}%"{% endif %} {% if sh.wide|default(false) %}data-phone="hide"{% endif %}>
 		{{ sh.label }}
 	</th>
 {% endif %}

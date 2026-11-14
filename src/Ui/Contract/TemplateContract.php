@@ -9,8 +9,9 @@ use LogicException;
 /**
  * Checks of a project's templates, run by its tests, read from their source (a rule about every place a component is
  * used, which a render reaches only on the pages a test happens to draw):
- * - each component's markup has one owner: its classes are written only in its own template, and a table, a window or a
- *   progress bar only by its component, so no page draws its own copy (`duplicates()`);
+ * - each component's markup has one owner: its classes are written only in its own template (a chart's columns and a bar
+ *   list's bars, a rating and a countdown too), and a table, a window, a progress bar or a timer only by its component,
+ *   so no page draws its own copy (`duplicates()`);
  * - every button and button-link names the icon that fits its action (`withoutIcon()`), and every icon named is in the
  *   project's sprite (`namedIcons()`, `missingSymbols()`).
  * Templates are given by name with their source; `cattophpTemplates()` gives CattoPHP's own, which draw on every page
@@ -44,10 +45,14 @@ final class TemplateContract
         'cl-ui-list' => 'data/item-list',
         'cl-ui-list-item' => 'data/list-item',
         'cl-ui-key-value-list' => 'data/key-value-list',
+        'cl-ui-column-chart' => 'data/column-chart',
+        'cl-ui-bar-list' => 'data/bar-list',
+        'cl-rating-summary' => 'data/rating',
         'cl-ui-badge' => 'feedback/badge',
         'cl-ui-notice' => 'feedback/notice',
         'cl-ui-empty-state' => 'feedback/empty-state',
         'cl-ui-progress' => 'feedback/progress',
+        'cl-ui-countdown' => 'feedback/countdown',
         'cl-ui-modal' => 'overlay/modal',
         'cl-ui-accordion-section' => 'overlay/accordion-section',
         'cl-ui-icon' => 'helpers/icon',
@@ -58,6 +63,7 @@ final class TemplateContract
         '/<table\b/' => 'data/data-table',
         '/role="dialog"/' => 'overlay/modal',
         '/role="progressbar"/' => 'feedback/progress',
+        '/role="timer"/' => 'feedback/countdown',
     ];
 
     private function __construct()

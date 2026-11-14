@@ -1,0 +1,15 @@
+{#
+	One thing a reader can do with an offer, as LandingViewBuilder gives it: a link through the page's own /go/{press}
+	address (which records the press and leads only to what the section holds), or a one-button form posting the project's
+	fields with the page's reference and address, so it works without JavaScript. In a preview it is a disabled button.
+#}
+{% if act.inert %}
+{{ ui('action.button', {label: act.label, type: 'button', disabled: true, title: 'In a preview the buttons do nothing', variant: act.primary ? 'primary' : 'secondary', icon: act.icon}) }}
+{% elseif act.method == 'POST' %}
+<form class="cl-landing-action" method="post" action="{{ act.action }}">
+{% for name, value in act.fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+{{ ui('action.button', {label: act.label, type: 'submit', variant: act.primary ? 'primary' : 'secondary', icon: act.icon}) }}
+</form>
+{% else %}
+{{ ui('action.link', {label: act.label, href: act.go, variant: act.primary ? 'primary' : 'secondary', icon: act.icon}) }}
+{% endif %}

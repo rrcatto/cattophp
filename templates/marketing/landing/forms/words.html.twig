@@ -1,0 +1,6 @@
+{#
+	A words section's fields: a heading and its words, plain text, an empty line starting a new paragraph.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' with {text_label: 'Words'} %}
+{% endblock %}{% endembed %}

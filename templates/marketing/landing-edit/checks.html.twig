@@ -1,0 +1,14 @@
+{#
+	What stops a landing page being published, under its editor's head, and what its reader should know: that someone
+	else publishes it, and that a page that has been public is unpublished rather than deleted. Swapped in place after
+	each change in the editor.
+#}
+<div class="cl-page-section cl-landing-checks" id="landing-checks">
+{% if not landing.published and landing.problems %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Before it can be published'})} %}{% block body %}
+<ul>{% for problem in landing.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+{% endblock %}{% endembed %}
+{% endif %}
+{% if may_edit and not may_publish %}<p class="cl-landing-note">Someone who may publish landing pages publishes this one.</p>{% endif %}
+{% if landing.was_public and not landing.published %}<p class="cl-landing-note">This page has been public, so it is unpublished rather than deleted.</p>{% endif %}
+</div>

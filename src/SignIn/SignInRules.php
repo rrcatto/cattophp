@@ -10,7 +10,8 @@ use CattoPHP\Settings\Settings;
 /**
  * Who may sign in and who must use two-step sign-in, from the settings. AUTH_SIGNIN: ADMIN (administrators and the
  * listed addresses, AUTH_SIGNIN_ALLOWED_EMAILS) or EVERYONE; anything else is ADMIN, the safe one. AUTH_TWO_STEP:
- * CHOICE (each person's), ADMINS (required of administrators) or EVERYONE; anything else is ADMINS.
+ * CHOICE (each person's choice), ADMINS (required of administrators) or EVERYONE; missing or anything else is CHOICE,
+ * so two-step sign-in is required of nobody unless the setting says so.
  */
 final class SignInRules
 {
@@ -58,13 +59,16 @@ final class SignInRules
         return $this->twoStepRequired($this->isAdministrator($account));
     }
 
-    /** Whether two-step sign-in is required of an administrator, or of anyone else: AUTH_TWO_STEP. */
+    /**
+     * Whether two-step sign-in is required of an administrator, or of anyone else: AUTH_TWO_STEP. EVERYONE requires it of
+     * everyone, ADMINS of administrators; CHOICE, or any other value, of nobody.
+     */
     public function twoStepRequired(bool $administrator): bool
     {
-        return match (strtoupper($this->settings->get('AUTH_TWO_STEP'))) {
+        return match (strtoupper(trim($this->settings->get('AUTH_TWO_STEP')))) {
             'EVERYONE' => true,
-            'CHOICE' => false,
-            default => $administrator,
+            'ADMINS' => $administrator,
+            default => false,
         };
     }
 

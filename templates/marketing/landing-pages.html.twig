@@ -1,0 +1,63 @@
+{#
+	Every landing page: what the list shows as feature cards (a GET form that changes the list in place, or loads the
+	page without JavaScript), the search, sortable headings and pages; each row the page's title (its editor, when the
+	reader may open it), what it is for, its address, its status, sections, last change and visits over the recent
+	setting. The saved templates follow, each deleted here. New landing page for someone who manages campaigns.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}
+{% if may_manage %}{{ ui('action.link', {label: 'New landing page', href: path('cattophp_marketing_landing_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'landing-pages-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: show == 'all' ? 'Every landing page' : show_words, heading_id: 'landing-pages-heading', summary: (total == 1 ? '1 page' : total ~ ' pages') ~ (searched ? ' matching "' ~ searched ~ '"' : '') ~ '. Visits are counted over the last ' ~ recent ~ '.'}) }}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+{% if searched %}<input type="hidden" name="landing_q" value="{{ searched }}">{% endif %}
+<input type="hidden" name="landing_sort" value="{{ sort }}">
+<input type="hidden" name="landing_dir" value="{{ direction }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'show', legend: 'Show', id: 'landing-pages-show', items: show_cards, selected: show, size: 'small'}) }}
+{% endblock %}{% endembed %}
+<noscript>{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show them', type: 'submit', icon: 'action-filter'}) }}{% endblock %}{% endembed %}</noscript>
+</form>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'landing', search: search, pagination: landing_pages ? pagination : null})} %}{% block results %}
+{% if landing_pages %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Landing pages, each with what it is for, its address, status, sections, last change and visits', stack: true})} %}
+{% block header %}<tr>{% for header in headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: header, sort_region: 'landing-region', sort_results: 'landing-results'} only %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for page in landing_pages %}
+<tr><td class="cell-text" data-label="Page">{% if page.href %}<a href="{{ page.href }}">{{ page.title }}</a>{% else %}{{ page.title }}{% endif %}</td><td class="cell-text" data-label="For">{{ ui('feedback.badge', {label: page.kind, size: 'small'}) }} {% if page.about_href %}<a href="{{ page.about_href }}">{{ page.about }}</a>{% else %}{{ page.about }}{% endif %}</td><td class="cell-text" data-label="Address">{% if page.published %}<a href="{{ page.address }}">{{ page.address }}</a>{% else %}<code>{{ page.address }}</code>{% endif %}</td><td data-label="Status">{{ ui('feedback.badge', {label: page.status, tone: page.tone}) }}</td><td class="text-end" data-label="Sections">{{ page.sections }}</td><td data-label="Last change">{{ page.changed }}</td><td class="text-end" data-label="Visits">{{ page.visits }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% elseif not any %}
+{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'No landing pages yet', summary: may_manage ? 'Make one with New landing page, or from a campaign\'s own page: it is a draft until you publish it.' : 'Someone who manages campaigns makes them here.'})} %}
+{% block actions %}{% if may_manage %}{{ ui('action.link', {label: 'New landing page', href: path('cattophp_marketing_landing_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: searched ? 'No landing page matches' : 'None of these', summary: searched ? 'Try other words, or show every landing page.' : 'No landing page is of this kind now. Choose another above.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% if may_manage %}
+<section class="cl-page-section" id="templates">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'templates-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Saved templates', heading_id: 'templates-heading', summary: 'Saved from a page with Save as a template, and offered whenever a page is made or started again. Pages made from one keep what they took when it is deleted.'}) }}
+{% if saved_templates %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The saved templates', stack: true, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Template</th><th scope="col">Note</th><th scope="col" class="cell-actions">Delete</th></tr>{% endblock %}
+{% block body %}
+{% for template in saved_templates %}
+<tr><td class="cell-text" data-label="Template">{{ template.name }}</td><td class="cell-text" data-label="Note">{{ template.note ?: 'None' }}</td><td class="cell-actions" data-label="Delete"><form method="post" action="{{ template.delete_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Delete', type: 'submit', icon: 'action-remove', size: 'small', aria_label: 'Delete the template ' ~ template.name, confirm: 'Delete the template ' ~ template.name ~ '? Pages made from it keep what they took.'}) }}</form></td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'None saved yet', summary: 'Open a landing page and use Save as a template to keep its sections for the next one.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

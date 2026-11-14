@@ -1,0 +1,4 @@
+{# Who it is for, as a checklist: each line, with its bold title when it has one. #}
+<ul class="cl-landing-checklist">
+{% for point in section.points %}<li>{% if point.title %}<strong class="cl-landing-point-title">{{ point.title }}</strong> {% endif %}{{ point.text }}</li>{% endfor %}
+</ul>

@@ -1,0 +1,44 @@
+{#
+	Every campaign: its status as feature cards (a GET form that changes the list in place, or loads the page without
+	JavaScript), the search, sortable headings and pages; each row its status badge, when it runs, its publications,
+	clicks, unique visitors, and spend against its budget. Download as CSV gives the same campaigns, every page of them.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}
+{% if may_manage %}{{ ui('action.link', {label: 'New campaign', href: path('cattophp_marketing_campaign_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}
+{{ ui('action.link', {label: 'Download as CSV', href: csv_href, icon: 'action-download'}) }}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'campaigns-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: status_words == 'All' ? 'Every campaign' : status_words ~ ' campaigns', heading_id: 'campaigns-heading', summary: (total == 1 ? '1 campaign' : total ~ ' campaigns') ~ (searched ? ' matching "' ~ searched ~ '"' : '') ~ '. A campaign is paused, copied and archived from its own page.'}) }}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+{% if searched %}<input type="hidden" name="campaigns_q" value="{{ searched }}">{% endif %}
+<input type="hidden" name="campaigns_sort" value="{{ sort }}">
+<input type="hidden" name="campaigns_dir" value="{{ direction }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'status', legend: 'Show', id: 'campaigns-status', items: status_cards, selected: status, size: 'small'}) }}
+{% endblock %}{% endembed %}
+<noscript>{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show them', type: 'submit', icon: 'action-filter'}) }}{% endblock %}{% endembed %}</noscript>
+</form>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'campaigns', search: search, pagination: campaigns ? pagination : null})} %}{% block results %}
+{% if campaigns %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Campaigns, each with its status, dates, publications, clicks, unique visitors and spend', stack: true})} %}
+{% block header %}<tr>{% for header in headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: header, sort_region: 'campaigns-region', sort_results: 'campaigns-results'} only %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for campaign in campaigns %}
+<tr><td class="cell-text" data-label="Campaign"><a href="{{ campaign.href }}">{{ campaign.name }}</a><small class="cl-marketing-line"><code>{{ campaign.code }}</code></small></td><td data-label="Status">{{ ui('feedback.badge', {label: campaign.status, tone: campaign.tone}) }}</td><td class="cell-text" data-label="Runs">{{ campaign.runs }}</td><td class="text-end" data-label="Publications">{{ campaign.publications }}</td><td class="text-end" data-label="Clicks">{{ campaign.clicks }}</td><td class="text-end" data-label="Unique visitors">{{ campaign.unique_visitors }}</td><td class="text-end cell-text" data-label="Spend and budget">{{ campaign.spend }}{% if campaign.over %}<div>{{ ui('feedback.badge', {label: 'Over budget', tone: 'danger', size: 'small'}) }}</div>{% endif %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% elseif not any %}
+{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'No campaigns yet', summary: may_manage ? 'Start one with New campaign: it is saved as a draft until you make it active.' : 'Someone who manages campaigns starts them here.'})} %}
+{% block actions %}{% if may_manage %}{{ ui('action.link', {label: 'New campaign', href: path('cattophp_marketing_campaign_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: searched ? 'No campaign matches' : 'None of these', summary: searched ? 'Try other words, or show every campaign.' : 'No campaign has this status now. Choose another above.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

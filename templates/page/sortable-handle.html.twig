@@ -1,0 +1,6 @@
+{#
+	A row's drag handle in a list put in order by hand (data-cl-sortable): hidden until cattophp.js shows it, since only
+	the script can drag; focused, it moves the row with the arrow keys, Home and End. Variables: sh_label (the row's
+	name, for a screen reader: "Move Welcome") and sh_keys_id (the id of the keys' help line, sortable-lines.html.twig).
+#}
+<button type="button" class="cl-tree-handle" data-cl-sortable-handle aria-label="Move {{ sh_label }}" aria-describedby="{{ sh_keys_id }}" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>

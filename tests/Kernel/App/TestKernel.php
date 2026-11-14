@@ -7,6 +7,7 @@ namespace CattoPHP\Tests\Kernel\App;
 use CattoPHP\CattoPHPBundle;
 use CattoPHP\Installation\Installation;
 use CattoPHP\Mail\Mailer;
+use CattoPHP\Marketing\Pages\LandingEditor;
 use CattoPHP\Runtime\SiteMode;
 use CattoPHP\Settings\Settings;
 use CattoPHP\Api\ApiTokenAuthenticator;
@@ -16,6 +17,7 @@ use CattoPHP\SignIn\SignInUserProvider;
 use CattoPHP\ServiceTags;
 use CattoPHP\Tests\Support\EveryExtension;
 use CattoPHP\Tests\Support\ExampleSetupSteps;
+use CattoPHP\Tests\Support\MarketingSitesResponses;
 use CattoPHP\Tests\Support\RecordingLogger;
 use CattoPHP\Tests\Support\RecordingTransport;
 use Doctrine\DBAL\Connection;
@@ -25,6 +27,7 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -60,8 +63,15 @@ final class TestKernel extends Kernel
      * @param bool $debug the kernel in debug, as a development site's is (RunMode::debug()); the tests' kernel is not
      * @param bool $everyExtension one class of the project's implementing every extension interface (EveryExtension), its
      *                             tags kept as the parameter test.every_extension_tags
+     * @param bool $marketing the Campaign Marketing Manager, the project's offers and promotions (ExampleMarketingProject) and
+     *                        its route files imported: the public tracking links and the ready-made pages
+     * @param array<string,mixed> $marketingConfig more of cattophp.marketing's configuration, over the test's own
+     * @param string|null $clock the site's clock stopped at a moment (Symfony\Component\Clock\MockClock, public as clock, such
+     *                           as 'now' or '+7 minutes'), for a test that moves time or sets two sites' clocks apart
+     * @param array{fixed?:list<string>,hidden?:list<string>} $settingsConfig cattophp.settings: the settings held fixed
+     * @param bool $settingsFacts the project's facts on the Settings page (ExampleSettingsFacts)
      */
-    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null, private readonly bool $scheduler = false, private readonly bool $setup = false, private readonly bool $protection = false, private readonly bool $telegram = false, private readonly bool $search = false, private readonly bool $documents = false, private readonly bool $api = false, private readonly bool $signup = false, private readonly bool $identity = false, private readonly bool $inbox = false, private readonly bool $mailing = false, private readonly bool $stockPages = false, private readonly bool $accounts = false, private readonly bool $signIns = false, private readonly bool $projectStep = false, bool $debug = false, private readonly bool $everyExtension = false)
+    public function __construct(private readonly string $folder, private readonly ?string $databaseUrl = null, private readonly array $starting = [], private readonly bool $ownSessions = false, private readonly ?array $theme = null, private readonly bool $scheduler = false, private readonly bool $setup = false, private readonly bool $protection = false, private readonly bool $telegram = false, private readonly bool $search = false, private readonly bool $documents = false, private readonly bool $api = false, private readonly bool $signup = false, private readonly bool $identity = false, private readonly bool $inbox = false, private readonly bool $mailing = false, private readonly bool $stockPages = false, private readonly bool $accounts = false, private readonly bool $signIns = false, private readonly bool $projectStep = false, bool $debug = false, private readonly bool $everyExtension = false, private readonly bool $marketing = false, private readonly array $marketingConfig = [], private readonly ?string $clock = null, private readonly array $settingsConfig = [], private readonly bool $settingsFacts = false)
     {
         parent::__construct('test', $debug);
     }
@@ -78,7 +88,7 @@ final class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme, $this->scheduler, $this->setup, $this->protection, $this->telegram, $this->search, $this->documents, $this->api, $this->signup, $this->identity, $this->inbox, $this->mailing, $this->stockPages, $this->accounts, $this->signIns, $this->projectStep, $this->debug, $this->everyExtension]));
+        return $this->folder . '/cache/' . md5(serialize([$this->databaseUrl, $this->starting, $this->ownSessions, $this->theme, $this->scheduler, $this->setup, $this->protection, $this->telegram, $this->search, $this->documents, $this->api, $this->signup, $this->identity, $this->inbox, $this->mailing, $this->stockPages, $this->accounts, $this->signIns, $this->projectStep, $this->debug, $this->everyExtension, $this->marketing, $this->marketingConfig, $this->clock, $this->settingsConfig, $this->settingsFacts]));
     }
 
     public function getLogDir(): string
@@ -97,6 +107,8 @@ final class TestKernel extends Kernel
             'router' => ['utf8' => true],
             'session' => $this->ownSessions ? ['enabled' => false] : ['storage_factory_id' => 'session.storage.factory.mock_file'],
         ] + ($this->telegram || $this->signup || $this->identity || $this->mailing ? ['http_client' => ['enabled' => true]] : [])
+            // The Campaign Marketing Manager's connected sites reach the network only through MarketingSitesResponses, which a test answers for.
+            + ($this->marketing && !($this->telegram || $this->signup || $this->identity || $this->mailing) ? ['http_client' => ['enabled' => true, 'mock_response_factory' => MarketingSitesResponses::class]] : [])
             // A project sending news usually has Symfony's mailer too, whose transport nothing of mailing's may take by mistake.
             + ($this->mailing ? ['mailer' => ['dsn' => 'null://null']] : []));
         $container->extension('twig', ['strict_variables' => true] + ($this->theme !== null ? ['paths' => [$this->theme['pages_folder'] => 'platform']] : []));
@@ -118,7 +130,7 @@ final class TestKernel extends Kernel
                 'entry_point' => SignInEntryPoint::class,
             ]],
             'access_control' => [
-                ['path' => '^/(sign-in|open|api)', 'roles' => 'PUBLIC_ACCESS'],
+                ['path' => '^/(sign-in|open|api|c/|landing/|webhooks/)', 'roles' => 'PUBLIC_ACCESS'],
                 ['path' => '^/', 'roles' => 'ROLE_USER'],
             ],
             ]);
@@ -149,10 +161,17 @@ final class TestKernel extends Kernel
             + ($this->signup ? ['network' => ['lists_folder' => $this->folder . '/network-lists'], 'signup' => ['enabled' => true, 'task_priority' => 5]] : [])
             + ($this->identity ? ['identity' => ['enabled' => true, 'return_path' => '/account/verification/return', 'account_detail' => 'user_id', 'minimum_age' => 18]] : [])
             + ($this->inbox ? ['inbox' => ['enabled' => true, 'files_folder' => $this->folder . '/inbox-files', 'task_priority' => -60]] : [])
-            + ($this->mailing ? ['mailing' => ['enabled' => true, 'project' => 'example']] : []));
+            + ($this->mailing ? ['mailing' => ['enabled' => true, 'project' => 'example']] : [])
+            + ($this->marketing ? ['marketing' => $this->marketingConfig + ['enabled' => true, 'project' => ExampleMarketingProject::class, 'files_folder' => $this->folder . '/marketing-files']] : [])
+            + ($this->settingsConfig !== [] ? ['settings' => $this->settingsConfig] : []));
 
         $services = $container->services()->defaults()->autowire()->autoconfigure();
+        if ($this->settingsFacts) {
+            // Found by autoconfiguration, as a project's own facts are.
+            $services->set(ExampleSettingsFacts::class);
+        }
         $services->set(PagesController::class)->public()->tag('controller.service_arguments');
+        $services->set(ArrangedListController::class)->public()->tag('controller.service_arguments')->arg('$folder', '%kernel.cache_dir%');
         $services->set(ProjectExtension::class);
         if ($this->api) {
             $services->set(ExampleApiAccounts::class);
@@ -177,6 +196,12 @@ final class TestKernel extends Kernel
         if ($this->accounts) {
             $services->set(ExampleAccounts::class)->public();
         }
+        if ($this->marketing) {
+            $services->set(ExampleMarketingProject::class);
+            $services->set(MarketingSitesResponses::class)->public();
+            // A product's landing page editor mounted at the shop's own address, as a project mounts it.
+            $services->set(ExampleShopLanding::class)->public()->tag('controller.service_arguments');
+        }
         if ($this->projectStep) {
             // Found by autoconfiguration, as a project's own steps are.
             $services->set(ExampleSchemaStep::class);
@@ -188,6 +213,9 @@ final class TestKernel extends Kernel
         if ($this->everyExtension) {
             // Found by autoconfiguration under every tag at once.
             $services->set(EveryExtension::class)->public();
+        }
+        if ($this->clock !== null) {
+            $services->set('clock', MockClock::class)->args([$this->clock])->public();
         }
         $services->set(RecordingTransport::class)->public();
         $services->set('logger', RecordingLogger::class)->public();
@@ -225,11 +253,20 @@ final class TestKernel extends Kernel
             $routes->import(dirname(__DIR__, 3) . '/config/routes/admin.php');
             $routes->import(dirname(__DIR__, 3) . '/config/routes/account.php');
         }
+        if ($this->marketing) {
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/marketing_links.php');
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/marketing_landing.php');
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/marketing_sites.php');
+            $routes->import(dirname(__DIR__, 3) . '/config/routes/marketing.php');
+            LandingEditor::routes($routes, ExampleShopLanding::ROUTE, '/shop/{reference}/landing', [ExampleShopLanding::class, 'answer'], ['reference' => '[a-z0-9-]{1,40}'], true);
+        }
         $routes->add('home', '/')->controller([PagesController::class, 'home']);
         $routes->add('settings_page', '/settings')->controller([PagesController::class, 'settings']);
         $routes->add('broken', '/open/broken')->controller([PagesController::class, 'broken']);
         $routes->add('refused', '/open/refused')->controller([PagesController::class, 'refused'])->methods(['POST']);
         $routes->add('form', '/open/form')->controller([PagesController::class, 'form'])->methods(['GET']);
+        $routes->add('arranged', '/open/arranged')->controller([ArrangedListController::class, 'page'])->methods(['GET']);
+        $routes->add('arranged_move', '/open/arranged/{key}')->controller([ArrangedListController::class, 'move'])->methods(['POST'])->requirements(['key' => '[a-z]+']);
         if ($this->api) {
             $routes->add('api_me', '/api/me')->controller([ExampleApiController::class, 'me'])->methods(['GET']);
             $routes->add('api_missing', '/api/missing')->controller([ExampleApiController::class, 'missing'])->methods(['GET']);

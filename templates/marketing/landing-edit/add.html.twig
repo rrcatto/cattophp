@@ -1,0 +1,15 @@
+{#
+	Add a section to a landing page: every kind that can be on the page as a feature card with what it shows; a kind the
+	page holds once is disabled "(already on the page)", one that repeats says "(on the page, you can add another)". The
+	new section goes to the bottom (a hero to the top), hidden until it is first saved, and its form opens beside the
+	list. Swapped in place after each change, so its marks stay true.
+#}
+<details class="cl-disclosure cl-landing-add-section" id="landing-add">
+<summary>Add a section</summary>
+<form method="post" action="{{ urls.add }}" hx-post="{{ urls.add }}" hx-target="#landing-edit-pane" hx-swap="outerHTML">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{{ ui('form.picture-choice', {name: 'kind', legend: 'Kind of section', legend_hidden: true, size: 'small', columns: 1, required: true, items: add_cards, selected: ''}) }}
+<p class="cl-landing-note">A new section is added at the bottom, hidden until you save it.</p>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add the section', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+</details>

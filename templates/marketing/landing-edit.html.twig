@@ -1,0 +1,73 @@
+{#
+	A landing page's editor, one page holding everything about it (Marketing\Pages\LandingEditor): its head (its status,
+	what it is for and its address as badges; View or Preview, Publish or Unpublish, Delete while it has never been public,
+	and the way back), what stops it being published, then on the left its sections (the list put in order by hand, Add a
+	section and the small drawing of the page) and starting again from a template or saving the page as one, on the right
+	the open section's form and its preview, and below them the page's settings and its earlier versions. Every action is
+	a form that works without JavaScript; htmx changes the part it belongs to in place. For an offer with no page yet
+	(empty) it offers to make one from a template. Someone who may only look sees no forms.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{% if not empty %}
+{{ ui('feedback.badge', {label: landing.status, tone: landing.tone}) }}
+{{ ui('feedback.badge', {label: 'For: ' ~ landing.for}) }}
+{% include '@CattoPHP/marketing/landing-edit/address.html.twig' %}
+{% if landing.running_words %}{{ ui('feedback.badge', {label: landing.running_words, tone: 'info'}) }}{% endif %}
+{% endif %}
+{% endblock %}
+{% block stock_actions %}
+{% if not empty %}
+{% if landing.published %}{{ ui('action.link', {label: 'View', href: landing.address, icon: 'action-view', new_window: true}) }}{% endif %}
+{{ ui('action.link', {label: 'Preview', href: urls.preview, icon: 'action-preview', new_window: true, variant: landing.published ? 'secondary' : 'primary'}) }}
+{% if landing.for_href %}{{ ui('action.link', {label: landing.kind == 'campaign' ? 'Open the campaign' : 'Open its own page', href: landing.for_href, icon: 'action-open'}) }}{% endif %}
+{% if may_save_templates %}{{ ui('action.link', {label: 'Save as a template', href: '#templates', icon: 'action-copy'}) }}{% endif %}
+{% include '@CattoPHP/marketing/landing-edit/publish.html.twig' %}
+{% if may_edit and landing.deletable %}<form method="post" action="{{ urls.delete }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Delete', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: 'Delete this landing page and everything written on it? It has never been public. This cannot be undone.'}) }}</form>{% endif %}
+{% endif %}
+{% if back.href %}{{ ui('action.link', {label: back.label, href: back.href, icon: 'action-back'}) }}{% endif %}
+{% endblock %}
+{% block stock_main %}
+{% if empty %}
+<section class="cl-page-section" id="landing-make">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'landing-make-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'This ' ~ offer_word ~ ' has no landing page', heading_id: 'landing-make-heading', summary: may_edit ? 'Make one from a template: it stays a draft, seen only in its preview, until it is published.' : 'Someone who may change it makes one here.'}) }}
+{% if may_edit %}
+<form method="post" action="{{ make_action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% if template_cards %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'template', legend: 'Start from', id: 'landing-make-template', items: template_cards, selected: template_chosen, error: errors.template, size: 'small'}) }}
+{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the landing page', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% else %}
+{% include '@CattoPHP/marketing/landing-edit/checks.html.twig' %}
+<section class="cl-page-section">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+<div class="cl-landing-column">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sections', labelledby: 'sections-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Sections', heading_id: 'sections-heading', summary: 'The page shows them from top to bottom. The hero is always first; drag the others by their handle, or use their menu, to change the order.'}) }}
+<div class="cl-tree-wrap cl-landing-editor"{% if may_edit %} data-cl-sortable{% endif %}>
+{% include '@CattoPHP/page/sortable-lines.html.twig' with {sl_keys_id: 'landing-section-keys', sl_error: ''} only %}
+{% include '@CattoPHP/marketing/landing-edit/list.html.twig' %}
+</div>
+{% if may_edit %}{% include '@CattoPHP/marketing/landing-edit/add.html.twig' %}{% endif %}
+{% endblock %}{% endembed %}
+{% include '@CattoPHP/marketing/landing-edit/templates.html.twig' %}
+</div>
+{% include '@CattoPHP/marketing/landing-edit/pane.html.twig' %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing-edit/settings.html.twig' %}
+{% include '@CattoPHP/marketing/landing-edit/versions.html.twig' %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

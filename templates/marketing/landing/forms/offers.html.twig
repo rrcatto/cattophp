@@ -1,0 +1,28 @@
+{#
+	An offers section's fields: a heading and words, the offers in the order the page shows them (each row one card;
+	None takes one out; save for more empty rows), whether the first is marked First, which buttons each card has
+	(feature cards, each saying what unticking it does) and, on a campaign's page with a promotion, whether the
+	promotion's price is shown while it runs. Prices, pictures and availability are read live.
+#}
+{% set chosen = values.offers is iterable ? values.offers|filter(key => key) : [] %}
+{% set count = min(form.limits.offers, (chosen|length) + 3) %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' %}
+<fieldset class="cl-landing-rows">
+<legend>{{ section.offers_heading }} on the page, in order</legend>
+<p class="cl-ui-field-help">Each row is one card on the page, from the first. Choose None to take one out; save to get more empty rows. At most {{ form.limits.offers }}.</p>
+{% if errors.offers|default('') %}<p class="cl-landing-note" role="alert" id="landing-offers-error">{{ errors.offers }}</p>{% endif %}
+{% for n in range(0, max(count, 1) - 1) %}
+{% set current = chosen|slice(n, 1)|first|default('') %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Card ' ~ (n + 1), for: 'landing-offer-' ~ n})} %}{% block control %}<select class="cl-select" id="landing-offer-{{ n }}" name="offers[]" {{ ui_field_attrs(props) }}><option value="">None</option>{% for key, label in form.offers %}<option value="{{ key }}"{{ key == current ? ' selected' : '' }}>{{ label }}</option>{% endfor %}{% if current and form.offers[current] is not defined %}<option value="{{ current }}" selected>{{ current }} (no longer offered)</option>{% endif %}</select>{% endblock %}{% endembed %}
+{% endfor %}
+</fieldset>
+{% set ticked = values.buttons is iterable ? values.buttons : [] %}
+{{ ui('form.picture-choice', {multiple: true, list: 'buttons', legend: 'The buttons on each card', id: 'landing-buttons', size: 'small', error: errors.buttons|default(''), selected: ticked|map(b => b ~ ''), items: form.buttons|map((button, key) => {value: key, label: button.label, icon: lucide({view: 'eye', favourite: 'heart', buy: 'shopping-cart'}[key]|default('square')), note: button.unticked})}) }}
+{% set flags = [] %}
+{% if values.first_marked|default(false) in [true, 1, '1', 'on'] %}{% set flags = flags|merge(['first_marked']) %}{% endif %}
+{% if values.show_promotion|default(false) in [true, 1, '1', 'on'] %}{% set flags = flags|merge(['show_promotion']) %}{% endif %}
+{% set flag_cards = [{value: 'first_marked', label: 'Mark the first card First', icon: lucide('award'), note: 'Unticked, every card looks the same.'}] %}
+{% if form.promotion %}{% set flag_cards = flag_cards|merge([{value: 'show_promotion', label: 'Show the promotion\'s price', icon: lucide('ticket-percent'), note: 'While the campaign runs. Unticked, the usual prices show, and the promotion still applies when they buy.'}]) %}{% endif %}
+{{ ui('form.picture-choice', {multiple: true, legend: 'How the cards look', id: 'landing-flags', size: 'small', selected: flags, items: flag_cards}) }}
+{% endblock %}{% endembed %}

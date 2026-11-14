@@ -1,0 +1,15 @@
+{#
+	A rating out of five: the stars, the mean to one decimal and how many reviews it comes from. The stars and figures are
+	for the eye; a screen reader hears the same as one sentence ("Rated 4.5 out of 5 from 12 reviews"). With no reviews
+	it says so in the empty words (or draws nothing when they are empty), never a row of empty stars, which would read as
+	a rating of nothing.
+#}
+{% if props.count > 0 %}
+<p class="cl-rating-summary{% if props.compact %} is-compact{% endif %}">
+<span class="cl-rating-stars" aria-hidden="true">{% for star in 1..5 %}<span{% if star <= props.filled %} class="is-filled"{% endif %}>{{ star <= props.filled ? '★' : '☆' }}</span>{% endfor %}</span>
+<span class="visually-hidden">Rated {{ props.average_words }} out of 5 from {{ props.count_words }} {{ props.noun }}</span>
+<span class="cl-rating-figures" aria-hidden="true"><strong>{{ props.average_words }}</strong> · {{ props.count_words }} {{ props.noun }}</span>
+</p>
+{% elseif props.empty %}
+<p class="cl-rating-summary{% if props.compact %} is-compact{% endif %}"><span class="cl-rating-none">{{ props.empty }}</span></p>
+{% endif %}

@@ -1,0 +1,25 @@
+<div class="cl-tree cl-tree--landing" id="arranged-list" data-cl-sortable-list data-error="{{ error }}">
+<ol class="cl-tree-list" aria-label="The sections in page order">
+{% for item in items %}
+<li class="cl-tree-node" data-cl-sortable-item="{{ item.key }}">
+<div class="cl-tree-row">
+{% include '@CattoPHP/page/sortable-handle.html.twig' with {sh_label: item.label, sh_keys_id: 'arranged-keys'} only %}
+<div class="cl-tree-label"><span class="cl-tree-name">{{ item.label }}</span><span class="cl-tree-meta">{{ item.width == 'half' ? 'Half' : 'Full width' }}</span></div>
+{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+{% include '@CattoPHP/page/sortable-moves.html.twig' with {sm_action: '/open/arranged/' ~ item.key, sm_position: loop.index0, sm_count: items|length, sm_order: order, sm_label: item.label} only %}
+{% endblock %}
+{% endembed %}
+</div>
+</li>
+{% endfor %}
+</ol>
+<aside class="cl-landing-sketch" aria-labelledby="arranged-sketch-heading">
+<h3 class="h6" id="arranged-sketch-heading">The page, as visitors see it</h3>
+<div class="cl-page-sketch" aria-hidden="true">
+<span class="cl-page-sketch-fixed">Hero</span>
+{% for row in rows %}{% for cell in row %}<span data-width="{{ cell.width }}"{% if cell.key == 'join' %} data-accent{% endif %}>{{ cell.label }}</span>{% endfor %}{% endfor %}
+</div>
+<p>Two half sections one after the other share a row and are the same height.</p>
+</aside>
+</div>

@@ -3,9 +3,10 @@
   menus and the narrow-screen navigation, messages that dismiss themselves, confirmations, the tree picker, feature cards
   that send their form, a list's lookups, tables that fit their columns and explain cut-short cells, the pager that fits
   its row, figures that fit their cards, a row's tooltip, links that open a closed section, hex colours with their swatch,
-  choices that fill a field, and live pages that refresh themselves without disturbing the reader. Everything works
-  without it; it only makes the server-drawn pages easier to use. A project's own script reaches the helpers through
-  window.CattoPHP (ready, within, keepScrollerPlace) and adds to the tree picker with window.CattoTreeSelect.extend().
+  choices that fill a field, links copied in one press, live pages that refresh themselves without disturbing the
+  reader, countdowns that tick, and lists put in order by dragging, by keyboard or by their move buttons. Everything works without it; it only makes the server-drawn pages easier to use. A project's own script reaches
+  the helpers through window.CattoPHP (ready, within, keepScrollerPlace) and adds to the tree picker with
+  window.CattoTreeSelect.extend().
 */
 (() => {
   'use strict';
@@ -819,4 +820,256 @@
         due.set(status, now + seconds * 1000);
         if (window.cattoLive && window.cattoLive.mayRefresh()) status.dispatchEvent(new CustomEvent('catto-live-refresh', {bubbles: true}));
     }, 1000);
+
+    /* A link to copy (@CattoPHP/marketing/copy-field.html.twig, data-cl-copy): its Copy button is shown only where the
+       browser can copy, and copies the field it names (aria-controls) in one press, saying Copied for a moment. Without
+       it the read-only field is there to select, and focusing it selects the whole link. Buttons arriving in an htmx
+       swap are shown too. */
+    var copyable = window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === 'function';
+    var showCopy = function () {
+        if (!copyable) return;
+        document.querySelectorAll('button[data-cl-copy][hidden]').forEach(function (button) { button.hidden = false; });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showCopy, {once: true}); else showCopy();
+    document.addEventListener('htmx:after:swap', showCopy);
+    document.addEventListener('focusin', function (event) {
+        if (event.target instanceof HTMLInputElement && event.target.readOnly && event.target.closest('.cl-copy-field')) event.target.select();
+    });
+    document.addEventListener('click', function (event) {
+        var button = event.target instanceof Element ? event.target.closest('button[data-cl-copy]') : null;
+        var field = button ? document.getElementById(button.getAttribute('aria-controls') || '') : null;
+        if (!button || !(field instanceof HTMLInputElement) || !copyable) return;
+        event.preventDefault();
+        var words = button.querySelector('span:last-child');
+        navigator.clipboard.writeText(field.value).then(function () {
+            if (!words) return;
+            if (!words.dataset.label) words.dataset.label = words.textContent;
+            words.textContent = 'Copied';
+            setTimeout(function () { words.textContent = words.dataset.label; }, 2000);
+        }, function () { field.focus(); field.select(); });
+    });
+})();
+
+/* A countdown (feedback.countdown, data-cl-countdown). The server draws the time left in its units and says its own
+   time (data-cl-now), so a visitor's wrong clock cannot change the count; this shows the count, keeps it ticking each
+   second from the server's time, and takes the countdown away at zero, or the element around it marked
+   data-cl-countdown-scope. Countdowns are found afresh each second, so one a page swaps in, or a live refresh redraws
+   with a new server time, ticks too. Without this the countdown says only the moment it counts to. */
+(function () {
+    'use strict';
+    var LENGTHS = {week: 604800, day: 86400, hour: 3600, minute: 60, second: 1};
+    function draw(timer) {
+        var now = Date.now() / 1000;
+        // How far the visitor's clock is behind the server's, measured again whenever the server draws the countdown.
+        if (timer.cattoSeen !== timer.dataset.clNow) {
+            timer.cattoSeen = timer.dataset.clNow;
+            timer.cattoAhead = Number(timer.dataset.clNow) - now;
+        }
+        var left = Math.floor(Number(timer.dataset.clCountdown) - now - timer.cattoAhead);
+        if (left <= 0) {
+            (timer.closest('[data-cl-countdown-scope]') || timer).hidden = true;
+            return;
+        }
+        var shown = false;
+        timer.querySelectorAll('[data-unit]').forEach(function (unit) {
+            var length = LENGTHS[unit.dataset.unit] || 1;
+            var count = Math.floor(left / length);
+            left -= count * length;
+            shown = shown || count > 0 || length === 1;
+            unit.hidden = !shown;
+            var number = unit.querySelector('strong');
+            if (number) number.textContent = String(count);
+            var name = unit.querySelector('[data-one]');
+            if (name) name.textContent = count === 1 ? name.dataset.one : name.dataset.many;
+        });
+        var count = timer.querySelector('[data-cl-countdown-count]');
+        if (count) count.hidden = false;
+    }
+    function tick() { document.querySelectorAll('[data-cl-countdown]').forEach(draw); }
+    setInterval(tick, 1000);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tick, {once: true}); else tick();
+    document.addEventListener('htmx:after:swap', tick);
+})();
+
+/* A list put in order by hand (data-cl-sortable). The page draws everything: the list (data-cl-sortable-list, with an
+   id), each row (data-cl-sortable-item, its key) with its hidden drag handle (data-cl-sortable-handle) and its move
+   forms (data-cl-sortable-move: top, up, down, bottom), which post the row's place after the move (index, from 0) and
+   the order shown, and work without JavaScript; and, outside the list, the keys' help (data-cl-sortable-keys), the
+   status line (data-cl-sortable-status) and the error line (data-cl-sortable-error), @CattoPHP/page/sortable-*.html.twig.
+   This shows the handles and the help, and moves a row by dragging its handle (before or after another), by the arrow
+   keys, Home and End on its handle, or by its move buttons, without a page load. A move is shown at once and sent as
+   the row's move form (a drag with its index replaced); the server answers with the list as it is saved (an answer
+   that holds the list's id: the list alone, or the whole page), or as it is stored with the reason in its data-error
+   when it refused, and that list is swapped in, so the page always ends up showing the server's. When the request
+   fails the list as it was comes back. No markup is written here: rows are only moved, and the server's list swapped
+   in. A project hears each saved move as the event cattophp:sortable-saved on the data-cl-sortable element. */
+(function () {
+    'use strict';
+    var KEYS = {ArrowUp: 'up', ArrowDown: 'down', Home: 'top', End: 'bottom'};
+    var WORDS = {
+        first: 'It is already first.',
+        last: 'It is already last.',
+        unreachable: 'The move could not be saved because the server could not be reached. The previous order is shown.',
+        unreadable: 'The move could not be saved. The previous order is shown; reload the page to check the current order.',
+        refused: 'The move could not be saved. The saved order is shown.',
+    };
+    var dragging = null, armed = null, marked = null;
+    function element(target) { return target instanceof Element ? target : null; }
+    function listOf(sortable) { return sortable.querySelector('[data-cl-sortable-list]'); }
+    function rows(list) { return Array.prototype.slice.call(list.querySelectorAll('[data-cl-sortable-item]')); }
+    function line(sortable, name) { return sortable.querySelector('[data-cl-sortable-' + name + ']'); }
+    function reveal(root) {
+        root.querySelectorAll('[data-cl-sortable] [data-cl-sortable-handle], [data-cl-sortable] [data-cl-sortable-keys]').forEach(function (shown) { shown.hidden = false; });
+    }
+    function say(sortable, state, text) {
+        var status = line(sortable, 'status'), error = line(sortable, 'error');
+        clearTimeout(sortable.cattoSaid);
+        if (error) { error.hidden = state !== 'error'; error.textContent = state === 'error' ? text : ''; }
+        if (!status) return;
+        status.dataset.state = state;
+        status.textContent = state === 'error' ? '' : text;
+        if (state === 'saved') sortable.cattoSaid = setTimeout(function () { status.textContent = ''; delete status.dataset.state; }, 2500);
+    }
+    function focusHandle(sortable, key) {
+        var list = listOf(sortable);
+        var row = list ? rows(list).filter(function (candidate) { return candidate.dataset.clSortableItem === key; })[0] : null;
+        var handle = row ? row.querySelector('[data-cl-sortable-handle]') : null;
+        if (handle) handle.focus();
+    }
+    // The row moved to its new place among the others at once, as the server is asked to place it.
+    function place(row, index) {
+        var others = rows(row.parentElement.closest('[data-cl-sortable-list]')).filter(function (other) { return other !== row; });
+        if (others[index]) others[index].before(row); else if (others.length) others[others.length - 1].after(row);
+    }
+    function swap(sortable, list, fresh) {
+        list.replaceWith(fresh);
+        reveal(sortable);
+        if (window.htmx) window.htmx.process(fresh);
+    }
+    function send(row, form, index) {
+        var sortable = row.closest('[data-cl-sortable]');
+        var list = sortable ? listOf(sortable) : null;
+        if (!list || !list.id || sortable.cattoBusy) return;
+        var body = new FormData(form);
+        if (index !== null) body.set('index', String(index));
+        var key = row.dataset.clSortableItem;
+        var refocus = sortable.contains(document.activeElement);
+        var before = list.cloneNode(true);
+        place(row, Number(body.get('index')));
+        if (refocus) focusHandle(sortable, key);
+        sortable.cattoBusy = true;
+        list.setAttribute('aria-busy', 'true');
+        say(sortable, 'saving', 'Saving…');
+        var failed = function (words) {
+            swap(sortable, listOf(sortable), before);
+            say(sortable, 'error', words);
+        };
+        fetch(form.action, {method: 'POST', body: body, headers: {'HX-Request': 'true'}, credentials: 'same-origin'}).then(function (response) {
+            return response.text().then(function (text) {
+                var answer = new DOMParser().parseFromString(text, 'text/html');
+                var found = answer.getElementById(list.id);
+                if (!found) { failed(WORDS.unreadable); return; }
+                var fresh = document.importNode(found, true);
+                swap(sortable, listOf(sortable), fresh);
+                if (!response.ok || fresh.dataset.error) say(sortable, 'error', fresh.dataset.error || WORDS.refused);
+                else say(sortable, 'saved', 'Saved');
+                sortable.dispatchEvent(new CustomEvent('cattophp:sortable-saved', {bubbles: true, detail: {key: key, answer: answer, refused: !response.ok || !!fresh.dataset.error}}));
+            });
+        }, function () { failed(WORDS.unreachable); }).catch(function () { failed(WORDS.unreadable); }).then(function () {
+            sortable.cattoBusy = false;
+            var now = listOf(sortable);
+            if (now) now.removeAttribute('aria-busy');
+            if (refocus) focusHandle(sortable, key);
+        });
+    }
+    function moveForm(row, direction) {
+        return row.querySelector(direction ? 'form[data-cl-sortable-move="' + direction + '"]' : 'form[data-cl-sortable-move]');
+    }
+    // The handles and the help, on the page as it arrives and on every part htmx swaps in.
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { reveal(document); }, {once: true}); else reveal(document);
+    document.addEventListener('htmx:after:swap', function () { reveal(document); });
+
+    // The move buttons: the same form, sent without a page load. A menu holding them closes.
+    document.addEventListener('submit', function (event) {
+        var form = event.target instanceof HTMLFormElement && event.target.matches('[data-cl-sortable] form[data-cl-sortable-move]') ? event.target : null;
+        var row = form ? form.closest('[data-cl-sortable-item]') : null;
+        if (!row || event.defaultPrevented || !window.fetch) return;
+        event.preventDefault();
+        var menu = form.closest('details');
+        if (menu) menu.open = false;
+        send(row, form, null);
+    });
+
+    // The arrow keys, Home and End on a handle: the row's own move form for that way, or why it cannot move.
+    document.addEventListener('keydown', function (event) {
+        var handle = element(event.target) ? event.target.closest('[data-cl-sortable-handle]') : null;
+        var direction = KEYS[event.key];
+        if (!handle || !direction || event.altKey || event.ctrlKey || event.metaKey) return;
+        event.preventDefault();
+        var row = handle.closest('[data-cl-sortable-item]'), sortable = handle.closest('[data-cl-sortable]');
+        var form = row ? moveForm(row, direction) : null;
+        var button = form ? form.querySelector('button[type="submit"]') : null;
+        if (!form || (button && button.disabled)) { if (sortable) say(sortable, 'error', direction === 'up' || direction === 'top' ? WORDS.first : WORDS.last); return; }
+        send(row, form, null);
+    });
+
+    // Dragging: only by the handle, which makes its row draggable until the drag ends; dropped before or after another
+    // row of the same list, the upper half of a row meaning before it.
+    function unmark() { if (marked) delete marked.dataset.drop; marked = null; }
+    function disarm() { if (armed) armed.draggable = false; armed = null; }
+    function finish() {
+        if (dragging) delete dragging.dataset.dragging;
+        dragging = null;
+        unmark();
+        disarm();
+    }
+    document.addEventListener('pointerdown', function (event) {
+        var handle = element(event.target) ? event.target.closest('[data-cl-sortable-handle]') : null;
+        var sortable = handle ? handle.closest('[data-cl-sortable]') : null;
+        if (!handle || !sortable || sortable.cattoBusy) return;
+        disarm();
+        armed = handle.closest('[data-cl-sortable-item]');
+        if (!armed) return;
+        armed.draggable = true;
+        window.addEventListener('pointerup', function () { if (!dragging) disarm(); }, {once: true});
+    });
+    document.addEventListener('dragstart', function (event) {
+        if (!armed || event.target !== armed) return;
+        dragging = armed;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', dragging.dataset.clSortableItem || '');
+        // After the browser has taken its picture of the row.
+        var row = dragging;
+        setTimeout(function () { if (dragging === row) row.dataset.dragging = 'true'; }, 0);
+    });
+    function zone(event) {
+        var target = element(event.target) ? event.target.closest('[data-cl-sortable-item]') : null;
+        if (!dragging || !target || target.parentElement !== dragging.parentElement) return null;
+        if (target === dragging) return {row: target, drop: 'invalid'};
+        var box = target.getBoundingClientRect();
+        return {row: target, drop: event.clientY < box.top + box.height / 2 ? 'before' : 'after'};
+    }
+    document.addEventListener('dragover', function (event) {
+        if (!dragging) return;
+        var where = zone(event);
+        if (!where) { unmark(); return; }
+        if (marked !== where.row) unmark();
+        marked = where.row;
+        marked.dataset.drop = where.drop;
+        if (where.drop === 'invalid') { event.dataTransfer.dropEffect = 'none'; return; }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    });
+    document.addEventListener('drop', function (event) {
+        var where = dragging ? zone(event) : null;
+        var row = dragging;
+        if (!where || where.drop === 'invalid') { finish(); return; }
+        event.preventDefault();
+        var others = rows(row.parentElement.closest('[data-cl-sortable-list]')).filter(function (other) { return other !== row; });
+        var index = others.indexOf(where.row) + (where.drop === 'after' ? 1 : 0);
+        var form = moveForm(row, '');
+        finish();
+        if (form) send(row, form, index);
+    });
+    document.addEventListener('dragend', finish);
 })();

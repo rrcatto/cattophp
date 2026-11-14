@@ -1,0 +1,31 @@
+{#
+	Start a landing page again from a template (its sections replaced, after a confirmation; on a published page what it
+	showed stays in its earlier versions), and save the page as a template of its own, with a name and a note, its copy,
+	widths and settings kept and its offers left out. Saved templates are shown only to someone who may use them.
+#}
+{% if may_edit and (template_cards or may_save_templates) %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'templates', labelledby: 'templates-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Start from a template', heading_id: 'templates-heading', summary: template_cards ? 'Replaces every section with the template\'s.' ~ (landing.published ? ' What the page shows now stays in its earlier versions.' : '') : 'No template suits this page yet.'}) }}
+{% if template_cards %}
+<form method="post" action="{{ urls.start_again }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{{ ui('form.picture-choice', {name: 'template', legend: 'Template', legend_hidden: true, id: 'landing-start-again', items: template_cards, selected: template_chosen, size: 'small', columns: 1, required: true}) }}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start again from it', type: 'submit', icon: 'action-reset', confirm: 'Replace every section of this page with the template\'s? What is written in them now goes' ~ (landing.published ? ', apart from what the earlier versions keep.' : '.')}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% if may_save_templates %}
+<details class="cl-disclosure"{% if template_typed.name or template_errors.name %} open{% endif %}>
+<summary>Save this page as a template</summary>
+<form method="post" action="{{ urls.template_save }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', required: true, help: 'Up to 80 characters, such as Spring special.', error: template_errors.name})} %}{% block control %}<input class="cl-input" id="template-name" type="text" name="name" value="{{ template_typed.name }}" maxlength="80" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Note', for: 'template-note', help: 'What it is good for, up to 200 characters. Shown on its card.', error: template_errors.note})} %}{% block control %}<input class="cl-input" id="template-note" type="text" name="note" value="{{ template_typed.note }}" maxlength="200" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+<p class="cl-landing-note">The sections keep their copy, widths and settings; the offers chosen are left out, so each page chooses its own.</p>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save as a template', type: 'submit', icon: 'action-copy', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+</details>
+{% endif %}
+{% endblock %}{% endembed %}
+{% endif %}

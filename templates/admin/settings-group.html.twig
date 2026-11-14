@@ -1,0 +1,66 @@
+{#
+	One group of settings as a form, saved on its own: each setting's field, saying where its value comes from, with a
+	Reset beside one saved here, then Save and "Reset every setting here". Each Reset is a form of its own after the
+	group's (the button beside its field names it with form=) and asks to be confirmed, so Enter in a field only ever saves
+	the group. A secret is never shown: a saved one shows as asterisks, left as they are to keep it. Without may_change
+	the fields are shown without the buttons. Administration > Settings draws every group with it, and a module's own
+	settings page its own group (the Campaign Marketing Manager's): group (Admin\SettingsPage), may_change, save_action,
+	reset_group_action, and reset_route with reset_params, to which each setting's name is added. A choice given cards
+	(each a feature card's value, label, icon and note) and cards_selected is drawn as feature cards. A setting the
+	installation holds fixed (setting.fixed) is shown with its value in a field that cannot be changed and no Reset; a group
+	whose every setting is fixed (group.fixed) has no Save.
+#}
+<form method="post" action="{{ save_action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% for setting in group.settings %}
+{% if setting.cards|default([]) and not setting.fixed|default(false) %}
+{{ ui('form.picture-choice', {name: setting.name, legend: setting.label, id: setting.id, items: setting.cards, selected: setting.cards_selected, help: setting.help, error: setting.error, size: 'small'}) }}
+{% if may_change and setting.overridden %}
+<div>{{ ui('action.button', {label: setting.reset_label, type: 'submit', icon: 'action-reset', size: 'small', form: setting.id ~ '-reset', confirm: setting.reset_confirm}) }}</div>
+{% endif %}
+{% else %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: setting.label, for: setting.id, required: setting.required, full_width: setting.control == 'paragraph', help: setting.help, error: setting.error})} %}{% block control %}
+{% if setting.control == 'paragraph' %}
+<textarea class="cl-input" id="{{ setting.id }}" name="{{ setting.name }}" rows="3" maxlength="{{ setting.maxlength }}"{% if setting.required %} required{% endif %}{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>{{ setting.value }}</textarea>
+{% elseif setting.control == 'choice' %}
+<select class="cl-select" id="{{ setting.id }}" name="{{ setting.name }}"{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>
+{% for choice in setting.choices %}
+<option value="{{ choice.value }}"{% if choice.selected %} selected{% endif %}>{{ choice.label }}</option>
+{% endfor %}
+</select>
+{% elseif setting.control == 'switch' %}
+<input class="cl-check" id="{{ setting.id }}" type="checkbox" name="{{ setting.name }}" value="true"{% if setting.checked %} checked{% endif %}{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>
+{% elseif setting.control == 'secret' %}
+<input class="cl-input" id="{{ setting.id }}" type="password" name="{{ setting.name }}" value=""{% if setting.shown %} placeholder="{{ setting.shown }}"{% endif %} maxlength="{{ setting.maxlength }}" autocomplete="new-password" spellcheck="false"{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>
+{% elseif setting.control == 'number' %}
+<input class="cl-input" id="{{ setting.id }}" type="number" name="{{ setting.name }}" value="{{ setting.value }}"{% if setting.min is not null %} min="{{ setting.min }}"{% endif %}{% if setting.max is not null %} max="{{ setting.max }}"{% endif %}{% if setting.required %} required{% endif %}{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>
+{% else %}
+<input class="cl-input" id="{{ setting.id }}" type="{{ setting.control }}" name="{{ setting.name }}" value="{{ setting.value }}" maxlength="{{ setting.maxlength }}" spellcheck="false"{% if setting.required %} required{% endif %}{% if not may_change or setting.fixed|default(false) %} disabled{% endif %} {{ ui_field_attrs(props) }}>
+{% endif %}
+{% if may_change and setting.overridden %}
+<div>{{ ui('action.button', {label: setting.reset_label, type: 'submit', icon: 'action-reset', size: 'small', form: setting.id ~ '-reset', confirm: setting.reset_confirm}) }}</div>
+{% endif %}
+{% endblock %}{% endembed %}
+{% endif %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% if may_change and not group.fixed|default(false) %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save these settings', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{% if group.saved > 0 %}{{ ui('action.button', {label: 'Reset every setting here', type: 'submit', icon: 'action-reset', form: 'settings-' ~ group.key ~ '-reset', confirm: 'Put every setting of ' ~ group.label ~ ' back to .env or its default?'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% endif %}
+</form>
+{% if may_change %}
+{% for setting in group.settings|filter(setting => setting.overridden) %}
+<form id="{{ setting.id }}-reset" method="post" action="{{ path(reset_route, reset_params|merge({name: setting.name})) }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+</form>
+{% endfor %}
+{% if group.saved > 0 %}
+<form id="settings-{{ group.key }}-reset" method="post" action="{{ reset_group_action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+</form>
+{% endif %}
+{% endif %}

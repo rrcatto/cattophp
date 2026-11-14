@@ -1,0 +1,96 @@
+{#
+	One visitor, everything about them on one page: their name (or "Visitor 7k2m9q4d") with their state, when they were
+	first seen, their country and devices as badges; Open this person's account; their figures, each opening what it
+	counts; their journey, oldest first, with Download as CSV; which campaign gets each paid sale; who they are; the
+	other visitors; and, for someone who manages campaigns, Forget this visitor's journey. No IP address is ever shown.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{{ ui('feedback.badge', {label: state, tone: state_tone}) }}
+{{ ui('feedback.badge', {label: 'First seen ' ~ first_seen}) }}
+{% if countries %}{{ ui('feedback.badge', {label: countries}) }}{% endif %}
+{% if devices %}{{ ui('feedback.badge', {label: devices}) }}{% endif %}
+{% endblock %}
+{% block stock_actions %}
+{% if account_href %}{{ ui('action.link', {label: 'Open this person\'s account', href: account_href, icon: 'action-open', variant: 'primary'}) }}{% endif %}
+{{ ui('action.link', {label: 'Every visitor', href: visitors_href, icon: 'action-back'}) }}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="figures">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'figures-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Their figures', heading_id: 'figures-heading', summary: 'A figure opens what it counts.'}) }}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+{% for figure in figures %}{{ ui('data.stat-card', {label: figure.label, value: figure.value, note: figure.note, href: figure.href}) }}{% endfor %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="journey">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'journey-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Journey', heading_id: 'journey-heading', summary: 'Oldest first. Everything this visitor did after arriving by a campaign\'s link, on each of their devices.'})} %}
+{% block section_actions %}{{ ui('action.link', {label: 'Download as CSV', href: csv_href, icon: 'action-download'}) }}{% endblock %}
+{% endembed %}
+{% if lines %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The journey, oldest first: when, what happened, its campaign, its detail and its badges', stack: true})} %}
+{% block header %}<tr><th scope="col">When</th><th scope="col">What happened</th><th scope="col">Campaign</th><th scope="col">Detail</th><th scope="col">Badge</th></tr>{% endblock %}
+{% block body %}
+{% for line in lines %}
+<tr><td data-label="When">{{ line.at }}</td><td class="cell-text" data-label="What happened">{% if line.href %}<a href="{{ line.href }}">{{ line.words }}</a>{% else %}{{ line.words }}{% endif %}</td><td class="cell-text" data-label="Campaign">{% if line.campaign_href %}<a href="{{ line.campaign_href }}">{{ line.campaign }}</a>{% else %}{{ line.campaign }}{% endif %}</td><td class="cell-text" data-label="Detail">{{ line.detail }}</td><td data-label="Badge">{% for badge in line.badges %}{{ ui('feedback.badge', {label: badge.label, tone: badge.tone, size: 'small'}) }} {% endfor %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing yet', summary: 'What they do on the site after following a campaign\'s link is written here as it happens.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% if attributions %}
+<section class="cl-page-section" id="which-campaign">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'which-campaign-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Which campaign gets the sale', heading_id: 'which-campaign-heading', summary: 'For each of their paid orders, fixed when it was paid.'})} %}
+{% block section_actions %}{% if settings_href %}{{ ui('action.link', {label: 'Change how a sale is counted', href: settings_href, icon: 'action-edit'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+{% for item in attributions %}
+{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}<p><a href="{{ item.href }}">{{ item.reference }}</a></p>{% if item.counted %}<p><strong>Last touch:</strong> {{ item.last }}</p><p><strong>First touch:</strong> {{ item.first }}</p>{% endif %}<p>{{ item.within }} {{ item.once }}</p>{% endblock %}
+{% endembed %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'person', labelledby: 'person-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'This person', heading_id: 'person-heading'}) }}
+{{ ui('data.key-value-list', {items: person}) }}
+<p class="cl-marketing-note">{{ ip_words }}</p>
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'others', labelledby: 'others-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Other visitors', heading_id: 'others-heading', summary: 'The latest seen. Visitors opens the whole list.'})} %}
+{% block section_actions %}{{ ui('action.link', {label: 'View all', href: visitors_href, icon: 'action-view-all'}) }}{% endblock %}
+{% endembed %}
+{% if others %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Other visitors, the latest seen first', stack: true, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Visitor</th><th scope="col">State</th><th scope="col" class="text-end">Visits</th><th scope="col">Country</th></tr>{% endblock %}
+{% block body %}
+{% for other in others %}
+<tr><td class="cell-text" data-label="Visitor"><a href="{{ other.href }}">{{ other.name }}</a></td><td data-label="State">{{ ui('feedback.badge', {label: other.state, tone: other.tone, size: 'small'}) }}</td><td class="text-end" data-label="Visits">{{ other.visits }}</td><td class="cell-text" data-label="Country">{{ other.country }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nobody else yet', summary: 'Others who follow a campaign\'s link are listed here.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% if may_forget %}
+<section class="cl-page-section" id="forget">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'forget-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Forget this journey', heading_id: 'forget-heading', summary: 'Removes this visitor\'s history and keeps the campaigns\' totals: the clicks and the money stay, naming nobody.'}) }}
+<form method="post" action="{{ forget_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Forget this visitor\'s journey', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: forget_confirm}) }}</form>
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

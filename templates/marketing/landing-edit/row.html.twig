@@ -1,0 +1,42 @@
+{#
+	One section in a landing page's editor list: its drag handle (not the hero's, which is always first), its kind and a
+	line about it, with Hidden, Not saved yet, Needs content and Left off the page when they apply; its width as two small
+	feature cards saved in place (Set width without JavaScript; the hero and the countdown are always full width); Edit,
+	which opens its form beside the list; Show or Hide; and the menu that moves it (top, up, down, bottom) or removes it.
+	Variables: row, and the editor's model (open, order, may_edit).
+#}
+<div class="cl-tree-row">
+{% if not row.is_hero and may_edit %}{% include '@CattoPHP/page/sortable-handle.html.twig' with {sh_label: row.label, sh_keys_id: 'landing-section-keys'} only %}{% endif %}
+<div class="cl-tree-label">
+<span class="cl-tree-leaf"><span class="cl-tree-spacer" aria-hidden="true"></span><span class="cl-tree-name">{{ row.label }}</span></span>
+<span class="cl-tree-meta">{{ row.is_hero ? 'Always at the top, full width · ' : '' }}{{ row.summary }}{% if row.shown_when_words %} · {{ row.shown_when_words }}{% endif %}{% if not may_edit and not row.always_full %} · {{ row.width == 'half' ? 'Half width' : 'Full width' }}{% endif %}</span>
+{% if not row.enabled %}{{ ui('feedback.badge', {label: 'Hidden', tone: 'neutral', size: 'small'}) }}{% endif %}
+{% if row.unsaved %}{{ ui('feedback.badge', {label: 'Not saved yet', tone: 'info', size: 'small'}) }}{% endif %}
+{% if row.needs_content and row.enabled %}{{ ui('feedback.badge', {label: 'Needs content', tone: 'warning', size: 'small'}) }}{% endif %}
+{% if row.invalid or not row.known %}{{ ui('feedback.badge', {label: 'Left off the page', tone: 'danger', size: 'small'}) }}{% endif %}
+</div>
+{% if may_edit and not row.always_full and row.known %}
+<form class="cl-landing-width" method="post" action="{{ row.width_action }}" data-choose-submits hx-post="{{ row.width_action }}" hx-target="#landing-section-list" hx-swap="outerHTML">
+<input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="open" value="{{ open }}">
+{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}{% block body %}
+<div class="cl-width-choice">{{ ui('form.picture-choice', {name: 'width', legend: 'Width of ' ~ row.label ~ ' on the page', legend_hidden: true, size: 'small', selected: row.width, items: [
+	{value: 'half', label: 'Half', icon: lucide('columns-2')},
+	{value: 'full', label: 'Full width', icon: lucide('rectangle-horizontal')},
+]}) }}</div>
+<noscript>{{ ui('action.button', {label: 'Set width', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-save', aria_label: 'Set the width of ' ~ row.label}) }}</noscript>
+{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+{% if row.known %}{{ ui('action.link', {label: may_edit ? 'Edit' : 'Open', variant: row.open ? 'primary' : 'secondary', size: 'small', href: row.edit_href ~ '#landing-edit', get: row.edit_href, target: '#landing-edit-pane', select: '#landing-edit-pane', swap: 'outerHTML', push_url: true, aria_label: (may_edit ? 'Edit ' : 'Open ') ~ row.label, icon: may_edit ? 'action-edit' : 'action-open'}) }}{% endif %}
+{% if may_edit %}
+{% if row.known %}
+<form method="post" action="{{ row.enabled ? row.hide_action : row.show_action }}" hx-post="{{ row.enabled ? row.hide_action : row.show_action }}" hx-target="#landing-section-list" hx-swap="outerHTML"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="open" value="{{ open }}">{{ ui('action.button', {label: row.enabled ? 'Hide' : 'Show', size: 'small', type: 'submit', aria_label: (row.enabled ? 'Hide ' : 'Show ') ~ row.label, icon: row.enabled ? 'action-hide' : 'action-view'}) }}</form>
+{% endif %}
+{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, label: 'More', icon: 'action-open', aria_label: 'More for ' ~ row.label})} %}{% block body %}
+{% if not row.is_hero %}{% include '@CattoPHP/page/sortable-moves.html.twig' with {sm_action: row.move_action, sm_position: row.position, sm_count: order|length, sm_order: order, sm_label: row.label} only %}{% endif %}
+<form method="post" action="{{ row.remove_action }}" hx-post="{{ row.remove_action }}" hx-target="#landing-section-list" hx-swap="outerHTML"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="open" value="{{ open }}">{{ ui('action.button', {label: 'Remove', type: 'submit', size: 'small', variant: 'danger', icon: 'action-remove', confirm: row.remove_confirm, aria_label: 'Remove ' ~ row.label}) }}</form>
+{% endblock %}{% endembed %}
+{% endif %}
+{% endblock %}{% endembed %}
+</div>

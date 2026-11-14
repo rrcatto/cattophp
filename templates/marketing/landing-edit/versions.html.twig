@@ -1,0 +1,21 @@
+{#
+	A landing page's earlier versions, newest first: every published state of the page is kept, never changed. Each says
+	when, what changed, its state (Published now, Replaced 5 Nov, Taken down) and who; View draws it as a preview, and Use
+	this version again puts its content back on the page (itself a new version on a published page). On a phone, where the
+	table stacks, the actions take the row's whole width (no label beside them), so Use this version again fits.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'versions', labelledby: 'versions-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Earlier versions', heading_id: 'versions-heading', summary: 'What visitors saw, kept each time the published page changed. Changes to a draft are not kept.'}) }}
+{% if versions %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The page\'s kept versions, newest first', stack: true, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Version</th><th scope="col">When</th><th scope="col">What changed</th><th scope="col">State</th><th scope="col" class="cell-actions">Actions</th></tr>{% endblock %}
+{% block body %}
+{% for version in versions %}
+<tr><td data-label="Version">{{ version.number }}</td><td data-label="When">{{ version.at }}{% if version.by %}<small class="cl-marketing-line">{{ version.by }}</small>{% endif %}</td><td class="cell-text" data-label="What changed">{{ version.what }}</td><td data-label="State">{{ ui('feedback.badge', {label: version.state, tone: version.current ? 'success' : 'neutral', size: 'small'}) }}</td><td class="cell-actions">{% if version.view_href %}{{ ui('action.link', {label: 'View', href: version.view_href, icon: 'action-preview', size: 'small', new_window: true, aria_label: 'View version ' ~ version.number}) }}{% endif %}{% if version.use_action %}<form method="post" action="{{ version.use_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Use this version again', type: 'submit', icon: 'action-restore', size: 'small', aria_label: 'Use version ' ~ version.number ~ ' again', confirm: 'Put version ' ~ version.number ~ ' back on the page? Its sections replace the ones there now.'}) }}</form>{% endif %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'None yet', summary: 'A version is kept when the page is published, and after every change while it is.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}

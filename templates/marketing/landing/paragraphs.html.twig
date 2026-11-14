@@ -1,0 +1,4 @@
+{# Plain-text copy as paragraphs: each paragraph its lines, every one escaped. #}
+{% for paragraph in paragraphs %}
+<p{% if paragraph_class|default('') %} class="{{ paragraph_class }}"{% endif %}>{% for line in paragraph %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+{% endfor %}

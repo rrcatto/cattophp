@@ -1,0 +1,19 @@
+{#
+	Things compared by one figure, a row each: its label (a link when it opens what it counts), its value in words with an
+	optional note, and a bar of it against the longest (or the page's max). A screen reader hears the label and the value;
+	the bar is only for the eye, and the words say the same without colour. Lengths are classes (the share filter), never a
+	style. On a phone the bar goes under its label and value.
+#}
+{% if props.blank %}
+{{ ui('feedback.empty', {summary: props.empty}) }}
+{% else %}
+<ul class="cl-ui-bar-list" aria-label="{{ props.label }}">
+{% for row in props.rows %}
+<li class="cl-ui-bar-list-row">
+<span class="cl-ui-bar-list-label">{% if row.href %}<a href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</span>
+<span class="cl-ui-bar-list-value">{{ row.words }}{% if row.note %} <span class="cl-ui-bar-list-note">{{ row.note }}</span>{% endif %}</span>
+<span class="cl-ui-bar-list-track" aria-hidden="true"><span class="cl-ui-bar-list-bar {{ row.share|share }}"></span></span>
+</li>
+{% endfor %}
+</ul>
+{% endif %}

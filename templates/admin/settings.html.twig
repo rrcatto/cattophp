@@ -4,10 +4,17 @@
 	.env's value (or its default) back. Each Reset is a form of its own after the group's (the button beside its field names
 	it with form=) and asks to be confirmed, so Enter in a field only ever saves the group. A secret is never shown: a saved
 	one shows as asterisks, left as they are to keep it. Someone who may only see the settings sees them without the forms'
-	buttons, and is told why.
+	buttons, and is told why. Saved settings that could not be read are said to be so first (read_problem). The project's
+	facts (facts: each with its key, heading, explanation, summary and items of label and value) follow the groups, each a
+	section of its own (#facts-<key>), shown and never changed.
 #}
 {% extends '@CattoPHP/page/stock.html.twig' %}
 {% block stock_main %}
+{% if read_problem %}
+<section class="cl-page-section">
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Saved settings could not be read'})} %}{% block body %}<p>{{ read_problem }}</p>{% endblock %}{% endembed %}
+</section>
+{% endif %}
 {% if why_not %}
 <section class="cl-page-section">
 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p>{{ why_not }}</p>{% endblock %}{% endembed %}
@@ -17,53 +24,13 @@
 {% for group in groups %}
 {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'settings-' ~ group.key, heading: group.label, summary: group.summary, open: open == group.key or group.refused})} %}{% block body %}
 <p>{{ group.description }}</p>
-<form method="post" action="{{ path('cattophp_admin_settings_save', {group: group.key}) }}">
-<input type="hidden" name="_token" value="{{ form_token() }}">
-{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-{% for setting in group.settings %}
-{% embed ui_template('form.field') with {props: ui_props('form.field', {label: setting.label, for: setting.id, required: setting.required, full_width: setting.control == 'paragraph', help: setting.help, error: setting.error})} %}{% block control %}
-{% if setting.control == 'paragraph' %}
-<textarea class="cl-input" id="{{ setting.id }}" name="{{ setting.name }}" rows="3" maxlength="{{ setting.maxlength }}"{% if setting.required %} required{% endif %}{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>{{ setting.value }}</textarea>
-{% elseif setting.control == 'choice' %}
-<select class="cl-select" id="{{ setting.id }}" name="{{ setting.name }}"{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>
-{% for choice in setting.choices %}
-<option value="{{ choice.value }}"{% if choice.selected %} selected{% endif %}>{{ choice.label }}</option>
-{% endfor %}
-</select>
-{% elseif setting.control == 'switch' %}
-<input class="cl-check" id="{{ setting.id }}" type="checkbox" name="{{ setting.name }}" value="true"{% if setting.checked %} checked{% endif %}{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>
-{% elseif setting.control == 'secret' %}
-<input class="cl-input" id="{{ setting.id }}" type="password" name="{{ setting.name }}" value=""{% if setting.shown %} placeholder="{{ setting.shown }}"{% endif %} maxlength="{{ setting.maxlength }}" autocomplete="new-password" spellcheck="false"{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>
-{% elseif setting.control == 'number' %}
-<input class="cl-input" id="{{ setting.id }}" type="number" name="{{ setting.name }}" value="{{ setting.value }}"{% if setting.min is not null %} min="{{ setting.min }}"{% endif %}{% if setting.max is not null %} max="{{ setting.max }}"{% endif %}{% if setting.required %} required{% endif %}{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>
-{% else %}
-<input class="cl-input" id="{{ setting.id }}" type="{{ setting.control }}" name="{{ setting.name }}" value="{{ setting.value }}" maxlength="{{ setting.maxlength }}" spellcheck="false"{% if setting.required %} required{% endif %}{% if not may_change %} disabled{% endif %} {{ ui_field_attrs(props) }}>
-{% endif %}
-{% if may_change and setting.overridden %}
-<div>{{ ui('action.button', {label: setting.reset_label, type: 'submit', icon: 'action-reset', size: 'small', form: setting.id ~ '-reset', confirm: setting.reset_confirm}) }}</div>
-{% endif %}
+{% include '@CattoPHP/admin/settings-group.html.twig' with {group: group, may_change: may_change, save_action: path('cattophp_admin_settings_save', {group: group.key}), reset_group_action: path('cattophp_admin_settings_reset_group', {group: group.key}), reset_route: 'cattophp_admin_settings_reset', reset_params: {group: group.key}} only %}
 {% endblock %}{% endembed %}
 {% endfor %}
-{% endblock %}{% endembed %}
-{% if may_change %}
-{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save these settings', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
-{% block secondary_actions %}{% if group.saved > 0 %}{{ ui('action.button', {label: 'Reset every setting here', type: 'submit', icon: 'action-reset', form: 'settings-' ~ group.key ~ '-reset', confirm: 'Put every setting of ' ~ group.label ~ ' back to .env or its default?'}) }}{% endif %}{% endblock %}
-{% endembed %}
-{% endif %}
-</form>
-{% if may_change %}
-{% for setting in group.settings|filter(setting => setting.overridden) %}
-<form id="{{ setting.id }}-reset" method="post" action="{{ path('cattophp_admin_settings_reset', {group: group.key, name: setting.name}) }}">
-<input type="hidden" name="_token" value="{{ form_token() }}">
-</form>
-{% endfor %}
-{% if group.saved > 0 %}
-<form id="settings-{{ group.key }}-reset" method="post" action="{{ path('cattophp_admin_settings_reset_group', {group: group.key}) }}">
-<input type="hidden" name="_token" value="{{ form_token() }}">
-</form>
-{% endif %}
-{% endif %}
+{% for fact_group in facts %}
+{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'facts-' ~ fact_group.key, heading: fact_group.heading, summary: fact_group.summary, open: open == fact_group.key})} %}{% block body %}
+<p>{{ fact_group.explanation }}</p>
+{{ ui('data.key-value-list', {items: fact_group.items}) }}
 {% endblock %}{% endembed %}
 {% endfor %}
 </section>

@@ -108,6 +108,10 @@ use CattoPHP\Mailing\MailingLists;
 use CattoPHP\Mailing\MailingSettingGroup;
 use CattoPHP\Mailing\MailingSettings;
 use CattoPHP\Mailing\MailingTransports;
+use CattoPHP\Marketing\MarketingWiring;
+use CattoPHP\Marketing\Landing\PictureSource;
+use CattoPHP\Marketing\Landing\SectionKind;
+use CattoPHP\Marketing\Landing\TemplateProvider;
 use CattoPHP\Mailing\RecipientAddresses;
 use CattoPHP\Mailing\SmtpMailingTransport;
 use CattoPHP\Mailing\Subscriptions;
@@ -186,7 +190,10 @@ use CattoPHP\Settings\DbalSettingsStore;
 use CattoPHP\Settings\EnvironmentValues;
 use CattoPHP\Settings\FoundationSettings;
 use CattoPHP\Settings\MemoryConnectionStore;
-use CattoPHP\Settings\MemorySettingsStore;
+use CattoPHP\Settings\FactsProvider;
+use CattoPHP\Settings\FileSettingsStore;
+use CattoPHP\Settings\FixedSettings;
+use CattoPHP\Settings\FixedSettingsProvider;
 use CattoPHP\Settings\ServiceConnections;
 use CattoPHP\Settings\Settings;
 use CattoPHP\Settings\SettingsCatalogue;
@@ -205,6 +212,9 @@ use CattoPHP\SignIn\SignInFlow;
 use CattoPHP\SignIn\SignInLinkCommand;
 use CattoPHP\SignIn\SignInLinks;
 use CattoPHP\SignIn\SignInRules;
+use CattoPHP\SignIn\SessionCookieOptionsPass;
+use CattoPHP\SignIn\SignInLength;
+use CattoPHP\SignIn\SignInLengthStorageFactory;
 use CattoPHP\SignIn\SignInSessions;
 use CattoPHP\SignIn\SignInUserProvider;
 use CattoPHP\SignIn\TwoStepResetCommand;
@@ -230,6 +240,8 @@ use CattoPHP\Telegram\TelegramTask;
 use CattoPHP\Telegram\TelegramWords;
 use CattoPHP\Theme\InstallThemesCommand;
 use CattoPHP\Theme\MemoryThemeChoice;
+use CattoPHP\Theme\MenuProvider;
+use CattoPHP\Theme\Menus;
 use CattoPHP\Theme\PackageValidator;
 use CattoPHP\Theme\PageRenderer;
 use CattoPHP\Theme\Publisher;
@@ -249,6 +261,7 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_it
 use InvalidArgumentException;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -277,12 +290,17 @@ final class CattoPHPBundle extends AbstractBundle
                 ->scalarNode('layout')->defaultValue('@CattoPHP/layout.html.twig')->info('The template CattoPHP\'s pages extend')->end()
                 ->arrayNode('starting_values')->normalizeKeys(false)->useAttributeAsKey('name')->scalarPrototype()->end()->info('Starting values in place of .env\'s, by name')->end()
                 ->arrayNode('defaults')->normalizeKeys(false)->useAttributeAsKey('name')->scalarPrototype()->end()->info('The project\'s own defaults, by name: used when .env and the Settings page give nothing')->end()
+                ->arrayNode('settings')->addDefaultsIfNotSet()->info('Settings the installation holds fixed: each a setting\'s name as in .env (APP_URL) or a group\'s key (sign_in)')->children()
+                    ->arrayNode('fixed')->scalarPrototype()->end()->info('Shown on the Settings page with their values, saying they are fixed; never changed there or by the Settings service')->end()
+                    ->arrayNode('hidden')->scalarPrototype()->end()->info('Fixed too, and left off the Settings page altogether')->end()
+                ->end()->end()
                 ->arrayNode('sign_in')->canBeDisabled()->children()
                     ->scalarNode('accounts')->defaultValue(OwnerOnlyAccounts::class)->info('The service that finds the application\'s accounts')->end()
                     ->scalarNode('after')->defaultValue('/')->info('Where a person goes after signing in')->end()
                     ->booleanNode('recovery_codes')->defaultTrue()->end()
                     ->scalarNode('two_step_file')->defaultNull()->info('With files: the file of the two-step key, {account} for one per account')->end()
                     ->booleanNode('sessions')->defaultFalse()->info('Keep each sign-in through these pages among the sign-ins a person can see and end (cattophp_sessions), checked on every request; off for a project that keeps its sign-ins itself')->end()
+                    ->booleanNode('session_lifetime')->defaultTrue()->info('How long a sign-in lasts (AUTH_SESSION_TTL) also sets the session cookie\'s lifetime and the stored session\'s, over framework.yaml\'s; false leaves those to framework.yaml')->end()
                 ->end()->end()
                 ->arrayNode('security_headers')->canBeDisabled()->children()
                     ->arrayNode('policy')->normalizeKeys(false)->useAttributeAsKey('directive')->scalarPrototype()->end()->info('Content-Security-Policy directives replaced or added')->end()
@@ -346,6 +364,17 @@ final class CattoPHPBundle extends AbstractBundle
                     ->scalarNode('documents')->defaultNull()->info('The service that gives an account\'s documents a reply may attach (CattoPHP\Inbox\InboxDocuments)')->end()
                     ->scalarNode('sender')->defaultNull()->info('The service that sends a reply (CattoPHP\Inbox\ReplySender); CattoPHP\'s mailer by default')->end()
                     ->integerNode('task_priority')->defaultValue(0)->info('The inbox_mailbox task\'s place among the scheduled tasks')->end()
+                ->end()->end()
+                ->arrayNode('marketing')->canBeEnabled()->info('The Campaign Marketing Manager: campaigns, adverts, publications, tracking links, the visitors they bring, spend and the figures (needs the database)')->children()
+                    ->scalarNode('project')->defaultNull()->info('The service that tells it what the project sells, how it names people and orders, its promotions and how it writes money (CattoPHP\Marketing\MarketingProject); CattoPHP\Marketing\NoProject when not given')->end()
+                    ->scalarNode('files_folder')->defaultValue('%kernel.project_dir%/var')->info('Where advert and landing page pictures are kept, under marketing/pictures/: a folder the web server never serves')->end()
+                    ->scalarNode('link_prefix')->defaultValue('c')->info('The first part of a tracking link\'s path, /c/{campaign}/{publication}: small letters, digits and hyphens; a change needs the cache cleared and makes the old links unknown')->end()
+                    ->integerNode('task_priority')->defaultValue(0)->info('The marketing_tidy_up task\'s place among the scheduled tasks')->end()
+                    ->scalarNode('landing_prefix')->defaultValue('landing')->info('The first part of an offer\'s landing page path, /landing/{slug}: small letters, digits and hyphens; a change needs the cache cleared and makes the old addresses unknown')->end()
+                    ->scalarNode('landing_project')->defaultNull()->info('The service that draws an offer\'s card and purchase box on a landing page, adds to its frame and says who may edit an offer\'s page (CattoPHP\Marketing\Landing\LandingProject); CattoPHP\Marketing\Landing\GenericLanding when not given')->end()
+                    ->booleanNode('landing_builtin_templates')->defaultTrue()->info('CattoPHP\'s own landing page templates (Several offers, A special with an end date); false for a project that gives its own')->end()
+                    ->booleanNode('returns')->defaultTrue()->info('Notice a followed visitor coming back (the journey\'s came_back) on any page but the tracking links, /marketing, /webhooks/ and returns_excluded, moving their last visit on')->end()
+                    ->arrayNode('returns_excluded')->scalarPrototype()->end()->defaultValue([])->info('The starts of paths where coming back is never noticed, such as /admin or /account')->end()
                 ->end()->end()
                 ->arrayNode('mailing')->canBeEnabled()->info('Mailing: the sender and transport settings, a mail server or catto-mail (its connection, events and send jobs) (needs the database)')->children()
                     ->scalarNode('project')->defaultValue('cattophp')->info('The project\'s short name in Feedback-ID headers and catto-mail\'s job references, such as example')->end()
@@ -418,6 +447,12 @@ final class CattoPHPBundle extends AbstractBundle
             ->end();
     }
 
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+        $container->addCompilerPass(new SessionCookieOptionsPass());
+    }
+
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         // Form tokens live in Symfony's session. A project that keeps the session off (one that runs its own) gets none,
@@ -440,13 +475,36 @@ final class CattoPHPBundle extends AbstractBundle
         return true;
     }
 
+    /** Whether a folder is the web root or inside it, the parameters in both resolved (an %env()% one never is). */
+    private static function isUnder(ContainerBuilder $builder, string $folder, mixed $root): bool
+    {
+        try {
+            $folder = $builder->getParameterBag()->resolveValue($folder);
+            $root = $builder->getParameterBag()->resolveValue($root);
+        } catch (\Throwable) {
+            return false;
+        }
+        if (!is_string($folder) || !is_string($root) || $folder === '' || trim($root, '/') === '') {
+            return false;
+        }
+        $tidy = static function (string $path): string {
+            $real = realpath($path);
+
+            return rtrim($real !== false ? $real : $path, '/') . '/';
+        };
+
+        return str_starts_with($tidy($folder), $tidy($root));
+    }
+
     /** @param array<string,mixed> $config */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         /** @var array{type:string,connection:string,folder:?string} $storage */
         $storage = $config['storage'];
-        /** @var array{enabled:bool,accounts:string,after:string,recovery_codes:bool,two_step_file:?string,sessions:bool} $signIn */
+        /** @var array{enabled:bool,accounts:string,after:string,recovery_codes:bool,two_step_file:?string,sessions:bool,session_lifetime:bool} $signIn */
         $signIn = $config['sign_in'];
+        /** @var array{fixed:list<string>,hidden:list<string>} $fixedSettings */
+        $fixedSettings = $config['settings'];
         /** @var array{enabled:bool,policy:array<string,string>,referrer_policy:string,permissions_policy:string,no_index:bool,no_store:bool} $headers */
         $headers = $config['security_headers'];
         /** @var array{enabled:bool,skip_paths:list<string>,drawer:string} $errors */
@@ -460,6 +518,9 @@ final class CattoPHPBundle extends AbstractBundle
             throw new InvalidArgumentException('cattophp.storage.folder must name a folder when cattophp.storage.type is files.');
         }
         $folder = rtrim((string) $storage['folder'], '/');
+        if (!$database && self::isUnder($builder, $folder, $config['ui']['public_root'])) {
+            throw new InvalidArgumentException('cattophp.storage.folder is inside the web root (cattophp.ui.public_root), where anyone could fetch its files: name a folder outside it, such as %kernel.project_dir%/var/storage.');
+        }
 
         // The optional modules switched on, and what stops any of them working, said plainly before anything is built.
         $on = [];
@@ -489,6 +550,12 @@ final class CattoPHPBundle extends AbstractBundle
         $builder->registerForAutoconfiguration(DetailWords::class)->addTag(ServiceTags::DETAIL_WORDS);
         $builder->registerForAutoconfiguration(SubjectLinks::class)->addTag(ServiceTags::SUBJECT_LINKS);
         $builder->registerForAutoconfiguration(ForgetsAccounts::class)->addTag(ServiceTags::FORGETS_ACCOUNTS);
+        $builder->registerForAutoconfiguration(MenuProvider::class)->addTag(ServiceTags::MENU);
+        $builder->registerForAutoconfiguration(SectionKind::class)->addTag(ServiceTags::LANDING_SECTION);
+        $builder->registerForAutoconfiguration(PictureSource::class)->addTag(ServiceTags::LANDING_PICTURE_SOURCE);
+        $builder->registerForAutoconfiguration(TemplateProvider::class)->addTag(ServiceTags::LANDING_TEMPLATES);
+        $builder->registerForAutoconfiguration(FixedSettingsProvider::class)->addTag(ServiceTags::FIXED_SETTINGS);
+        $builder->registerForAutoconfiguration(FactsProvider::class)->addTag(ServiceTags::SETTINGS_FACTS);
 
         $services = $container->services()->defaults()->private()->autowire();
         $container->parameters()->set('cattophp.application_key', $config['application_key']);
@@ -515,7 +582,8 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(SchemaRunner::class)->args([$connection, tagged_iterator(ServiceTags::SCHEMA_STEP)]);
             $services->set(MigrateCommand::class)->tag('console.command');
         } else {
-            $services->set(SettingsStore::class, MemorySettingsStore::class)->args([false]);
+            // What the Settings page saves, in a file beside the others, as the database would keep it.
+            $services->set(SettingsStore::class, FileSettingsStore::class)->args([$folder . '/settings.json', service('logger')->nullOnInvalid()]);
             $services->set(ActivityStore::class, FileActivityStore::class)->args([$folder]);
             $services->set(RoleStore::class, MemoryRoleStore::class)->args([false]);
             $services->set(LinkStore::class, FileLinkStore::class)->args([$folder . '/links.json']);
@@ -527,7 +595,9 @@ final class CattoPHPBundle extends AbstractBundle
         $services->set(ActivityLog::class)->args([service(ActivityStore::class), service('clock'), service('request_stack')->nullOnInvalid(), service('security.token_storage')->nullOnInvalid()]);
         $services->set(FoundationSettings::class)->args([$config['site_mode'], $signIn['enabled']])->tag(ServiceTags::SETTINGS);
         $services->set(SettingsCatalogue::class)->args([tagged_iterator(ServiceTags::SETTINGS), $config['defaults']]);
-        $services->set(Settings::class);
+        // The settings the installation holds fixed, by its configuration and the project's FixedSettingsProvider services.
+        $services->set(FixedSettings::class)->args([$fixedSettings['fixed'], $fixedSettings['hidden'], tagged_iterator(ServiceTags::FIXED_SETTINGS)]);
+        $services->set(Settings::class)->arg('$fixed', service(FixedSettings::class));
         $services->set(Installation::class);
         // PHP's own time zone kept to the installation's, as every request and console command starts.
         $services->set(PhpTimeZone::class)->args([service(Installation::class)])->public()
@@ -560,6 +630,9 @@ final class CattoPHPBundle extends AbstractBundle
         // cattophp:icons:search, for finding an icon's name before a template or a sprite names it.
         $services->set(IconSearchCommand::class)->args([service(IconLibrary::class)])->tag('console.command');
         $services->set(UiExtension::class)->args([service(Components::class), service(IconLibrary::class)])->tag('twig.extension', ['priority' => 100]);
+        // The pages modules and the project add to the menu (MenuProvider), as the person signed in may see them.
+        $services->set(Menus::class)->args([tagged_iterator(ServiceTags::MENU), service('router'), service('request_stack')->nullOnInvalid(),
+            service('security.authorization_checker')->nullOnInvalid()])->public();
         // The scheduler, for a project with background work: its tasks are the services that implement ScheduledTask.
         /** @var array{enabled:bool,command_alias:?string,log_archive:array{enabled:bool,folder:?string,first:string}} $scheduler */
         $scheduler = $config['scheduler'];
@@ -711,6 +784,7 @@ final class CattoPHPBundle extends AbstractBundle
         // connection, the events its webhook reports (worked through by the project's handlers) and its send jobs.
         /** @var array{enabled:bool,project:string,callback_path:string,webhook_path:string,campaign_project:?string,recipient_addresses:?string,http_client:string} $mailing */
         $mailing = $config['mailing'];
+        $mailingCampaigns = false;
         if ($mailing['enabled']) {
             $builder->registerForAutoconfiguration(CattoMailEventHandler::class)->addTag(ServiceTags::CATTOMAIL_EVENT_HANDLER);
             $services->set(MailingSettingGroup::class)->tag(ServiceTags::SETTINGS);
@@ -742,6 +816,7 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(CopyOutcomes::class)->args([service(Copies::class), service(Suppressions::class), service(Consents::class), service(ActivityLog::class)])->public();
             $services->set(CopyEvents::class)->args([service(Copies::class), service(CopyOutcomes::class)])->tag(ServiceTags::CATTOMAIL_EVENT_HANDLER);
             $campaigns = $mailing['campaign_project'] !== null && $mailing['campaign_project'] !== '';
+            $mailingCampaigns = $campaigns;
             if ($campaigns) {
                 $services->alias(CampaignProject::class, (string) $mailing['campaign_project']);
                 $services->set(CampaignSender::class)->args([service(Campaigns::class), service(Copies::class), service(MailingTransports::class), service(CopyOutcomes::class),
@@ -751,6 +826,15 @@ final class CattoPHPBundle extends AbstractBundle
                 $services->set(Forwards::class)->args([service($storage['connection']), service(Suppressions::class), service(Mailer::class), service(CampaignProject::class), service(ActivityLog::class)])->public();
             }
             $services->set(MailingRecords::class)->arg('$forwards', $campaigns ? service(Forwards::class) : null)->arg('$events', service(CattoMailEvents::class))->tag(ServiceTags::FORGETS_ACCOUNTS);
+        }
+
+        // The Campaign Marketing Manager: campaigns, adverts, publications and spend, the tracking links and the visitors and
+        // touches they record, landing pages, the journey, sales and connected sites, and what the project sells and how it
+        // names things (MarketingProject). Its wiring is its own (Marketing\MarketingWiring and the files it calls).
+        /** @var array{enabled:bool,project:?string,files_folder:string,link_prefix:string,task_priority:int,landing_prefix:string,landing_project:?string,landing_builtin_templates:bool,returns:bool,returns_excluded:list<string>} $marketing */
+        $marketing = $config['marketing'];
+        if ($marketing['enabled']) {
+            MarketingWiring::register($marketing, $services, $container, $builder, $storage['connection'], $scheduler['enabled'], $mailing['enabled'], $mailingCampaigns);
         }
 
         // Site protection, for a public site: the Site Log, flags, time-outs and lockouts, the rules every minute, the form
@@ -944,6 +1028,15 @@ final class CattoPHPBundle extends AbstractBundle
             $services->set(SignInFlow::class);
             $services->set(SignInLinks::class)->arg('$urls', service('router'));
             $services->set(SignInUserProvider::class)->arg('$sessions', $sessions ? service(SignInSessions::class) : null);
+            // How long a sign-in lasts, from signing in; with session_lifetime the session cookie and the stored session too.
+            // framework.session's options, for the cookie's flags, are given by SessionCookieOptionsPass once Symfony has them.
+            $length = $services->set(SignInLength::class)->arg('$sessions', $sessions ? service(SignInSessions::class) : null);
+            if ($signIn['session_lifetime']) {
+                $length->tag('kernel.event_subscriber');
+                $services->set(SignInLengthStorageFactory::class)
+                    ->decorate('session.storage.factory', null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE)
+                    ->args([service('.inner'), service(SignInLength::class)]);
+            }
             $services->set(SignInAuthenticator::class);
             $services->set(SignInEntryPoint::class)->args([service('router')]);
             $services->set(SignInController::class)
@@ -952,6 +1045,7 @@ final class CattoPHPBundle extends AbstractBundle
                     service(TwoStep::class), service(FormToken::class), service('security.helper'), service(Installation::class),
                     service(ActivityLog::class), service('twig'), service('router'), service('logger'), service('clock'), $signIn['after'],
                     $themedPages ? service(PageRenderer::class) : null, $sessions ? service(SignInSessions::class) : null, service(AfterResponse::class),
+                    service(SignInLength::class),
                 ])
                 ->public()
                 ->tag('controller.service_arguments');
@@ -976,7 +1070,7 @@ final class CattoPHPBundle extends AbstractBundle
             // The project's accounts by a closure: its own accounts service may take this to delete an account.
             $database ? service($storage['connection']) : null, $signIn['enabled'] ? service_closure(SignInAccounts::class) : null, service(Installation::class),
         ])->public();
-        $services->set(SettingsPage::class);
+        $services->set(SettingsPage::class)->arg('$facts', tagged_iterator(ServiceTags::SETTINGS_FACTS));
         $services->set(AdminSettingsController::class)->public()->tag('controller.service_arguments');
         $services->set(AdminRolesController::class)->arg('$accounts', $signIn['enabled'] ? service(SignInAccounts::class) : null)->public()->tag('controller.service_arguments');
         $services->set(ActivityDetails::class)->args([service(Installation::class), tagged_iterator(ServiceTags::DETAIL_WORDS)])->public();

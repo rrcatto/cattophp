@@ -1,0 +1,13 @@
+{#
+	Publish or Unpublish in a landing page's editor head, for someone who may publish: Publish is disabled, saying why,
+	while anything stops the page being published. Swapped in place when a change in the editor makes it so or not.
+#}
+<span class="cl-landing-publish" id="landing-publish">
+{% if may_publish %}
+{% if landing.published %}
+<form method="post" action="{{ urls.unpublish }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', icon: 'action-hide', confirm: landing.kind == 'campaign' ? 'Unpublish the landing page? The campaign\'s links lead where they did before it had one until you publish it again. Nothing on it is lost.' : 'Unpublish the landing page? Its address is not found until you publish it again. Nothing on it is lost.'}) }}</form>
+{% else %}
+<form method="post" action="{{ urls.publish }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Publish', type: 'submit', icon: 'action-publish', variant: 'primary', disabled: landing.problems is not empty, title: landing.problems is not empty ? 'Put right what is listed under Before it can be published first.' : ''}) }}</form>
+{% endif %}
+{% endif %}
+</span>

@@ -1,0 +1,80 @@
+{#
+	Every sale: the period, its state (paid to start), which touch a sale counts for and, with a connected site, where it
+	was sold, as feature cards, and the campaign, publication, channel, offer and country, in one GET form that changes
+	the page in place (htmx) or loads it without JavaScript; the search finds an order by its reference. The totals are
+	Sales::totals() of the same filter, and change with the search and the cards. Sortable headings, pages, two
+	downloads (the sales as listed with their totals, and their lines); the page refreshes itself every 30 seconds, with
+	Pause.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}
+{{ ui('action.link', {label: 'Download as CSV', href: csv_href, icon: 'action-download'}) }}
+{{ ui('action.link', {label: 'Download the lines', href: lines_href, icon: 'action-download'}) }}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="filters">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'filters-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Sales for ' ~ period_words, heading_id: 'filters-heading', summary: 'A paid sale by when it was paid, any other by when it was placed. Both dates are included; leave one empty for an open end.'}) }}
+{% if period_problem %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ period_problem }}</p>{% endblock %}{% endembed %}
+{% endif %}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+{% if searched %}<input type="hidden" name="sales_q" value="{{ searched }}">{% endif %}
+<input type="hidden" name="sales_sort" value="{{ sort }}">
+<input type="hidden" name="sales_dir" value="{{ direction }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'period', legend: 'Period', id: 'sales-period', items: period_cards, selected: period, size: 'small', legend_hidden: true}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', for: 'sales-from', help: 'Such as 2026-11-01.'})} %}{% block control %}<input class="cl-input" id="sales-from" type="date" name="from" value="{{ from }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', for: 'sales-to', help: 'Such as 2026-11-30.'})} %}{% block control %}<input class="cl-input" id="sales-to" type="date" name="to" value="{{ to }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'state', legend: 'Show', id: 'sales-state', items: state_cards, selected: state, size: 'small'}) }}
+{{ ui('form.picture-choice', {name: 'counts', legend: 'A sale counts for', id: 'sales-counts', items: model_cards, selected: model, size: 'small', help: 'Each sale counts for one campaign at a time, so no total holds a sale twice. This changes only what you see here; the settings keep the reports\' own choice.'}) }}
+{% if where_cards %}{{ ui('form.picture-choice', {name: 'where', legend: 'Where sold', id: 'sales-where', items: where_cards, selected: where, size: 'small'}) }}{% endif %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Campaign', for: 'sales-campaign'})} %}{% block control %}<select class="cl-select" id="sales-campaign" name="campaign" {{ ui_field_attrs(props) }}>{% for option in campaign_options %}<option value="{{ option.value }}"{{ option.value == campaign ? ' selected' : '' }}>{{ option.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% if publication_options %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Publication', for: 'sales-publication', help: 'Of the campaign chosen.'})} %}{% block control %}<select class="cl-select" id="sales-publication" name="publication" {{ ui_field_attrs(props) }}><option value="">Any of its publications</option>{% for option in publication_options %}<option value="{{ option.value }}"{{ option.value == publication ? ' selected' : '' }}>{{ option.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Channel', for: 'sales-channel'})} %}{% block control %}<select class="cl-select" id="sales-channel" name="channel" {{ ui_field_attrs(props) }}><option value="">Any channel</option>{% for option in channel_options %}<option value="{{ option.value }}"{{ option.value == channel ? ' selected' : '' }}>{{ option.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% if offer_options %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What was bought', for: 'sales-offer', help: 'Sales holding it. A bundle counts as itself.'})} %}{% block control %}<select class="cl-select" id="sales-offer" name="offer" {{ ui_field_attrs(props) }}><option value="">Any of the {{ offers_heading|lower }}</option>{% for option in offer_options %}<option value="{{ option.value }}"{{ option.value == offer ? ' selected' : '' }}>{{ option.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Country', for: 'sales-country', help: 'Of the browser that placed the order.'})} %}{% block control %}<select class="cl-select" id="sales-country" name="country" {{ ui_field_attrs(props) }}><option value="">Any country</option>{% for option in country_options %}<option value="{{ option.code }}"{{ option.code == country ? ' selected' : '' }}>{{ option.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show the sales', type: 'submit', icon: 'action-filter', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 30} %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="sales">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'sales-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The sales listed', heading_id: 'sales-heading', summary: 'The newest first. A heading sorts by it; an order opens everything about it.'}) }}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'sales', search: search, pagination: rows ? pagination : null})} %}{% block results %}
+<div id="sales-totals">
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}{% block body %}
+{% for figure in totals %}{{ ui('data.stat-card', {label: figure.label, value: figure.value, note: figure.note, size: 'small'}) }}{% endfor %}
+{% endblock %}{% endembed %}
+<p class="cl-marketing-note">Refunds and chargebacks are those of the sales listed, whenever they were made. Waiting and cancelled sales are never in the revenue.{% if left_out %} {{ left_out }}{% endif %}</p>
+</div>
+{% if rows %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Sales, each with when, its order, customer, what was bought, its campaign and what it came through, its country, money and state', stack: true})} %}
+{% block header %}<tr>{% for header in headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: header, sort_region: 'sales-region', sort_results: 'sales-results'} only %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for row in rows %}
+{% include '@CattoPHP/marketing/sales-row.html.twig' with {row: row} only %}
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% elseif not any %}
+{{ ui('feedback.empty', {heading: 'No sales yet', summary: 'Every order the site takes is listed here, with or without a campaign, once the site reports it.'}) }}
+{% else %}
+{{ ui('feedback.empty', {heading: searched ? 'No order matches' : 'No sales here', summary: searched ? 'Try another part of the reference, or clear the search.' : 'No sale has these choices in this period. Try a longer period, or show all of them.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

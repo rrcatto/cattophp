@@ -1,0 +1,10 @@
+{#
+	The lines above a list put in order by hand (data-cl-sortable, cattophp.js): how to move a row with the keyboard
+	(shown only with JavaScript; each handle is described by it), what is being saved, and why a move was refused. They
+	sit outside the part of the list the script swaps, so a screen reader hears each change. Variables: sl_keys_id (the
+	help line's id, which each handle names) and, optionally, sl_error (a refusal the server draws for a page without
+	JavaScript).
+#}
+<p class="cl-tree-help" id="{{ sl_keys_id }}" data-cl-sortable-keys hidden>Drag a row by its handle, or focus the handle and press the up or down arrow, Home or End. Each move is saved at once.</p>
+<p class="cl-tree-status" role="status" data-cl-sortable-status></p>
+<p class="cl-tree-error" role="alert" data-cl-sortable-error{% if not sl_error|default('') %} hidden{% endif %}>{{ sl_error|default('') }}</p>

@@ -1,0 +1,5 @@
+{#
+	The countdown: its words and the days, hours and minutes left, by the server's clock, ticking with cattophp.js; without
+	JavaScript the moment it ends is shown. The section is marked data-cl-countdown-scope, so it goes at zero.
+#}
+{{ ui('feedback.countdown', {ends_at: section.ends_at_time, now: section.now_time, words: section.words, until: 'Until', largest: 'day'}) }}

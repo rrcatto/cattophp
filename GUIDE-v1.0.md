@@ -1,13 +1,15 @@
 # The CattoPHP Guide 1.0
 
-**Version 1.0** · 13 November 2026, 12:43 SAST · Authored by Claude Opus 5.5
+**Version 1.0** · 14 November 2026, 18:40 SAST · Authored by Claude Opus 5.5
 
 The guide to building a web application on CattoPHP: one document, given whole to a developer or an AI assistant at
 the start of a project, saying what CattoPHP provides, the rules every project on it follows, how to start a project
 from the starter and how to use each part. A project is started from this guide and the starter, never from a study of
-another project's code: if something a project needs is not here, the guide is what gets fixed.
+another project's code: if something a project needs is not here, the guide is what gets fixed. The optional modules
+have a document of their own beside it, `MODULES-v1.0.md`, read after the guide and given with it when a project uses
+a module; section 8 here lists them.
 
-It describes CattoPHP as its code stands for version 1.0 (0.3.0 and the changes since, in its CHANGELOG) and the
+It describes CattoPHP as its code stands for version 1.0.1 (0.3.0 and the changes since, in its CHANGELOG) and the
 starter 1.0.0. Where the guide and the code disagree, the code is right and the guide is corrected. It is kept under
 150,000 characters, so it can always be given whole; newer versions replace it in CattoPHP's repository as
 `GUIDE-v<version>.md`.
@@ -15,18 +17,18 @@ starter 1.0.0. Where the guide and the code disagree, the code is right and the 
 ## Contents
 
 1 What CattoPHP is · 2 The standing rules · 3 Starting a project · 4 Building on it · 5 The foundations · 6 The
-interface system · 7 Themes · 8 The optional modules · 9 The checks · 10 Deploying · 11 Releasing
+interface system · 7 Themes · 8 The optional modules (described in `MODULES-v1.0.md`) · 9 The checks · 10
+Deploying · 11 Releasing
 
 ## 1. What CattoPHP is
 
 ### 1.1 Three parts
 
-CattoPHP is a layer on Symfony, which already does routing, requests, dependency injection and the console well, not
-a new framework. Its three parts:
+CattoPHP is a layer on Symfony (which does routing, requests, dependency injection and the console well), not a new
+framework. Its three parts:
 
 1. **The package**, `rrcatto/cattophp` (namespace `CattoPHP\`, MIT): a Symfony bundle of the foundations every web
-   application needs, the interface system its pages are drawn with, and optional modules switched on in
-   `config/packages/cattophp.yaml`.
+   application needs, the interface system its pages are drawn with, and optional modules.
 2. **The starter**, `rrcatto/cattophp-starter`: one command makes an application with the foundations working, a theme
    of its own, the scheduler with an example task, a Podman deploy kit, an install script and checks (3.4).
 3. **This guide**: the rules and how to use each part.
@@ -36,17 +38,17 @@ a new framework. Its three parts:
 - PHP 8.5.12 or later (it fixes two remote code execution flaws), with mbstring, OpenSSL and pdo_pgsql.
 - Symfony 8.1 (framework, security, Twig, console, mailer); Twig with strict variables, a missing one an error, never an
   empty string.
-- PostgreSQL 13 or later through Doctrine DBAL 4, which also serves a project with the Doctrine ORM (the starter has
-  DBAL alone, one service).
-- In the browser: htmx 4.0.1, Bootstrap 6.0.0-alpha.1's reboot, grid and utilities (no Bootstrap script), CattoPHP's
-  stylesheet and script, and the theme's; no npm build.
+- PostgreSQL 13 or later through Doctrine DBAL 4, which also serves a project with the Doctrine ORM (the starter: DBAL
+  alone).
+- In the browser: htmx 4.0.1, Bootstrap 6.0.0-alpha.1's reboot, grid and utilities, CattoPHP's stylesheet and script,
+  and the theme's; no npm build.
 
 ### 1.3 What CattoPHP gives
 
-The foundations, always there (section 5); the interface system, 34 components from one registry with the page frame,
-lists, trees, icons and the theme system (6, 7); thirteen optional modules, each off until switched on (the list in
-8.1); and in the starter the tooling: the Podman kit, the install script, `composer qa`, the browser checks and the gate
-(9, 10).
+The foundations, always there (section 5); the interface system, 38 components from one registry with the page frame,
+lists, trees, icons and the theme system (6, 7); fourteen optional modules, each off until switched on (Modules
+8.1); and in the starter the tooling: the Podman kit, the install script, `composer qa`, the browser checks and the
+gate (9, 10).
 
 ### 1.4 What stays in each application
 
@@ -57,29 +59,25 @@ components; document types, sitemap sources and campaigns; its look, as a theme.
 
 ### 1.5 Versions
 
-CattoPHP has its own versions and changelog. A project requires one (`"rrcatto/cattophp": "^0.3"`, `^1.0` from 1.0.0),
-so a change in CattoPHP reaches it only when it updates. Until CattoPHP is on Packagist, a project takes it from GitHub
-at a version tag:
+CattoPHP has its own versions and changelog; a change reaches a project only when it updates. Until CattoPHP is on
+Packagist, a project takes it from GitHub at a version tag, as the starter does:
 
 ```json
 "repositories": [{"type": "vcs", "url": "https://github.com/rrcatto/cattophp"}],
-"require": {"rrcatto/cattophp": "^0.3"}
+"require": {"rrcatto/cattophp": "^1.0"}
 ```
 
-While both change together, a project may take CattoPHP from a folder beside it (a Composer path repository, mirrored,
-`symlink: false`, as `dev-main`) on a branch of its own, as the starter does from `../cattophp` until CattoPHP 1.0, then
-`^1.0` from GitHub (its CHANGELOG says so). With `"reference": "config"` the lock names it by a hash of its
-`composer.json` and options, alike for any copy, so `composer update --lock` leaves it;
-`composer reinstall rrcatto/cattophp` takes the folder's code, its install scripts publishing the browser files and
-theme again. That is for development, never a release. Either way a project gets only the package's files (`bin`,
-`config`, `public`, `resources`, `src`, `templates`, `composer.json`, `README.md`, `CHANGELOG.md`, the guide,
-`LICENSE`), `.gitattributes` and `composer.json`'s `archive.exclude` leaving out the rest.
+To try a change in CattoPHP before its release, a project on a branch of its own may take it from a folder beside it
+(a Composer path repository, mirrored, `symlink: false`, as `dev-main`; with `"reference": "config"` the lock names it
+by a hash of its `composer.json` and options, so `composer update --lock` leaves it); `composer reinstall
+rrcatto/cattophp` takes the folder's code and publishes the browser files and theme again. Never for a release.
+Either way a project gets only the package's files (`bin`, `config`, `public`, `resources`, `src`, `templates`,
+`composer.json`, `README.md`, `CHANGELOG.md`, the guide, `LICENSE`), the rest left out by `.gitattributes` and `archive.exclude`.
 
 ## 2. The standing rules
 
-Every project on CattoPHP adopts these rules, through its `CLAUDE.md` (3.6), for every assistant and developer. A rule
-holds for every page and part: a fault found in one place is fixed everywhere the pattern is, in the same change, with a
-check so it cannot come back.
+Every project adopts these rules through its `CLAUDE.md` (3.6), for every assistant and developer. A rule holds for
+every page and part: a fault found in one place is fixed everywhere the pattern is, in the same change, with a check.
 
 ### 2.1 Nothing is done without the owner's word
 
@@ -88,10 +86,10 @@ publishing a release or listing on Packagist; choosing a version; changing a ser
 removing, replacing or going around a Composer dependency (flag one that seems redundant and ask); changing `APP_ENV`
 (2.5).
 
-What the owner says while your questions are open is information: check and report, change nothing unasked. Background
-about their own affairs is context, never a task. Ask only about genuine choices, in plain words with an example and A
-or B with a recommendation, never slipping in a decision. Something nobody asked for that contradicts what a feature
-obviously means is a defect: say so once, say where it came from, fix it.
+What the owner says while your questions are open is information: check and report, change nothing unasked; their own
+affairs are context, never a task. Ask only genuine choices, in plain words, an example, A or B with a recommendation,
+never slipping in a decision. Something nobody asked for contradicting what a feature obviously means is a defect: say
+so once, say where it came from, fix it.
 
 ### 2.2 The repository is public
 
@@ -103,8 +101,8 @@ CattoPHP's repository is public and MIT, as a project's usually is. Only the pro
 - **Never committed:** `.env` and anything with a secret; `vendor/`, `var/` and what Composer or the console copies in
   (`public/cattophp/`, `public/themes/`); runtime data, caches, logs; the workspace's files: `CLAUDE.md`, `AGENTS.md`,
   plans, maps, reports, notes, `old/`.
-- Files are added by name, never with `git add -A` or `git add .`. The workspace's own files go in `.git/info/exclude`;
-  a pre-commit hook refuses anything outside the allowed list:
+- Files are added by name, never `git add -A` or `git add .`; the workspace's files go in `.git/info/exclude`; a
+  pre-commit hook refuses anything else:
 
   ```sh
   #!/bin/sh
@@ -118,8 +116,7 @@ CattoPHP's repository is public and MIT, as a project's usually is. Only the pro
   fi
   ```
 
-- Before each push, list what the commits hold (`git show --stat`, `git ls-files`), reading anything new outside the
-  code folders (11.2).
+- Before each push, list what the commits hold (`git show --stat`), reading anything new outside the code folders.
 - **Only generic content:** no person, business, domain, host, server address, workstation path or anything of an
   installation in the code, tests or documents (the owner's name only in `LICENSE`, `composer.json`'s authors, a theme's
   author line); examples use `example.com` and made-up names; an installation names itself through its settings. Commits
@@ -128,19 +125,19 @@ CattoPHP's repository is public and MIT, as a project's usually is. Only the pro
 ### 2.3 Versions and release notes
 
 - A project's version is `composer.json`'s `version`; `CHANGELOG.md`, newest first, gets every change as made under
-  `## Unreleased (1.2.0)`, which becomes `## 1.2.0 · 14 December 2026` on release. The release check (part of
+  `## Unreleased (1.2.0)`, then `## 1.2.0 · 14 December 2026`. The release check (part of
   `composer qa`) fails when `README.md` or `CHANGELOG.md` does not name the version.
 - Release notes are complete (11.1).
 - A version is written with its package ("CattoPHP 0.3.0"); a dependency "requires CattoPHP ^1.0", never "runs 1.0".
 - A theme's new version raises its third number (1.0.4 to 1.0.5) unless the owner chooses otherwise.
-- A minor dependency update goes out with the next release, never alone; a security fix is raised with the owner at
-  once.
+- A minor dependency update waits for the next release; a security fix is raised with the owner at once.
 
 ### 2.4 Settings override `.env`
 
 - `.env` gives each setting its starting value; the Settings page overrides any the catalogue allows, says where the
   value in force comes from (saved here, `.env` or the default) and has a Reset back to `.env`. Never a `.env` value
-  that wins, or a list Settings cannot remove an entry from: nobody can tell such values by reading `.env`.
+  that wins, or a list Settings cannot remove an entry from: nobody can tell such values by reading `.env`. The one
+  exception is made on purpose and shown: a setting a project holds fixed (5.3), which the page shows saying so.
 - `APP_ENV`, `APP_KEY` and the database's details are not settings; they stay in `.env`. The catalogue never offers a
   secret's value, a database, a host the code depends on or a safety switch.
 - A saved secret is encrypted (`Security\SecretCipher`, AES-256-GCM from `APP_KEY`; a new `APP_KEY` loses them all),
@@ -158,9 +155,9 @@ CattoPHP's repository is public and MIT, as a project's usually is. Only the pro
 
 ### 2.6 Mail
 
-Mailpit catches mail on a development machine, nowhere else. A server sends everything, test emails too, so they prove
-what they say, through its configured transport: its own mail server (such as Postfix accepting mail from 127.0.0.1),
-another SMTP server, or a smarthost. The starter's wizard refuses Mailpit.
+Mailpit catches mail on a development machine, nowhere else. A server sends everything, test emails too, through its
+configured transport: its own mail server (Postfix accepting mail from 127.0.0.1), another SMTP server, or a smarthost.
+The starter's wizard refuses Mailpit.
 
 ### 2.7 Pages
 
@@ -219,7 +216,7 @@ number, which stays in the code (9.3).
 - A connection to an outside service exists only once a real try made it. Until then (never tried, or failed) it is a
   form with Check the connection and what went wrong, no Drop connection, nothing retrying in the background. Connected,
   the details are text with a Connected badge and Drop connection, which forgets them (`.env`'s too, until a Reset);
-  details changed since count as unchecked (8.15).
+  details changed since count as unchecked (Modules 8.15).
 - A refused form comes back as typed, once, with why and what to do beside each field it blames (5.12).
 
 ### 2.11 Documents
@@ -229,8 +226,7 @@ number, which stays in the code (9.3).
   `CLAUDE.md` and `AGENTS.md` keep their names; a public versioned document carries its version (`GUIDE-v1.0.md`).
 - Each opens with its version, date and time (SAST) and author ("**Version 1.2** · 14 December 2026, 09:30 SAST ·
   Authored by ..."), bumped for a change of substance; a rewrite keeps the header, saying which version it replaces.
-- Each stays under 150,000 characters, to be given whole: what stops being true is changed or taken out, history
-  archived.
+- Each stays under 150,000 characters: what stops being true is changed or taken out, history archived.
 - **The plan**, `YYYYMMDD-HHMM-<project>-plan.md` beside the code: what the application is for and what is to be built,
   in order, each step with its checks; the newest in force (`CLAUDE.md` sends assistants to it first), older in `old/`.
   Never committed: `.git/info/exclude` holds `/CLAUDE.md`, `/AGENTS.md`, `/*-plan.md` and `/old/`.
@@ -242,10 +238,8 @@ number, which stays in the code (9.3).
 - **Realistic and unique:** believable names, never repeated, without digits or codes.
 - **Checks remove what they make:** a run leaves a shared database as found, deleting an account as the application does
   (`AccountRecords::forget()`, 5.6); checks emptying a database get their own (`DB_TEST_NAME`).
-- **A check measures what a person sees:** one that passed with a fault visible is changed, proved to fail on the old
-  code.
-- **The right checks at the right time** (9.6), each judged by its exit code; a changed page looked at desktop and phone
-  width.
+- **A check measures what a person sees:** one that passed with a fault visible is changed, proved to fail on it.
+- **The right checks at the right time** (9.6), judged by exit codes; a changed page looked at desktop and phone width.
 
 ### 2.13 How the code is written
 
@@ -255,8 +249,7 @@ number, which stays in the code (9.3).
 - A settings provider never depends on `Settings`, or the catalogue builds itself endlessly.
 - A schema change is a step of its own (5.14); a released step never changes; no server schema changes by hand.
 - Configuration is never read by `parse_ini_file()` or `parse_ini_string()`.
-- Every feature does what its name obviously means, visibly, with its obvious siblings (a person told at each step
-  involving them).
+- Every feature does what its name obviously means, visibly, with its obvious siblings.
 
 ### 2.14 Dependencies
 
@@ -283,17 +276,11 @@ composer create-project rrcatto/cattophp-starter my-app \
     --repository='{"type":"vcs","url":"https://github.com/rrcatto/cattophp-starter"}'
 ```
 
-`--repository` is needed until the starter is on Packagist, then dropped. Before its first tag, the command takes a
-folder of it instead: `--repository='{"type":"path","url":"<folder>","options":{"symlink":false}}'`, `<folder>` a path
-from where the command runs. Until CattoPHP 1.0 the starter takes it from `../cattophp`, so the project is made beside
-`cattophp/`; from 1.0 from GitHub, `^1.0`, anywhere.
+(`--repository` until the starter is on Packagist.) Composer then:
 
-Composer then:
-
-1. installs the packages, CattoPHP among them (until CattoPHP 1.0 from `../cattophp` beside the project, 1.5; then
-   `^1.0` from GitHub);
+1. installs the packages, CattoPHP `^1.0` from GitHub among them;
 2. makes `.env` from `.env.example` with a new random `APP_KEY` (64 hex characters), readable by its owner alone
-   (`bin/make-env`; an existing `.env` never touched, no other value changed, `APP_ENV` included);
+   (`bin/make-env`; an existing `.env` never touched);
 3. copies CattoPHP's browser files into `public/cattophp/` (`vendor/bin/cattophp-assets public`);
 4. installs the starter's theme, publishing its browser files into `public/themes/` (`bin/console
    cattophp:themes:install`).
@@ -312,8 +299,7 @@ Steps 2 to 4 run again after each Composer install and update.
 4. **Serve it:** `php -S 127.0.0.1:8000 -t public`, or a web server with `public/` as root, running only `index.php`.
 5. **Sign in** at `/sign-in` with the administrator's address; the link arrives in Mailpit (or
    `bin/console cattophp:sign-in-link admin@example.com` prints one). The account, made when the link is used, has the
-   Administrator role and sets up two-step (`AUTH_TWO_STEP=ADMINS`): scan the QR code, type the code, keep the eight
-   recovery codes shown once.
+   Administrator role; two-step is their choice, at `/account/security` (5.8).
 6. **The scheduler:** `bin/console cattophp:schedule:run` every minute from cron, or `--watch` under a supervisor.
 7. **The checks:** `composer qa` (9) passes before anything is called done.
 
@@ -344,16 +330,16 @@ goes into `StarterPages::ADMINISTRATION`, which the menu and the Administration 
 
 ### 3.5 Making it the project's own
 
-In one change, `composer qa` passing after it (as the starter's README, "Making it your own", lists); the kit and the
-install script, each fetched alone onto a server, name the application themselves.
+In one change, `composer qa` passing after it (the starter's README, "Making it your own"); the kit and the install
+script, each fetched alone onto a server, name the application themselves.
 
 1. `git init`, the pre-commit hook and `.git/info/exclude` (2.2), nothing committed until the owner says so;
    `CLAUDE.md`, `AGENTS.md` (templates below) and the first plan (2.11) beside the code, never committed. `git mv` moves
    only added files: the renames below are plain `mv`.
 2. `composer.json`: `name` (`example/notes`), `description`, `version`, `authors`; then `composer update --lock`, which
-   only rewrites the lock's hash (CattoPHP from `../cattophp` is named by its `composer.json`, 1.5). `README.md` becomes
-   the project's (what it is, how to install it, its settings), `CHANGELOG.md` starts at `## Unreleased (0.1.0)`,
-   `LICENSE` names its holder. `cattophp.defaults.APP_NAME` is the name when neither `.env` nor Settings gives one.
+   only rewrites the lock's hash. `README.md` becomes the project's (what it is, how to install it, its settings),
+   `CHANGELOG.md` starts at `## Unreleased (0.1.0)`, `LICENSE` names its holder. `cattophp.defaults.APP_NAME` is the
+   name when neither `.env` nor Settings gives one.
 3. The theme: `mv themes/starter themes/<slug>`; its `theme.json` gets a `name` and `slug` of its own (the project's or
    the theme's), `version` 1.0.0, today's `created_at`, the project's `author`, a `description`; set
    `theme.default: <slug>`, delete `public/themes/starter-v1.0.0/` and run `bin/console cattophp:themes:install`
@@ -369,68 +355,59 @@ install script, each fetched alone onto a server, name the application themselve
    new page's family in `FAMILIES`) and the tests' installation in `phpunit.xml.dist` (`APP_NAME`, `MAIL_FROM_ADDRESS`).
 6. The home page becomes the project's own (a title equal to the name is written once); `.env.example` gains its
    settings under "The application's own".
-7. Then `grep -rniI starter --exclude-dir=vendor --exclude-dir=var .` and change what is left but comments in `tests/`
-   on what came from the starter and `EnvWizardTest`'s `--app=starter` fixture.
+7. `grep -rniI starter --exclude-dir=vendor --exclude-dir=var .`: change what is left but comments in `tests/` and
+   `EnvWizardTest`'s `--app=starter` fixture.
 
-The starter's tests find the theme, name and home heading themselves and check only its own task, tables, role and
-modules: they pass unchanged (9.1).
+The starter's tests pass unchanged (9.1).
 
 ### 3.6 The project's `CLAUDE.md`
 
-Copy it whole, replace each `<...>`, keep only what is true: the standing rules, the project's decisions added under
-"The project's own" as made, each with the owner's words and the date.
+Copy it whole, replace each `<...>`, keep only what is true; add the project's decisions under "The project's own" as
+made, each with the owner's words and the date.
 
 ````markdown
 # CLAUDE.md
 
-Working rules for <Project>, for Claude Code and any other assistant. Before changing code, read the newest
-`*-plan.md`, then `AGENTS.md` (its latest checkpoint is current), then CattoPHP's guide,
-`vendor/rrcatto/cattophp/GUIDE-v<n.n>.md` (the rules every project follows, and how to use CattoPHP). Keep this file
-under 150,000 characters; change or remove what stops being true, history in `old/`.
+Working rules for <Project>, for any assistant. Before changing code, read the newest `*-plan.md`, then `AGENTS.md`
+(its latest checkpoint), then CattoPHP's guide, `vendor/rrcatto/cattophp/GUIDE-v<n.n>.md`. Keep this file under
+150,000 characters, what stops being true changed or removed.
 
 ## Where things are
 
-- The code: this folder, a Git repository on `<branch>`, version <x.y.z> (`composer.json`), requiring CattoPHP `<^x.y>`;
-  a change CattoPHP should make is made there, released at the owner's word, taken by updating.
+- The code: this folder, Git branch `<branch>`, version <x.y.z>, requiring CattoPHP `<^x.y>` (a change CattoPHP should
+  make is made there, 11.4).
 - Modules on in `config/packages/cattophp.yaml`: <the scheduler, ...>.
 - The development site: `<http://127.0.0.1:8000>`, databases `<name>` and `<name_test>`, mail in Mailpit.
 
 ## Nothing without the owner's word
 
 - Commit, tag, push, release, list on Packagist, choose a version or change a server only at the owner's word, in that
-  turn. Commits are signed `<owner> <<no-reply address>>`. Never remove or replace a Composer dependency unasked.
-- What the owner says while your questions are open is information: check, report, change nothing unasked.
-- Ask only about genuine choices, in plain words, an example, A or B; a restriction nobody asked for is a defect.
+  turn, signed `<owner> <<no-reply address>>`. Never remove or replace a Composer dependency unasked.
+- What the owner says while your questions are open is information. Ask only genuine choices: plain words, A or B.
 
 ## The repository is public
 
-- Only the project's own files are committed, by name (never `git add -A`), as the pre-commit hook allows (CattoPHP's
-  guide, 2.2); never `.env`, a secret, `vendor/`, `var/`, `public/cattophp/`, `public/themes/`, runtime data, caches
-  or logs. This file, `AGENTS.md`, plans, reports, notes and `old/` stay out (`.git/info/exclude`). Before a push, read
-  what the commits hold (`git show --stat`).
-- Only generic content and placeholders: no person (the owner's name only in `LICENSE`, `composer.json`), business,
-  domain, host, server address or workstation path; examples use `example.com` and made-up names.
+- Only the project's own files are committed, by name, as the pre-commit hook allows (CattoPHP's guide, 2.2); this
+  file, `AGENTS.md`, plans, reports, notes and `old/` stay out (`.git/info/exclude`). Before a push, read what the
+  commits hold (`git show --stat`).
+- Only generic content: no person (the owner's name only in `LICENSE`, `composer.json`), business, domain, host,
+  server address or workstation path; examples use `example.com` and made-up names.
 
 ## Versions and release notes
 
-- Every change goes under `## Unreleased (x.y.z)` as made (the release check fails when `README.md` or `CHANGELOG.md`
-  does not name `composer.json`'s version); release notes complete, checked against the diff before tagging (CattoPHP's
-  guide, 11.1); a version always written with its package ("<Project> 1.2.0", "CattoPHP 0.3.0").
+- Every change goes under `## Unreleased (x.y.z)` as made; release notes complete, checked against the diff before
+  tagging (CattoPHP's guide, 11.1); a version written with its package ("<Project> 1.2.0", "CattoPHP 0.3.0").
 
 ## How it is built
 
 - PHP 8.5.12+, Symfony 8.1, strict Twig, PostgreSQL through Doctrine DBAL, CattoPHP; thin controllers, services own the
-  rules, repositories the SQL. Settings over `.env` with a Reset, secrets encrypted; `APP_ENV` the owner's alone;
-  `APP_SITE_MODE` demo or live; Mailpit on a development machine only.
+  rules. Settings over `.env` with a Reset; `APP_ENV` the owner's alone; Mailpit on a development machine only.
 - Pages work without JavaScript (htmx 4 enhancing) under a strict Content-Security-Policy, built from CattoPHP's
-  components (page head, identity band, cards), the theme painting `cl-` classes, never laying them out; in place by
-  default, live pages refreshing with Pause. Forms: a saved secret shows `************`; a connection exists once a real
-  try made it; choices are feature cards; colours hex codes; every button names an icon.
-- Words: plain British English, hyphens, straight quotes, no em dash, an en dash only in a range; errors say what
-  happened and what to do; another's record is not found; a held visitor learns nothing.
-- Addresses by name in public, by a recognisable code signed in, never a row number. A schema step in `src/Schema/` per
-  change, never changed once released.
-- The owner manages everything from the web app. The rest of the standing rules: CattoPHP's guide, section 2.
+  components, the theme painting `cl-` classes, never laying them out; in place by default, live pages with Pause.
+  Forms: a saved secret shows `************`; choices are feature cards; colours hex codes; every button an icon.
+- Words: plain British English, hyphens, straight quotes, no em dash; errors say what happened and what to do.
+- Addresses by name in public, by a code signed in, never a row number. A schema step per change, never changed once
+  released. The owner manages everything from the web app. The rest of the standing rules: CattoPHP's guide, 2.
 
 ## The project's own
 
@@ -440,16 +417,15 @@ under 150,000 characters; change or remove what stops being true, history in `ol
 
 ## Checks
 
-- `composer qa` (the tests on `DB_TEST_NAME`, never the site's database, the contract and deploy checks, PHPStan level
-  8, the release check), and `bin/gate` before a release; while building, the checks relevant to the change. Judge a
-  check by its exit code; look at a changed page at desktop and phone width.
-- Checks write only real records, made through the workflows, with realistic unique names, removing what they make.
+- `composer qa` (9.1), and `bin/gate` before a release; while building, the checks relevant to the change, each judged
+  by its exit code; a changed page looked at desktop and phone width.
+- Checks write only real records, made through the workflows, realistic and unique, removing what they make.
 - `composer audit` and `composer outdated --direct` when building work starts and before a release; tell the owner.
 
 ## Documents
 
-- Named `YYYYMMDD-HHMM-name.md`, the newest in force, older ones in `old/`; each opens with its version, date and time
-  (SAST) and author, bumped for a change of substance, and stays under 150,000 characters.
+- Named `YYYYMMDD-HHMM-name.md`, older ones in `old/`; each opens with its version, date, time (SAST) and author, and
+  stays under 150,000 characters.
 ````
 
 ### 3.7 The project's `AGENTS.md`
@@ -457,26 +433,23 @@ under 150,000 characters; change or remove what stops being true, history in `ol
 ````markdown
 # AGENTS.md
 
-Where <Project>'s work stands, newest last (rules in `CLAUDE.md`, the plan the newest `*-plan.md`). Each checkpoint: a
-dated heading, what was done, how it was checked, what was decided and by whom (the owner's words), what is next; the
-latest alone is current. Under 150,000 characters: older checkpoints go to `old/AGENTS-ARCHIVE.md`.
+Where <Project>'s work stands, newest last. Each checkpoint: a dated heading, what was done, how it was checked, what
+was decided and by whom (the owner's words), what is next; the latest alone is current. Older checkpoints go to
+`old/AGENTS-ARCHIVE.md`, keeping this under 150,000 characters.
 
 ## <YYYY-MM-DD>: the project begins
 
-- Made from the CattoPHP starter <1.0.0> (`composer create-project rrcatto/cattophp-starter <folder>`), requiring
-  CattoPHP <^x.y>.
-- Renamed: `composer.json` (`<vendor/name>`, version <x.y.z>), the theme (`themes/<slug>/`), the kit
-  (`deploy/podman/<app>-podman.sh`), the installer.
-- Databases `<name>` and `<name_test>`; `cattophp:migrate` applied <N> steps; `cattophp:modules` OK.
-- `composer qa` passes: <N> tests, the contract and deploy checks, PHPStan level 8, the release check.
-- Signed in as the administrator through Mailpit; two-step set up.
+- Made from the CattoPHP starter <1.0.0>, requiring CattoPHP <^x.y>; renamed (`<vendor/name>` <x.y.z>, the theme
+  `<slug>`, the kit and installer `<app>`).
+- Databases `<name>`, `<name_test>`; `cattophp:migrate` applied <N> steps; `cattophp:modules` OK; `composer qa` passes
+  (<N> tests); signed in as the administrator through Mailpit.
 - Nothing committed yet. Next: <the first piece of the application's own>.
 ````
 
 ## 4. Building on it
 
-How a project adds its own pages, records, settings, permissions, background work and icons, as the starter does; 5 to 8
-describe the parts.
+How a project adds its own pages, records, settings, permissions, background work and icons; 5 to 7 and, for the
+optional modules, `MODULES-v1.0.md` describe the parts.
 
 ### 4.1 The kernel and the environment
 
@@ -635,11 +608,11 @@ final class Step202612011030Notes extends \CattoPHP\Schema\SqlStep
 
 The id starts with the date and time the step was written (`YYYYMMDDHHMM-what-it-does`, the class
 `StepYYYYMMDDHHMMName`). Each step runs in its own transaction, a failure leaving nothing; a released step never
-changes, a later change being a new step for a database holding data. The repository takes the
+changes: a later change is a new step. The repository takes the
 `Doctrine\DBAL\Connection` and writes SQL with parameters (`src/Account/Accounts.php`); a record a public page names has
 a slug, one a signed-in page names a code (2.9) from `Foundation\ReadableCode::make()` (5.15), made again when the
-unique index refuses one. A project may keep its tables with another tool (Phinx, Doctrine Migrations), never touching
-CattoPHP's (5.14).
+unique index refuses one. A project may keep its tables with another tool (Phinx, Doctrine Migrations), never CattoPHP's
+(5.14).
 
 ### 4.5 Settings of the project's own
 
@@ -665,8 +638,8 @@ final class NoteSettings implements SettingsProvider
 ```
 
 The value in force is `$settings->get('NOTES_KEPT_FOR')` (or `int()`, `bool()`, `duration()`) on
-`CattoPHP\Settings\Settings`. Each new setting goes into `.env.example` with a line saying what it is; a provider never
-takes `Settings` (2.13); 5.3 lists types and arguments.
+`CattoPHP\Settings\Settings`. Each new setting goes into `.env.example`, a line saying what it is; a provider never
+takes `Settings` (2.13); types and arguments in 5.3.
 
 ### 4.6 Permissions of the project's own
 
@@ -690,13 +663,13 @@ A route asks for a permission with `#[IsGranted('NOTE.VIEW')]`, a template with 
 with `Roles::may($accountId, 'NOTE.VIEW')`; code never asks for a role, which grants permissions on the Roles page. A
 `SYSTEM.` key is administrators' alone.
 
-**What every signed-in person may do asks for no permission** (no role is everyone's). A page every member may open
-relies on sign-in alone, which the starter's `access_control` requires (`^/` needs `ROLE_USER`, everyone signed in
-holding it); a route outside it asks `#[IsGranted('IS_AUTHENTICATED')]`. Each person still sees only their own records.
+**What every signed-in person may do asks for no permission** (no role is everyone's): a page every member may open
+relies on sign-in alone (the starter's `access_control`: `^/` needs `ROLE_USER`); a route outside it asks
+`#[IsGranted('IS_AUTHENTICATED')]`. Each person still sees only their own records.
 
 **A role the application needs from the start** (an administrator only gives it) is made by a schema step of its own
-calling `Roles::save()`: a service taking `Roles` in its constructor, applied once per database in its transaction on
-the same connection, recording `access.role_made`; the role is then the administrators' to change or delete. Its
+calling `Roles::save()` (a service taking `Roles`, applied once per database in its transaction, recording
+`access.role_made`); the administrators may then change or delete it. Its
 permissions come from the catalogue (never `SYSTEM.`), its id sorting after CattoPHP's roles step (any date from
 2026-11-10):
 
@@ -742,7 +715,7 @@ final class NoteCleanupTask implements ScheduledTask
 }
 ```
 
-Found as a `ScheduledTask`, it returns what it did in words, or throws; each run is recorded (8.2).
+Found as a `ScheduledTask`, it returns what it did in words, or throws; each run is recorded (Modules 8.2).
 `--job note_cleanup --now "+3 days"` tries it as at another moment on a development site, kept apart from its runs.
 
 ### 4.8 Icons
@@ -797,8 +770,7 @@ The starter does all this; a project adopting CattoPHP later does it by hand: re
 replace its copy of each foundation with CattoPHP's, one at a time, checks passing after each, and put its look in a
 theme.
 
-Every key of `config/packages/cattophp.yaml`, with its default. Only `application_key` is required; a module's keys
-matter only once it is on (`enabled: true`).
+Every key of `config/packages/cattophp.yaml`, with its default; only `application_key` is required.
 
 ```yaml
 cattophp:
@@ -811,12 +783,16 @@ cattophp:
   layout: '@CattoPHP/layout.html.twig'  # what CattoPHP's pages extend without themes
   starting_values: {}  # by name, in place of .env's (a fixed value, another name); Settings overrides
   defaults: {}  # by name, when .env and Settings give nothing: APP_LOCALE: fr_FR
+  settings:  # held fixed (5.3): a setting by its name (APP_URL) or a group by its key (sign_in)
+    fixed: []  # shown on the Settings page, saying so; refused however a change is sent
+    hidden: []  # fixed too, and left off the page
   sign_in:  # on unless enabled: false
     accounts: CattoPHP\SignIn\OwnerOnlyAccounts  # the application's accounts
     after: /  # where a person goes after signing in
     recovery_codes: true
     two_step_file: ~  # with files: the key's file, {account} for one per account
     sessions: false  # sign-ins a person can see and end (5.8)
+    session_lifetime: true  # AUTH_SESSION_TTL also sets the session cookie's and stored session's lifetimes (5.6)
   security_headers:  # on unless enabled: false
     policy: {}  # Content-Security-Policy directives replaced or added
     referrer_policy: strict-origin-when-cross-origin
@@ -832,30 +808,37 @@ cattophp:
   error_pages:  # on unless enabled: false
     skip_paths: []  # prefixes whose errors the project answers itself, such as /api/
     drawer: CattoPHP\Http\TwigErrorPageDrawer  # an Http\ErrorPageDrawer
-  network: { ... }  # the network lookup (8.4)
-  theme: { enabled: false, ... }  # section 7; the scheduler and every other module in section 8
+  network: { ... }  # the network lookup (Modules 8.4)
+  theme: { enabled: false, ... }  # section 7; the scheduler and every other module in MODULES-v1.0.md
 ```
 
 Three Twig namespaces: `@CattoPHP` (CattoPHP's templates), `@platform` (the project's own; the starter maps
 `templates/` to it in `twig.yaml`) and `@theme` (the theme a request is drawn in).
 
 **Service tags** (`CattoPHP\ServiceTags`): a service is tagged for each extension interface it implements
-(`ServiceTags::EXTENSION_POINTS`), so a class may implement several; no interface has a `TAG` (`PublicPageProvider` no
-`PAGES_TAG`). One wired by hand names the constant, `->tag(ServiceTags::SCHEDULED_TASK, ['priority' => 5])`, or the YAML
-string: `SETTINGS`, `PERMISSIONS`, `SCHEMA_STEP`, `COMPONENT_SET`, `DRAWING_CHECK`, `ACTION_WORDS`, `DETAIL_WORDS`,
-`SUBJECT_LINKS`, `FORGETS_ACCOUNTS`, `SCHEDULED_TASK`, `SETUP_STEPS`, `CATTOMAIL_EVENT_HANDLER`, `SITEMAP_SOURCES`,
-`PUBLIC_PAGES`. A `ScheduledTask` that is also a `DetailWords` declares
-`label(string $action = '', string $key = ''): string`, `''` for a detail meaning none of its own.
+(`ServiceTags::EXTENSION_POINTS`), so a class may implement several. One wired by hand names the constant,
+`->tag(ServiceTags::SCHEDULED_TASK, ['priority' => 5])`, or the YAML string: `SETTINGS`, `PERMISSIONS`, `SCHEMA_STEP`,
+`COMPONENT_SET`, `DRAWING_CHECK`, `ACTION_WORDS`, `DETAIL_WORDS`, `SUBJECT_LINKS`, `FORGETS_ACCOUNTS`, `SCHEDULED_TASK`,
+`SETUP_STEPS`, `CATTOMAIL_EVENT_HANDLER`, `SITEMAP_SOURCES`, `PUBLIC_PAGES`, `MENU`, `FIXED_SETTINGS`, `SETTINGS_FACTS`. A `ScheduledTask` that is also a
+`DetailWords` declares `label(string $action = '', string $key = ''): string`, `''` for a detail meaning none of its
+own.
 
 ### 5.2 Where the records are kept
 
 `storage.type: database` keeps CattoPHP's records (settings, the activity log, roles, links, sign-ins, two-step keys,
 the schema runner's record, the modules' tables) in PostgreSQL through the DBAL connection; `files` is for a page
-without one: links, sign-ins, the two-step key and the activity log in files in `storage.folder`, readable by the site's
-account alone (one two-step file, without `{account}`, records whose key it holds; the activity log is rewritten to a
-file beside it, renamed in, under `activity.log.lock`); settings stay in `.env`, nobody holds a role (administrators are
-whom the application says), no module keeping records can be on, and there is no `cattophp:migrate`. Forgetting an
-account changes each file whole, the two-step key last; `forget()` run again finishes.
+without one: what the Settings page saves, links, sign-ins, the two-step key and the activity log in files in
+`storage.folder`, readable by the site's account alone (folders made 0700, files 0600; a folder inside
+`ui.public_root` is refused when the container is built). One two-step file, without `{account}`, records whose key it
+holds; the activity log is rewritten to a file beside it, renamed in, under `activity.log.lock`. Saved settings are
+`settings.json` (`Settings\FileSettingsStore`): each change reads it, changes it and writes it whole to a file beside it
+that then takes its place, under `settings.json.lock`; a secret is in it encrypted, as in the database. A file that
+cannot be read, or is not as CattoPHP writes it, never stops the application: every setting has its starting value, the
+fault is logged, the Settings page says so (`Settings::readProblem()`), and the next save puts the file aside as
+`settings.json.damaged-<when>` and starts afresh; a save that cannot be written is refused in words. Until something is
+saved there is no file, and every value is what `.env` gives, as before. Nobody holds a role (administrators are whom
+the application says), no module keeping records can be on, and there is no `cattophp:migrate`. Forgetting an account
+changes each file whole, the two-step key last; `forget()` run again finishes.
 
 ### 5.3 Settings
 
@@ -870,7 +853,9 @@ reread after 5 seconds.
 `savedBy()`; `save($groupKey, $input, $actor)` (a group, nothing if any is refused: `Settings\SettingsRefused`, why by
 name), `set()` (one), `reset()`, `resetGroup()`; `clear($name)` (empty on purpose, so a dropped connection stays dropped
 though `.env` holds its keys, until Reset); `secretProblem()` (a stored secret unreadable after a changed `APP_KEY`);
-`canSave()` (false where settings live in `.env` alone).
+`canSave()` (false only with a store that refuses every save, `MemorySettingsStore(false)`); `readProblem()` (saved
+settings that could not be read, in words, or null); `isFixed()`, `isHidden()`, `groupIsFixed()`; `isCutToLongest()`
+(`.env`'s length of time is longer than the setting's longest).
 
 **The catalogue.** `Settings\SettingsCatalogue` gathers every `SettingGroup` from the `Settings\SettingsProvider`
 services (tag `cattophp.settings`, autoconfigured; higher tag priority first). A group has a key in small letters, a
@@ -880,11 +865,69 @@ label, a description, its settings. A `Setting` has:
 |---|---|
 | `name` | as in `.env`, in capitals (`NOTES_KEPT_FOR`) |
 | `label`, `help` | the words on the page |
-| `type` | `Text` (one line), `Paragraph`, `Email`, `Address` (http or https; `httpsOnly: true`), `Number` (`min`, `max`), `Switch` (true or false), `Duration` (`shortest`), `Choice` (`choices`: value => words), `TimeZone`, `MailTransport` |
+| `type` | `Text` (one line), `Paragraph`, `Email`, `Address` (http or https; `httpsOnly: true`), `Number` (`min`, `max`), `Switch` (true or false), `Duration` (`shortest`, `longestTime`), `Choice` (`choices`: value => words), `TimeZone`, `MailTransport` |
 | `default` | used when `.env` and the project give nothing |
 | `optional` | may be blank |
 | `secret` | stored encrypted, never shown |
 | `longest` | the most characters (300 by default; a paragraph 5,000, an address or mail transport 2,000) |
+| `shortest`, `longestTime` | a length of time's bounds, in its notation (`'5m'`, `'365d'`); either may be left out |
+
+**A longest length of time.** `new Setting('NOTES_KEPT_FOR', 'How long notes are kept', SettingType::Duration, '1y',
+shortest: '1d', longestTime: '10y')`: a save beyond it is refused ("How long notes are kept must be at most 10 years."),
+and a starting value beyond it (`.env`'s `20y`, or one saved before the bound was set) is read as the longest, the
+page saying so; the page's help says the bounds ("It may be from 1 day to 10 years."). A setting is refused when made
+if its bound is no length of time, its shortest is longer than its longest or its default (the project's too) is longer.
+A setting without `longestTime` takes any length, as before.
+
+**Settings held fixed.** A project keeps chosen settings off the Settings page's reach: they keep the value their
+configuration gives (the project's `starting_values`, `.env`, `defaults` or their own), whatever was saved for them
+before, and `save()`, `set()`, `clear()`, `reset()` and `resetGroup()` refuse them (`SettingsRefused`, "Public address
+is fixed in this installation's configuration and cannot be changed here."), so a request made by hand changes nothing.
+A setting is named as in `.env`, a group by its key, standing for all its settings:
+
+```yaml
+cattophp:
+  settings:
+    fixed: [sign_in, APP_URL, APP_ADMIN_EMAIL]  # shown with their values, saying they are fixed
+    hidden: [MAILER_DSN]                        # fixed, and not on the page at all
+```
+
+Or in code, where the project decides as it starts, a `Settings\FixedSettingsProvider` (tag `cattophp.fixed_settings`,
+autoconfigured; added to the configuration's):
+
+```php
+final class GuardedSettings implements FixedSettingsProvider
+{
+    public function fixedSettings(): iterable { return ['sign_in', 'APP_URL']; }
+    public function hiddenSettings(): iterable { return []; }
+}
+```
+
+To leave one setting of a group open to change, name the group's others instead of the group (`AUTH_SIGNIN`,
+`AUTH_TWO_STEP` and the rest of sign-in, leaving `AUTH_SESSION_TTL`). A name that is no setting or group is refused when
+first read, saying so. On the page a fixed setting shows its value
+in a field that cannot be changed, with no Reset, its help starting "Fixed in this installation's configuration"; a
+group fixed whole has no Save and its summary says so; a hidden setting is not drawn, a group hidden whole neither, and
+its addresses answer not found. A group saved with a fixed setting in it saves the rest; one sent its fixed field
+changed is refused whole, the field saying why; sent as it is, it changes nothing.
+
+**Facts on the Settings page.** What the page shows and never changes, such as what the installation's configuration
+holds, comes from a `Settings\FactsProvider` (tag `cattophp.settings_facts`, autoconfigured; higher tag priority
+first): each `Settings\FactGroup` (a key in small letters, a heading, a sentence of explanation, its lines) of
+`Settings\Fact` (a label and a value, in words). The groups follow the settings, each a section (`#facts-<key>`) with
+its lines as a key-value list; nothing in it is a form.
+
+```php
+final class NetworkFacts implements FactsProvider
+{
+    public function settingsFacts(): iterable
+    {
+        yield new FactGroup('protected_networks', 'Protected networks',
+            'These networks are never refused. They are set in the installation\'s configuration and cannot be changed here.',
+            [new Fact('Office', '192.0.2.0/24'), new Fact('Tunnel', '198.51.100.0/24')]);
+    }
+}
+```
 
 **CattoPHP's own settings** (each a line in the starter's `.env.example` too):
 
@@ -893,9 +936,9 @@ label, a description, its settings. A `Setting` has:
 | This installation | `APP_NAME`, `APP_ORGANISATION` (optional), `APP_URL`, `APP_ADMIN_EMAIL`, `APP_TIMEZONE` (UTC), `APP_LOCALE` (en_GB) |
 | Demo or live (with `site_mode`) | `APP_SITE_MODE` (demo or live; demo), `APP_DEMO_HEADING` ("Demo mode"), `APP_DEMO_NOTICE`, `APP_DEMO_EMAIL_NOTICE` |
 | Mail | `MAILER_DSN` (secret), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (the installation's name when blank), `MAIL_REPLY_TO` |
-| Sign-in (with `sign_in`) | `AUTH_SIGNIN` (ADMIN or EVERYONE; ADMIN), `AUTH_SIGNIN_ALLOWED_EMAILS`, `AUTH_TWO_STEP` (CHOICE, ADMINS or EVERYONE; ADMINS), `AUTH_MAGIC_LINK_TTL` (30m), `AUTH_SESSION_TTL` (1d), `AUTH_REQUEST_LIMIT_EMAIL` (5), `AUTH_REQUEST_LIMIT_IP` (20), `AUTH_REQUEST_WINDOW` (15m) |
+| Sign-in (with `sign_in`) | `AUTH_SIGNIN` (ADMIN or EVERYONE; ADMIN), `AUTH_SIGNIN_ALLOWED_EMAILS`, `AUTH_TWO_STEP` (CHOICE, ADMINS or EVERYONE; CHOICE), `AUTH_MAGIC_LINK_TTL` (30m), `AUTH_SESSION_TTL` (1d without a visit, from 5 minutes to 365 days), `AUTH_REQUEST_LIMIT_EMAIL` (5), `AUTH_REQUEST_LIMIT_IP` (20), `AUTH_REQUEST_WINDOW` (15m) |
 
-Each module adds its group (8); `APP_ENV`, `APP_KEY` and the database are not settings (2.4).
+Each module adds its group (its section in `MODULES-v1.0.md`); `APP_ENV`, `APP_KEY` and the database are not settings (2.4).
 
 **The page** is 5.11. Every change is logged (`settings.changed`, `settings.reset`), a secret's without its values.
 
@@ -932,14 +975,53 @@ may sign in is emailed a link, any other gets nothing. An address or network add
 `AUTH_MAGIC_LINK_TTL`, kept as a hash; opening it shows a button, so a mail scanner uses nothing; pressing it leads to a
 one-time code where two-step is needed (set up by QR code first; checked under a lock, working once). Symfony's
 `Security::login()` finishes, renewing the session, firing its events; then `sign_in.after` or the page asked for. A
-sign-in ends when the account, loaded each request, is gone or disabled, may no longer sign in, or has lasted
-`AUTH_SESSION_TTL`.
+sign-in ends when the account, loaded each request, is gone or disabled, may no longer sign in, or the person has
+stayed away longer than `AUTH_SESSION_TTL`.
+
+**How long a sign-in lasts.** `AUTH_SESSION_TTL` is how long a person stays signed in without a visit, counted from
+their last visit: set to `30d`, they stay signed in as long as they come back within 30 days, and are signed out after
+30 days away; closing the browser does not sign them out, and there is no overall limit. Each visit that counts moves
+the end on (`SignIn\SignInLength`, at the response, so a controller's marks are seen): the sign-in's own end in the
+session (`SignInFlow::LAST_VISIT`, `SIGNED_IN_UNTIL`; `SignInFlow::endsAt()`, checked by `SignIn\SignInUserProvider` on
+every request), the kept sign-in with `sign_in.sessions` (its last seen and runs out), and the session cookie, sent
+again ending then. A shorter setting applies at once, from the last visit; a longer one from the next visit. To cost
+little the end is moved only once it would move by a hundredth of the length or more, never more than an hour
+(`SignInLength::moveEvery()`), so most requests write nothing; the end may be that much earlier than the last visit
+plus the length.
+
+**What counts as a visit** is decided in one place, `SignInLength::countsAsVisit(Request)`: every request the signed-in
+person's browser makes, a page's own refresh included, so a page left open that refreshes itself (every 15 or 30
+seconds, `@CattoPHP/page/live-status.html.twig`) keeps them signed in for as long as it stays open. A project's own
+polling counts the same way and needs nothing. (The site log still leaves a live page's refresh out, by
+`Http\LiveRefresh::notAVisit()`; that is a different question.)
+
+**The stored session and the cookie.** With `sign_in.session_lifetime` (on by default) each request's session storage
+is given the length as `gc_maxlifetime` (`SignIn\SignInLengthStorageFactory`, decorating `session.storage.factory`),
+so the session handler keeps a session that long after it was last used and its garbage collection, run with the same
+lifetime on every request, never clears it sooner; PHP's file handler has one lifetime for every session, so one
+nobody is signed in to is kept as long, holding nothing to sign anyone in with. Until someone signs in, the session
+cookie has no expiry and ends when the browser is closed (`cookie_lifetime` 0); at signing in it is sent again lasting
+the sign-in's length, and moves with each visit; signing out clears it. The cookie keeps its HttpOnly, Secure,
+SameSite, path and domain as Symfony makes them (from framework.session, `SessionCookieOptionsPass`). There is no remember-me: the session
+is the sign-in. Signing out, ending a sign-in on the Sign-in and security page, too many wrong codes and two-step work
+as before.
+
+**Which wins over `framework.yaml`.** The setting: `framework.session.cookie_lifetime` and `gc_maxlifetime` are
+overridden at run time, so take them out of `framework.yaml` (leaving them misleads whoever reads it), and keep the
+cookie's flags there (`cookie_secure: auto`, `cookie_samesite: lax`). Keep the session files where only this
+application cleans them: a project's own folder (`handler_id: session.handler.native_file`, `save_path:
+'%kernel.project_dir%/var/sessions'`), never PHP's shared folder (`handler_id: null`), where some systems' own cleaner
+removes sessions by `php.ini`'s 24 minutes whatever the application says, and not the cache folder, which a cache clear
+empties. A project that wants its framework.yaml values sets `sign_in.session_lifetime: false`; the sign-in still ends
+as the setting says. A project that starts PHP's session itself before Symfony (the PHP bridge,
+`session.storage.factory.php_bridge`) gives its own `session_start()` the length, `SignInLength::seconds()`, since PHP
+takes no session settings once a session is going.
 
 **Who may sign in** (`SignIn\SignInRules`): an administrator always (`maySignIn($account)` counts `APP_ADMIN_EMAIL`'s
 account, flagged or not); everyone when `AUTH_SIGNIN` is `EVERYONE`; else only the addresses in
 `AUTH_SIGNIN_ALLOWED_EMAILS` (separated by spaces, lines, commas or semicolons). `mayUse($email, $administrator)`, and
 `mayJoin($email)` for an address with no account yet. `mustUseTwoStep()`, `twoStepRequired($administrator)`: `EVERYONE`
-requires two-step of everyone, `CHOICE` leaves it to each, anything else (`ADMINS`) requires it of administrators.
+requires two-step of everyone, `ADMINS` of administrators; anything else (`CHOICE`, the default) of nobody.
 
 **The application's accounts** come from a `SignIn\SignInAccounts` service named in `sign_in.accounts`:
 `forEmail($email)`, `forId($id)`, each a `SignInAccount(id, email, name, administrator)` or null (none, or disabled).
@@ -1034,16 +1116,16 @@ cattophp_account:
 ```
 
 - **Two-step by choice**, where Settings does not require it (`AUTH_TWO_STEP=CHOICE`, or `ADMINS` for
-  non-administrators): set up by QR code (`/account/security/two-step`; while on, "Two-step sign-in is already on."),
+  non-administrators): set up by QR code (`/account/security/two-step`),
   off with a current or recovery code (`.../two-step/off`), new recovery codes with a current code
   (`.../recovery-codes`). A wrong code is logged (`two_step.wrong_code`, `for` "turning two-step sign-in off" or "new
   recovery codes", `signed_out: true` on the last), counted per account (`Http\Throttle`); the 5th in 15 minutes
-  (`WRONG_CODES_ALLOWED`, `WRONG_CODES_WINDOW`) ends that sign-in: "Too many wrong codes were typed on Sign-in and
-  security, so you were signed out. Sign in again to carry on." The page is `/account/security` (routes
+  (`WRONG_CODES_ALLOWED`, `WRONG_CODES_WINDOW`) ends that sign-in, saying so. The page is `/account/security` (routes
   `cattophp_account_*`; templates `@CattoPHP/account/{security,two-step,recovery-codes}.html.twig`).
 - **Sign-ins a person can see and end** (`sign_in.sessions: true`, off by default): each sign-in through CattoPHP's
   pages kept (`cattophp_sessions`) by a hash of a token in the session, with the account and address, the browser, a
-  keyed fingerprint of the network address (never the address), when it began, was last seen, runs out. Checked on each
+  keyed fingerprint of the network address (never the address), when it began, its last visit, when it runs out if
+  the person stays away (a shorter setting brought in at once). Checked on each
   request, an ended or expired sign-in signs that browser out; signing out ends it. Listed as cards (`#sign-ins
   .cl-ui-card`, three a row wide, "This browser" a badge in `.cl-ui-card-title`), End and End all others
   (`sign_in.session_ended`, `sign_in.sessions_ended`). A project keeping sign-ins through its own
@@ -1121,11 +1203,13 @@ cattophp_admin:
 - **Settings** (`/admin/settings`): each group, each setting saying where its value comes from (saved here, when, by
   whom; `.env`; its default) and what Reset goes back to; one Save a group (Enter in a field saves it); a Reset beside
   each saved one and "Reset every setting here", each its own form after the group's (`form#setting-<name>-reset`,
-  `form#settings-<group>-reset`; the button beside its field by `form=`), confirmed ("Put {Label} back to .env's value?
-  What is saved here goes.", or "its default"); a value in force that is no option drawn first, selected, kept when sent
-  back unchanged ("{value} (as .env gives it, not one of these)", or "as saved here"; an older zone name PHP knows drops
-  "not one of these"); a saved secret as 2.10 says, one no longer readable kept when left blank; a refused form back as
-  typed, why beside each field; a reader who may only look told why there are no buttons.
+  `form#settings-<group>-reset`; the button beside its field by `form=`), confirmed first; a value in force that is no
+  option drawn first, selected, saying where it comes from, kept when sent back unchanged; a saved secret as 2.10 says,
+  one no longer readable kept when left blank; a refused form back as typed, why beside each field; a reader who may
+  only look told why there are no buttons. Settings held fixed are shown and refused, hidden ones not there (5.3); the
+  project's facts follow the groups (5.3); saved settings that could not be read are said to be so first. It saves on
+  an installation with files as with a database: such a project imports the routes, signs in through CattoPHP's pages
+  with Symfony's session, and needs nothing else.
 - **Roles** (`/admin/roles`, `/new`, `/{key}`): every role, what it allows (permissions as feature cards), who holds it;
   a role given by email address (only to an existing account: a person signs in once first, as the starter's Accounts
   page shows), taken away, made, changed, deleted.
@@ -1181,6 +1265,10 @@ autocomplete="off"></label></div>`; `BotCheck::signal($request)` says why it loo
 `X-Suspect-Network` from the server in front, no browser, an outdated one, a script) or null; the controller then
 answers as usual, sending nothing. A private or loopback address is never refused.
 
+**A CSV download:** `new Http\CsvDownload('campaigns', $header, $rows, ?$day)`, streamed: UTF-8 with a byte-order mark,
+`campaigns-2026-11-13.csv`, `no-store`; words starting `=`, `+`, `-`, `@`, a tab or a carriage return get an apostrophe
+first, numbers stay numbers.
+
 **Also:** `Http\FormStamp` (`stamp()` in a hidden field, signed with `APP_KEY`; `secondsOpen()` when sent, people slower
 than scripts); `Http\Throttle::allow($action, $keys, $limit, Duration $window)` (a sliding-window limit counted by hash,
 for what sends mail for a visitor); `Http\RequestReference` (each request's reference, `K7QX-M2PA`, without 0, O, 1 or
@@ -1232,6 +1320,10 @@ and the project's own (classes implementing `Schema\SchemaStep`, tag `cattophp.s
   capitals, spaces and hyphens forgiven, or null). Not unique: keep a unique index.
 - **SVG as PNG** (`Foundation\SvgRaster`): `rsvg-convert` (`librsvg2-bin` on Debian, Ubuntu), the SVG on standard input,
   loading no file, stopped when too slow.
+- **Rows of halves** (`Ui\HalfRows::rows($blocks)`): two `width: half` blocks in a row, one after the other; others
+  alone.
+- **QR codes** (`Ui\QrCode`): `svg($text, $label)` for a page (named for a screen reader, no inline style),
+  `document($text, $title)` a file of its own with the XML declaration.
 - **Countries** (`Country\Countries`): each ISO 3166-1 code with its British English name (from intl if installed);
   `code($value)` checks one sent, `options('GB')` gives a drop-down, A to Z, the project's own first.
 - **South Africa** (`SouthAfrica\IdNumber`, `Provinces`): an ID number checked as well formed (13 digits, a real date of
@@ -1258,26 +1350,25 @@ drawing naming a symbol), `lucide(name)` (6.7). Filters: `|local_time(format)` (
 ### 6.1 The browser files
 
 `vendor/bin/cattophp-assets public` copies CattoPHP's browser files into `public/cattophp/` after each install and
-update. Every page loads, in order, Bootstrap 6's `bootstrap-reboot.min.css`, `bootstrap-grid.min.css` and
-`bootstrap-utilities.min.css` (no Bootstrap script), `cattophp/css/cattophp.css` (the components, from the theme's
-`--cl-` tokens), the application's stylesheet, the theme's; then, each with the nonce and `defer`, htmx 4
-(`htmx.min.js`), `cattophp/js/cattophp.js`, the application's scripts, the theme's.
+update. Every page loads, in order, Bootstrap 6's `bootstrap-{reboot,grid,utilities}.min.css` (no Bootstrap script),
+`cattophp/css/cattophp.css` (from the theme's `--cl-` tokens), the application's stylesheet, the theme's; then, each
+with the nonce and `defer`, htmx 4 (`htmx.min.js`), `cattophp/js/cattophp.js`, the application's scripts, the theme's.
 
 The starter lists them in `App\View\StarterPages::STYLES` and `SCRIPTS`, each address fingerprinted by its contents.
-`cattophp.js` only makes server-drawn pages easier to use (windows, menus, confirmations, the tree picker, tables sizing
-their columns, the pager fitting its row, hex colours with their swatch, live pages); a project's script reaches its
-helpers through `window.CattoPHP` (`ready`, `within`, `keepScrollerPlace`).
+`cattophp.js` only makes server-drawn pages easier to use (windows, menus, confirmations, the tree picker, tables and
+pagers that fit, hex colours with their swatch, live pages); a project's script reaches its helpers through
+`window.CattoPHP` (`ready`, `within`, `keepScrollerPlace`).
 
 ### 6.2 The components
 
-One registry (`Ui\Components`) maps each component to its template and properties: data (words, numbers, a choice from a
-fixed list, true or false, lists), never a class, attributes or markup; variable HTML goes in a slot. An unknown,
-missing required or out-of-list property is an error, as is an item's key out of place (keys in any order; the refusal
-names item and key: "option 1 lacks label"). `{{ ui('feedback.badge', {label: 'Live', tone: 'success'}) }}` draws one;
-`{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {...})} %}` draws one, filling its
-slots; `ui_field_attrs(props)` on a `form.field`'s control ties it to its help and error.
+One registry (`Ui\Components`) maps each component to its template and properties: data (words, numbers, fixed
+choices, true or false, lists), never a class, attribute or markup; variable HTML goes in a slot. An unknown, missing
+required or out-of-list property is an error, as is an item's key out of place (any order; named: "option 1 lacks
+label"). `{{ ui('feedback.badge', {label: 'Live', tone: 'success'}) }}` draws one;
+`{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {...})} %}` fills its slots;
+`ui_field_attrs(props)` ties a `form.field`'s control to its help and error.
 
-CattoPHP's 34 components (templates in `@CattoPHP/ui/`), their main properties and slots:
+CattoPHP's 38 components (`@CattoPHP/ui/`), their main properties and slots:
 
 | Component | For |
 |---|---|
@@ -1291,7 +1382,7 @@ CattoPHP's 34 components (templates in `@CattoPHP/ui/`), their main properties a
 | `form.grid` | fields: `columns` auto, 1, 2 or wide; slot `body` |
 | `form.field` | one field: `label`, `for`, `required`, `help`, `error`, `full_width`, `span`; slot `control` |
 | `form.actions` | the one action row: slots `primary_actions`, `secondary_actions` |
-| `form.picture-choice` | feature cards: `name`, `legend`, `items` (each `value`, `label`, one of `icon` (SVG from `lucide()`), `image` or `drawing`, and optional `note`, `disabled`), `selected`, `help`, `error` (under the legend, `role="alert"`, each control `aria-invalid`; ticks with `multiple`, no `list`, then need `id`), `id`, `size`, `columns` auto, 1 or 4, `form`, `multiple`, `list`, `tick_value`, `required`, `legend_hidden` |
+| `form.picture-choice` | feature cards: `name`, `legend`, `items` (`value`, `label`, one of `icon` (SVG, `lucide()`), `image`, `drawing`; optional `note`, `disabled`), `selected`, `help`, `error` (under the legend, `role="alert"`, controls `aria-invalid`; ticks with `multiple` and no `list` need `id`), `id`, `size`, `columns` auto, 1 or 4, `form`, `multiple`, `list`, `tick_value`, `required`, `legend_hidden` |
 | `form.choice`, `form.tree-select`, `form.compact-action` | a plain choice; a tree's (`name`, `items` of `value`, `label`, `depth`, `path`, optional `icon`, checked as a feature card's, `children`; `selected`); one control with its button |
 | `data.table` | the only `<table>`: `caption`, `density`, `fit` (false: meant to scroll), `stack` (true: below 768 px each row a card, labels from each cell's `data-label`, empty cells left out); slots `header`, `body`, `footer`, `empty` |
 | `data.dataset` | a list, with its search and pager if any (6.4): `name`, `heading`, `summary`, `search`, `pagination`; slots `toolbar`, `results` |
@@ -1299,6 +1390,10 @@ CattoPHP's 34 components (templates in `@CattoPHP/ui/`), their main properties a
 | `data.card-grid`, `data.card` | 4 or 5 cards to a row; `title`, `href`, `picture` round, square, wide or none (words at the start) |
 | `data.list`, `data.list-item`, `data.key-value-list` | plain lists; facts as label and value (`items`) |
 | `data.person` | a person linked to their page: `name`, `href`, `reference`, `email`, `full` (the page's own person) |
+| `data.column-chart` | columns over time: `label`, `columns` (`label`, `value`; `words`, `href`, `named`), `top`, `table`, `label_heading`, `value_heading`, `empty` |
+| `data.bar-list` | rows by one figure: `label`, `rows` (`label`, `value`; `words`, `href`, `note`), `max` (0: the largest), `empty` |
+| `data.rating` | stars of five: `count` (reviews), `average` (0 to 5), `compact`, `empty` (none yet; `''`: nothing) |
+| `feedback.countdown` | to `ends_at` (Unix time) by `now` (0: server's clock): `words` and units from `largest` (week, day), ticking by script; `until` and the moment always; gone at zero (and an ancestor with `data-cl-countdown-scope`) |
 | `feedback.badge` | a short state: `label`, `tone` (neutral, info, success, warning, danger, permanent) |
 | `feedback.notice` | `tone` (info, success, warning, danger, neutral), `heading`, `icon`, `solid`, `flash`; slot `body` |
 | `feedback.empty`, `feedback.progress` | an empty list's words (`heading`, `summary`); a bar (`value`, `min`, `max`, `label`) |
@@ -1306,21 +1401,24 @@ CattoPHP's 34 components (templates in `@CattoPHP/ui/`), their main properties a
 | `overlay.accordion-section` | opened and closed by hand: `heading`, `summary`, `open`, `icon`, `eyebrow`, `load_url` |
 | `icon` | a sprite icon: `name`, `label`, `decorative` |
 
-**`confirm`** (`action.button`, `action.link`) is the question `cattophp.js` asks by the browser's own
-`window.confirm()` when the control is pressed, Cancel stopping it; `<form data-confirm-submit="...">` asks before any
-button sends it. Without JavaScript nothing is asked. A browser check answers with
-`page.once('dialog', dialog => dialog.accept())` before the click (Playwright otherwise dismisses it).
+**Charts** size by `cl-share-N` classes; every figure is in words (the column chart's also in a table, Show the
+figures); nothing to draw shows `empty`.
 
-**A project's own components:** a `Ui\ComponentSet` service (tag `cattophp.ui_component_set`) registers components by
-name (never CattoPHP's), each with its full template name, its properties' defaults (null when required), optionally the
-values a property may take; `sharedContext()` names page values its components read (a form token); `check()` checks
-what only the project knows; `ui()` draws them. A `Ui\DrawingCheck` (tag `cattophp.ui_drawing`) says which of the
-project's drawings a feature card may show; without one, none.
+**`confirm`** (`action.button`, `action.link`): `cattophp.js` asks it by `window.confirm()` when the control is
+pressed, Cancel stopping it; `<form data-confirm-submit="...">` asks before the form is sent. Without JavaScript nothing
+is asked. A browser check accepts with `page.once('dialog', dialog => dialog.accept())` before the click (Playwright
+otherwise dismisses it).
 
-**An uploaded SVG** (`Ui\UploadedSvg::fromUpload()`, `validate()`) is well formed with nothing that runs (no script,
-event attribute, embedded document, outside link or document type with content). An icon site's file is made fit: its
-plain document type line and comments dropped, `<style>` and ids scoped to it, a one-colour icon (up to 20,000 bytes) in
-`currentColor` with no fixed size; a picture may be 200,000 bytes.
+**A project's own components:** a `Ui\ComponentSet` (tag `cattophp.ui_component_set`) registers them by name (never
+CattoPHP's), each with its template, its properties' defaults (null: required), optionally the values a property takes;
+`sharedContext()` names page values they read (a form token), `check()` checks what only the project knows; `ui()`
+draws them. A `Ui\DrawingCheck` (tag `cattophp.ui_drawing`) says which of the project's drawings a feature card may show
+(none without one).
+
+**An uploaded SVG** (`Ui\UploadedSvg::fromUpload()`, `validate()`): well formed, nothing that runs (script, event
+attribute, embedded document, outside link, document type with content). An icon site's file is made fit (plain
+document type line and comments dropped, `<style>` and ids scoped to it); a one-colour icon (to 20,000 bytes) in
+`currentColor`, no fixed size; a picture to 200,000 bytes.
 
 ### 6.3 The page frame
 
@@ -1387,19 +1485,18 @@ public function list(Request $request, Notes $notes): Response
   `from`, `to`. Only the approved sizes (25, 50, 100, 150, 250, or a list's own through `within()`) reach a query, so a
   tampered address cannot widen a page; one past the end is clamped.
 - **`Ui\Pager::payload($pagination, $list, $base, $label, $filters)`** is the pager's data (`$list` the dataset's
-  `name`, `$label` the list in words, naming the pager to a screen reader: "Notes pagination"): first, previous,
-  numbered, next and last links, the jump and the rows drop-down, each keeping `$filters` and the size, in `<list>_page`
-  and `<list>_page_size`; a row above and below the results ("26–50 of 100 · Pg 2 of 4").
-- `search` and `pagination` are optional: a list without a search box leaves out `search`, one never paged
-  `pagination`.
+  `name`, `$label` naming the pager to a screen reader: "Notes pagination"): first, previous, numbered, next and last
+  links, the jump and the rows drop-down, each keeping `$filters` and the size (`<list>_page`, `<list>_page_size`); a
+  row above and below the results ("26–50 of 100 · Pg 2 of 4").
+- `search` and `pagination` are optional (no search box; never paged).
 - **`search`** is `ds_name` (the dataset's name), `ds_label`, `ds_action` (the list's address), `ds_value` (what was
   searched), and optional `ds_push_url` (the address follows), `ds_help` (the line under the box), `ds_hidden` (other
-  fields the list depends on, by name), `ds_include` (another part of the page whose fields go too), `ds_swap`
-  (`innerMorph` where two lists share a page), `ds_morph_skip`. Search covers the whole list. The box's field look,
-  `:where(.dataset-search input[type=search])`, yields to any rule of the theme's.
-- **In place, and without JavaScript:** the box asks 300 ms after typing, as do the pager's links and jump, through
-  htmx, taking `#<name>-results` from the answer into `#<name>-region`; the controller always answers with the whole
-  page. Without JavaScript the box is a GET form with a Search button, the pager plain links and a form.
+  fields it depends on, by name), `ds_include` (another part whose fields go too), `ds_swap` (`innerMorph` where two
+  lists share a page), `ds_morph_skip`. Search covers the whole list. The box's look,
+  `:where(.dataset-search input[type=search])`, yields to any theme rule.
+- **In place, and without JavaScript:** the box asks through htmx 300 ms after typing, as do the pager's links and
+  jump, taking `#<name>-results` from the answer into `#<name>-region`; the controller always answers the whole page.
+  Without JavaScript the box is a GET form with a Search button, the pager links and a form.
 - **Table or grid** (`Ui\ListView`): the reader's choice in the address (`<list>_view`), else a cookie
   (`cl_view_<list>`), else the list's default; plain links switch.
 - A person is named with `data.person`, linked to their page. A table wider than a phone has `stack: true` (6.2).
@@ -1411,9 +1508,9 @@ public function list(Request $request, Notes $notes): Response
   fetched again and morphed (focus, scroll and typing kept, the address following, Back working); without JavaScript the
   form loads the page.
 - **Live:** `{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 15} %}` (15 for what is happening, 30
-  for figures) refreshes the page in place with Pause (only with JavaScript), holding back while the reader reads, types
-  or has something marked `data-live-hold` open (`live_held` says so). Its request carries `X-Live-Refresh` (the
-  controller calls `LiveRefresh::notAVisit($request)`); a form holding typing has `hx-morph-skip`.
+  for figures) refreshes the page in place, with Pause (JavaScript only), holding back while the reader reads, types or
+  has something `data-live-hold` open (`live_held` says so). Its request carries `X-Live-Refresh` (the controller calls
+  `LiveRefresh::notAVisit($request)`); a form holding typing has `hx-morph-skip`.
 
 ### 6.6 Trees
 
@@ -1422,6 +1519,10 @@ public function list(Request $request, Notes $notes): Response
 `assertComplete()`, `levelled()`, `heights()`. Rows are `{id, parent}` in tree order; each gives the whole new tree or
 throws `Ui\TreeMoveRefused` with a reason code; a row moves with its subtree, never into itself. No database: the
 project validates the change, saves it under a lock, words a refusal.
+
+**A list put in order by hand** (`data-cl-sortable`, one level): `@CattoPHP/page/sortable-{lines,handle,moves}.html.twig`
+(their comments say how); each move a form posting `index` (from 0), `order` (the keys shown) and `_token`, which
+`cattophp.js` sends in place on a drag, an arrow key or a press, swapping in the answer's list (`data-error`: refused).
 
 ### 6.7 Icons
 
@@ -1445,7 +1546,7 @@ decoration may sit absolutely (`::before` or `::after`, `content: ""`, `position
 
 ### 7.2 The theme package
 
-A theme is files only, in a folder named by its slug (`themes/<slug>/`) or its ZIP (package 4.0, template API 2.0):
+A theme is files only, in a folder named by its slug (`themes/<slug>/`) or a ZIP (package 4.0, template API 2.0):
 
 ```text
 theme.json   the manifest
@@ -1469,15 +1570,15 @@ public/css/*.css, public/js/*.js, public/img/..., fonts   optional, each listed 
 - `format` is the project's package format (`theme.package_format`, default `cattophp-theme`).
 - `theme`: `name`, `slug` (small letters and hyphens), `version` (1.0.0), `author`, `created_at` (ISO) and
   `description` required; `color_scheme` light (default) or dark, written on `<html>` as `data-bs-theme`.
-- `parent`: null, or `{"name", "version"}` naming one release; a child inherits from it alone (its templates searched
-  first, its files over the parent's) and is never a parent.
-- `styles`, `scripts`: extra files under `public/`, never `css/theme.css` (always loaded); `external`: HTTPS only.
+- `parent`: null, or `{"name", "version"}` naming one release; a child (its templates searched first, its files over
+  the parent's) is never a parent.
+- `styles`, `scripts`: extra files under `public/`, not `css/theme.css` (always loaded); `external`: HTTPS only.
 - `palettes` (optional): named palettes of five hex colours; Core draws the switcher, never the theme.
 
 **`base.html.twig`** declares `{% block page_content %}` (which a page-family wrapper overrides) holding
 `{% block page_body %}` (where the page renders); loads `platform.styles` and `platform.scripts` (scripts with
 `nonce="{{ csp_nonce() }}"`), then `theme.styles` and `theme.scripts`; and holds the frame (header, menu, demo notice,
-`main#cl-main.cl-main`, footer). No PHP in any template; the example is `themes/starter/base.html.twig`.
+`main#cl-main.cl-main`, footer). No PHP in any template (example: `themes/starter/base.html.twig`).
 
 **A page-family wrapper** (`pages/admin.html.twig`, for a family in `theme.page_families`) extends
 `'@theme/base.html.twig'` and draws `{{ block('page_body') }}` inside what it adds (an administration frame).
@@ -1547,8 +1648,14 @@ The starter's `App\View\StarterPages` is the example: `FAMILIES` gives each page
 family, `admin` or `content` (one unlisted is `admin` if named `admin-...`); `scalars()` gives `site`; `model()` adds
 the page's `title`, `lead`, `notices` and `current`, `site` (name, organisation, demo, the demo notice), `nav` (the
 menu, each entry's `label`, `href`, `current`), `platform.styles` and `platform.scripts` (fingerprinted addresses) and
-the identity band's values; `generator()` says "CattoPHP v0.3.0, rrcatto/cattophp-starter v1.0.0" from the installed
+the identity band's values; `generator()` says "CattoPHP v1.0.0, rrcatto/cattophp-starter v1.0.0" from the installed
 versions. Change the menu; keep the shape.
+
+**A module's pages in the menu:** a `Theme\MenuProvider` (tag `cattophp.menu`, by priority) gives `menuSections()`:
+`new MenuSection($key, $label, $icon, [MenuEntry::route($label, $route, $parameters, $permission, $icon),
+MenuEntry::address($label, '/help')])`, a later section of a key adding to it. `Theme\Menus::sections()` gives each
+section the reader may open an entry in: `key`, `label`, `icon`, `current`, `entries` (`label`, `href`, `icon`,
+`current`). `model()` adds each to `nav` as an item with `entries`, drawn as `<details data-cl-dropdown>` of links.
 
 ### 7.5 CattoPHP's own pages in the theme
 
@@ -1559,10 +1666,9 @@ security) extend `@CattoPHP/page/stock.html.twig`, filling block `page_body` whe
 (`Http\StockPages::PAGES`; `PageProject::family()`, `prepare()` and `model()` receive them), in the theme's frame with
 CattoPHP's page head, identity band, notices and the page's rows. A page on the stock frame fills `stock_main` (actions,
 if any, in `stock_actions`), its data giving `title`, `lead`, `cattophp_notices`. A project replaces one only to change
-it, at `templates/bundles/CattoPHPBundle/` (`error`, `sign_in/*`, `admin/*`, `account/*`); replacements made for 0.3.0
-still work; the starter needs none. The project's sprite must hold the icons they draw: `action-` `add`, `back`,
-`disable`, `done`, `email`, `enable`, `filter`, `generate`, `grant`, `open`, `remove`, `reset`, `revoke` and `save`, and
-the pager's and the live refresh's.
+it, at `templates/bundles/CattoPHPBundle/` (`error`, `sign_in/*`, `admin/*`, `account/*`); the starter needs none. The
+project's sprite must hold the icons they draw: `action-` `add`, `back`, `disable`, `done`, `email`, `enable`, `filter`,
+`generate`, `grant`, `open`, `remove`, `reset`, `revoke` and `save`, and the pager's and the live refresh's.
 
 ### 7.6 Making a theme of the project's own
 
@@ -1573,439 +1679,30 @@ classes, laid out by `public/css/app.css`, painted like Core's); look at every p
 
 ## 8. The optional modules
 
-### 8.1 Choosing modules
-
-The foundations are always there; each optional module is off until `enabled: true` under its name in
-`config/packages/cattophp.yaml`. A module off costs nothing: no services, settings, tasks or tables. The list is
-`Module\Modules::all()`:
-
-| Module (`cattophp.<key>`) | Needs | Works better with |
-|---|---|---|
-| The scheduler (`scheduler`) | | |
-| The setup checklist (`setup`) | the database | |
-| Site protection (`protection`) | the database, the scheduler | |
-| Telegram (`telegram`) | the database, `symfony/http-client` | the scheduler (the owner's messages each minute) |
-| An API (`api`) | the database | |
-| Documents and PDFs (`documents`) | `dompdf/dompdf` | |
-| Search engines and AI (`search`) | the database | |
-| The sign-up check (`signup`) | the database | the scheduler (the lists every day) |
-| Identity verification (`identity`) | the database, `symfony/http-client` | |
-| The Inbox (`inbox`) | the database | the scheduler (the mailbox's answers each minute) |
-| Mailing (`mailing`) | the database, `symfony/http-client` | |
-| Payments (`payments`) | `omnipay/common` and the gateway's package | |
-| Themes (`theme`) | | |
-
-At start, what the modules switched on need is checked, every problem said at once with what to do.
-`bin/console cattophp:modules` lists every module, whether it is on, what it needs and whether that is there, and its
-tables, each made or not; it fails while a problem remains. Switch a module on, run `cattophp:modules`, then
-`cattophp:migrate`. A module's task is registered only with the scheduler on, placed by `<module>.task_priority`. Some
-modules leave a part to the project's task (a daily clean-up, the mailing sender each minute), as their sections say.
-
-### 8.2 The scheduler
-
-Runs a project's tasks (`Scheduler\ScheduledTask` services, 4.7) when due, recording each run. A task never run is due;
-one with a time of day (`runsAt()`, `H:i` in the site's zone, `Scheduler::zone()`) once that time has passed since it
-last started, so a scheduler stopped then runs it on starting again; any other when `interval()` seconds have passed
-since it last started. One failing never stops the rest. Each task's last start, finish, success, failure, summary and
-error are kept (`cattophp_scheduled_jobs`, else a file). A task's place is its tag priority (`#[AsTaggedItem(priority:
-10)]`).
-
-```yaml
-scheduler:
-  enabled: true
-  command_alias: ~  # another name for cattophp:schedule:run, such as one a cron line already runs
-  log_archive:
-    enabled: false  # with folder: the nightly log archive
-    folder: ~  # such as '%kernel.project_dir%/var/log'
-    first: application.log  # the main log, listed first
-```
-
-- `bin/console cattophp:schedule:run` runs what is due once (cron every minute), or each minute with `--watch` (a
-  worker); `--job <key>` runs named tasks now. Told to stop (SIGTERM, SIGINT), it finishes the task under way, starts no
-  other and ends, where PHP can catch signals (`ScheduleRunCommand::signalsSupported()`: pcntl loaded, `pcntl_signal`
-  allowed); without pcntl a stop ends it mid-task. The starter suggests `ext-pcntl`, its kit's image installs it.
-- **Another moment, on a development site:** `--job <key> --now "2026-12-01 09:00"` (the site's zone; a date alone, its
-  midnight) or `--now "+3 days"` (from the scheduler's clock) gives `run()` that moment: a trial, its summary starting
-  "As at 2026-12-01 09:00: ", kept apart (`RunStore::tried()`: `last_trial_at`, `last_trial_ok`, `last_trial_summary`;
-  schema step `202611130300-scheduled-job-trials`), the runs untouched. Refused without `--job`, with `--watch`, for an
-  empty `--now` or no moment, and by `Scheduler::run()` (`TRIALS_REFUSED`, `trialRefused()`) off a development site
-  (kernel in debug, environment neither production nor `prod`: the constructor's last `bool $development = false`) and
-  whenever `APP_ENV` is production: "A task is run as if it were another moment only on a development site, and this
-  site's APP_ENV is production. Try it on a development site."
-  `Scheduler::run(?array $only = null, ?Closure $stopping = null, ?DateTimeImmutable $at = null)`, `moment($typed)`.
-- `Scheduler\TaskStatus`: `tasks()` (each task's last runs in words, overdue past `overdueAfter()` or not, its last
-  trial apart: `last_trial`, `trial_summary`, `trial_failed`), `lastSucceeded()`, `isOverdue()`, `words()`, for a
-  dashboard or setup step warning of a stopped task.
-- **The log archive:** the `log_archive` task, just after midnight, moves each `.log` holding anything into
-  `archive/<name>-<day>.log.gz`, starting it afresh, and deletes archives older than `LOG_ARCHIVES_KEPT_FOR` (group "Log
-  archives"; 2w unless set, a day at least).
-
-### 8.3 The setup checklist
-
-`setup: { enabled: true }`, with the database: each step a new installation needs, in order, from the project's
-`Setup\SetupStepProvider` services (`steps(SetupMarks $marks)`, by tag priority). A `Setup\SetupStep` has a key, group,
-title, purpose, where it stands, `checked` (true, false or null: whether the site finds it done), `needsYou` (a person
-marks it), its page (`href`, `link`), an optional button. A checked step is done while the site finds it so, one that
-needs you once marked (or skipped, and reopened); a step can be both. `Setup\SetupChecklist`: `steps()`, `progress()`
-(with the next step), `markDone($key, $actor, $note)`, `skip()`, `reopen()`; marks are kept (`cattophp_setup_steps`) and
-logged; what a step found is shown, secrets hidden.
-
-### 8.4 The network lookup
-
-Not a module: what an address says of a visitor, for site protection, the sign-up check and the Inbox.
-
-```yaml
-network:
-  country_database: '/var/lib/GeoIP/GeoLite2-City.mmdb'  # needs geocoder-php/geoip2-provider
-  asn_database: ~  # GeoLite2-ASN.mmdb beside it by default: the network's owner
-  geocoder: ~  # another Geocoder provider (a web service, a chain), in place of GeoIP2
-  lists_folder: '%kernel.project_dir%/var/network-lists'  # Tor, VPN, hosting and throwaway email lists
-  lookup: ~  # a project's own Network\NetworkLookup instead
-```
-
-`Network\GeoIp` gives an address's place and country through Geocoder PHP, never breaking a page;
-`Network\ReputationLists` keeps the Tor exit list (daily), X4BNet's VPN and hosting networks (MIT, weekly) and throwaway
-email domains (CC0, weekly), fetched by task `signup_lists`, never on a request; `NetworkLookup::facts($address)` gives
-the country and the network's number, name and kind (home, hosting, vpn, tor, private). Without a database or provider
-only private addresses are known. Geocoder is the chosen abstraction (providers swapped and chained by configuration),
-never bypassed.
-
-### 8.5 Site protection
-
-The Site Log of every request (written as it ends; no query string; secrets masked); flags, time-outs and lockouts (an
-address, an IPv6 /64, a range or a network owner), the lockout gate first of all, eight rules each minute (task
-`site_protection`), a form guard with a refused list of addresses and domains; a two-file link to a server firewall.
-
-```yaml
-protection:
-  enabled: true
-  secret_paths: ['/join/']  # prefixes whose next part is a secret, masked in the Site Log
-  firewall_folder: '%kernel.project_dir%/var/server-firewall'
-  visitors: ~  # Protection\VisitorAccounts; CattoPHP's sign-in by default
-  administrator_permission: PLATFORM.SETTINGS.VIEW  # whose addresses the rules spare
-  gate_listener: true
-  record_requests: true
-  forms: { sign_in: Sign in, register: Register, contact: Contact }
-  list_only_forms: [register]  # refused only by the list
-```
-
-**Settings** (group "Site protection"), each rule `on|off,count,within,flag|timeout,for`: `SITE_RULE_MISSING` (missing
-pages, `on,20,10m,timeout,1h`), `SITE_RULE_FLOOD` (`on,300,1m,timeout,10m`), `SITE_RULE_LINKS` (links for many
-addresses, `on,5,15m,timeout,1h`), `SITE_RULE_REGISTER` (`on,3,1h,flag,1h`), `SITE_RULE_TOKENS` (bad form tokens,
-`on,10,10m,timeout,1h`), `SITE_RULE_TRAP` (the hidden field, `on,1,10m,timeout,1d`), `SITE_RULE_SCRIPT`, `SITE_RULE_OLD`
-(a script, an outdated browser, `on,1,10m,flag,1h`). Then `SITE_TIMEOUT_DOUBLES` (on), `SITE_TIMEOUT_LONGEST` (1w),
-`SITE_LOCKOUT_AFTER` (`3,1w,30d`), `SITE_SPARE_ADMINISTRATORS`, `SITE_SPARE_SIGNED_IN` (flagged, never timed out),
-`SITE_SPARE_SEARCH_ENGINES` (proved ones), `SITE_NEVER_LOCK_OUT`, `SITE_LOG_KEPT_FOR` (120d), `SITE_FLAGS_KEPT_FOR`
-(1y), `SITE_FIGURES_LEAVE_OUT_ADMINISTRATORS`, `SITE_FIREWALL_LINK` (off); private addresses always spared.
-
-**The parts a project uses.**
-
-- `Protection\LockoutGate`: a timed-out or locked-out visitor gets a bare "This site is not available." first (never a
-  webhook). A project starting its own session first sets `gate_listener: false`, calling
-  `LockoutGate::beforeTheContainer($connection, $neverLockOut)->refuses(...)`.
-- `Protection\FormGuard::refuses($form, $fields, $email)` on a public form (a bot, a refused address): the usual answer,
-  nothing done.
-- `Protection\LockoutService`: `lockOut($target, $length, $why, $firewall, $actor)`, `lift()`, `markNotAProblem()`;
-  nobody locks out their own address or network owner, or one on Never lock out.
-- `Protection\SiteLog`, `Flags`, `Lockouts`, `RefusedEmails`: records the project's pages read;
-  `Protection\ProtectionRetention::run($now)`, for its daily clean-up.
-- `Protection\ServerLink`: the site appends ban and lift requests to `requests.log` and reads the server's `view.json`;
-  what runs as root is on the server, never the site.
-
-### 8.6 The sign-up check
-
-`signup: { enabled: true }`, with the database (the lists with the scheduler and `network.lists_folder`). A registration
-is judged when sent, each signal scored in words (`Signup\SignupRisk`): a blocked country 60, outside the allowed list
-30; Tor 50, VPN 30, hosting network 30; a domain receiving no mail 40, a random-looking address 10; no browser or a
-script 40; sent within 3 seconds 30; a time zone outside the address's country 15; each other sign-up from the address
-that day 20 (60 at most); a made-up looking name 20; the hidden field 100. Low is under 25, medium under 60. A throwaway
-address is refused ("Use an email address you keep."); a blocked country or a high score holds the registration, the
-person never told why, a hold meaning what the project says; every attempt is recorded.
-
-- Settings (group "Sign-up checks"): `SIGNUP_ALLOWED_COUNTRIES`, `SIGNUP_BLOCKED_COUNTRIES` (ISO codes).
-- The form carries `SignupChecks::stamp()` in `signup_opened`, the browser's time zone in `signup_time_zone` and the
-  hidden field `website`. `SignupChecks::check($form, $email, $refusal, $homeCountry, $details)` judges and records;
-  `complete($attemptId, $account, $held)`; `Signup\SignupAttempts` for the project's page. The address is `REMOTE_ADDR`,
-  never a forwarded one.
-
-### 8.7 Identity verification
-
-A check on Didit's hosted page (ID and a live selfie there, nothing uploaded here), its result by signed webhook (each
-event once) and on the person's return; an approval passed on unless under `minimum_age`; a decline told why, 3 tries
-before an administrator allows another; revoking with a reason. Kept: status, verified name, document type, number and
-country, date of birth, never an image. A live site takes no sandbox result; keyless, it is unavailable, never skipped.
-
-```yaml
-identity:
-  enabled: true
-  return_path: /account/identity/return  # the project's routes
-  webhook_path: /webhooks/didit
-  accounts: ~  # Identity\IdentityAccounts: what Didit is told of an account (its id by default)
-  approved: ~  # Identity\IdentityApproved: what happens once approved
-  minimum_age: ~
-```
-
-- Settings (a connection, 2.10): `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, `DIDIT_WEBHOOK_SECRET`;
-  `Identity\IdentitySettings` takes `.env`'s only where the catalogue lacks the setting.
-- `Identity\IdentityVerification`: `start($account)`, `returned()`, `webhook($rawBody, $headers)`, `isVerified()`,
-  `state()`, `history()`, `revoke()`, `allowAnotherTry()`, `inReview()`; `Identity\IdentityConnection`: `check()` (reads
-  the application's workflows only), `status()`, `keysSaved($before)`, `registerWebhook()`, `drop()`, `resetToEnv()`.
-
-### 8.8 The Inbox
-
-A contact form's messages as conversations (`MSG-` and a number), judged on arrival by fixed signs and a Bayesian word
-filter learning from what is marked, filed in the Inbox or Spam (the sender never told); Mark as spam, Not spam, block a
-sender, Trash, Restore, Delete forever; replies in plain text or HTML with a signature, drafts, files, the account's
-documents, threaded so answers come back, read over IMAP each minute (`inbox_mailbox`) when a mailbox is set; each
-decision logged.
-
-```yaml
-inbox:
-  enabled: true
-  reference_prefix: MSG-
-  files_folder: '%kernel.project_dir%/var'
-  documents: ~  # Inbox\InboxDocuments: an account's documents a reply may attach
-  sender: ~  # Inbox\ReplySender: CattoPHP's mailer by default
-```
-
-- Settings (group "Inbox"): `INBOX_TRASH_KEPT_FOR`, `INBOX_SPAM_KEPT_FOR`, `INBOX_KEPT_FOR`, `INBOX_SPAM_LINE`,
-  `INBOX_HOLD_BLOCKED_COUNTRIES`, `INBOX_LEARN`, `INBOX_NEVER_SPAM`, the sender (`INBOX_FROM_NAME`, `_FROM_ADDRESS`,
-  `_REPLY_TO`), replies (`INBOX_REPLY_FORMAT`, `_SIGNATURE_TEXT`, `_SIGNATURE_HTML`), notices (`INBOX_NOTIFY_EMAIL`,
-  `_NOTIFY_TELEGRAM`, `_ACKNOWLEDGE`), the mailbox (`INBOX_IMAP_HOST`, `_PORT`, `_SECURITY`, `_USER`, `_PASSWORD`).
-- The form carries `Inbox::stamp()` in `contact_opened`; the controller calls `Inbox::keep($message)`, then `arrived()`.
-  `markSpam()`, `notSpam()`, `blockSender()`, `trash()`, `restore()`, `deleteForever()`, `emptyFolder()`, `counts()`,
-  `cleanUp($now)` for the daily clean-up; `Inbox\InboxReplies` writes and sends replies. `Inbox\InboxMailbox` is a
-  connection (2.10): `check()`, `status()`, `detailsSaved($before)`, `forget()`; only a connected mailbox is read, one
-  that refused waiting for Check the connection.
-
-### 8.9 Mailing
-
-For a site sending news to account holders who agreed:
-
-- **Settings > Mailing:** the sender, the links' address, the transport: a mail server (each copy with
-  `List-Unsubscribe`, one-click `List-Unsubscribe-Post`, `List-Id`, `Feedback-ID`) or catto-mail, a smarthost with an
-  HTTP API (a send job per list, each request idempotent).
-- **catto-mail's connection** (`Mailing\CattoMail\CattoMailConnection`): Connect by its approval page (OAuth 2, PKCE),
-  key and webhook secret saved encrypted; Check the connection, Drop connection, test email; news waits while the
-  sending domain cannot send or the quota is used. Its webhook (`CattoMailWebhook::answer($signature, $body)`) keeps
-  each signed event once for the project's `CattoMail\CattoMailEventHandler` services (tag
-  `cattophp.cattomail_event_handler`).
-- **Lists and consent** (`Mailing\Consents`, `MailingLists`, `Subscriptions`): a list per subject offered (made at the
-  first yes), an administrator's (`own`: name, join link, open or closed, own sender); each answer with where given and
-  its history: `subscribe()`, `unsubscribe()`, `joinList()`, `unsubscribeList()`, `unsubscribeAll()`; **addresses never
-  emailed:** `Mailing\Suppressions`.
-- **Campaigns and copies** (`Mailing\Campaigns`, `Copies`, `Links`), sent a little each run of
-  `Mailing\CampaignSender::run()`, which the project's task calls each minute: within the sending hours and hourly
-  limit, a first day doubling, a copy skipped for an address never emailed or a person who left every list that brought
-  it, a campaign pausing itself above the bounce or complaint rate, outcomes read back.
-- **The links in a copy** (`Mailing\CopyLinks`), **Forward to a friend** (`Mailing\Forwards`: five friends a copy, ten a
-  day, on no list, "Never email me"), **the figures** (`Mailing\MailingFigures`) serve the project's pages.
-
-```yaml
-mailing:
-  enabled: true
-  project: example  # in Feedback-ID headers and catto-mail's job references
-  callback_path: /mailing/cattomail/callback
-  webhook_path: /webhooks/cattomail
-  campaign_project: ~  # Mailing\CampaignProject; without it campaigns are kept but not sent
-  recipient_addresses: ~  # Mailing\RecipientAddresses: where a mail server delivers made-up addresses
-```
-
-- Settings (group "Mailing"): `MAILING_FROM_ADDRESS`, `MAILING_FROM_NAME`, `MAILING_LINK_BASE`, `MAILING_TRANSPORT`,
-  `MAILING_DSN`, `CATTOMAIL_API_BASE_URL`, `CATTOMAIL_API_KEY`, `CATTOMAIL_WEBHOOK_SECRET`,
-  `CATTOMAIL_WEBHOOK_SECRET_PREVIOUS` (DSN, key and secrets encrypted).
-- **The project's side** (`Mailing\CampaignProject`): `audience($campaign)`, `sender()` (`SenderIdentity`),
-  `draw($campaign, $copy)` (`DrawnCopy`: subject, HTML, text, unsubscribe link, list name), `drawForFriend()`,
-  `waitsForMore()`, `rules()` (`Mailing\SendingRules`: 300 an hour, 50 the first day, a pause over 2% bounces or 0.1%
-  complaints after 20 copies, sending hours, whether opens and clicks are recorded).
-- **The discipline:** a reputation is kept by consent only and the stops, pacing and pauses above, not more sending
-  addresses.
-
-### 8.10 Telegram
-
-A bot connected at a settings page (key encrypted, never shown back; the owner's username and chat; no phone number or
-`.env` value). Messages to the owner are queued in the transaction of what happened, sent within a minute
-(`owner_messages`), so Telegram being down holds nothing up; to people (a sign-in code) at once; people connect through
-the bot's `/start` by a 10-minute single-use link, what they send read by `getUpdates` only while they may sign in with
-Telegram. No secret logged; one bot, one site.
-
-```yaml
-telegram:
-  enabled: true
-  choices: [on_sale]  # the project's own choices of what messages the owner, each on until turned off
-```
-
-`Telegram\OwnerMessages::queue($reference, $kind, $words)` (once a reference; nothing unless connected);
-`Telegram\TelegramSetup` (`view()`, `connect()`, `saveChoices()`, `sendTest()`, `dropConnection()`);
-`Telegram\TelegramConnections` (a person's `start()`, `view()`, `test()`, `dropConnection()`);
-`Telegram\TelegramMessenger::send()`. What a message says, and when, is the project's.
-
-### 8.11 An API and signed webhooks
-
-Tokens issued to accounts with a name, scopes and optional lifetime, shown once, kept as SHA-256, accepted while
-unrevoked, unexpired and the account may use the API, each use noted; a Bearer authenticator and entry point, a scope
-voter, one JSON error document, `{"error": {"status", "code", "message"}}`, never cached.
-
-```yaml
-api:
-  enabled: true
-  path: /api/
-  token_prefix: app_  # 'cat_' by default
-  scopes: { 'notes:read': 'Read notes.' }
-  all_scopes: ~
-  accounts: ~  # Api\ApiAccounts: whether an account may use the API
-```
-
-```yaml
-# security.yaml, before main:
-firewalls:
-  api:
-    pattern: ^/api/
-    stateless: true
-    provider: cattophp
-    custom_authenticators: [CattoPHP\Api\ApiTokenAuthenticator]
-    entry_point: CattoPHP\Api\ApiTokenAuthenticator
-access_control:
-  - { path: ^/api, roles: PUBLIC_ACCESS }  # the authenticator refuses a request without a good token
-```
-
-`Api\ApiTokens`: `create($accountId, $name, $scopes, $ttlSeconds, $actor)`, `tokensOf()`, `revoke()` (both logged). A
-route asks `#[IsGranted('notes:read')]` and `#[IsGranted('NOTE.VIEW')]`, `Api\ApiAccess` the same elsewhere;
-`Api\ApiProblem::response()` draws the error document. **Signed webhooks** (`Webhooks\WebhookSignature`, always there):
-`t=<time>,v1=<hex>`, the HMAC-SHA256 of `<t>.<body>`; `sign()`, `valid()` (refusing one over 300 seconds off; several
-secrets accepted, for rotating).
-
-### 8.12 Documents and PDFs
-
-Templates in a controlled language (`{{ group.name }}`, `{{#each items}}...{{/each}}`,
-`{{#if name}}...{{else}}...{{/if}}`), checked against the type's placeholders; nothing executable or fetched (no script,
-event handler, style element, remote picture or `@import`; pictures `data:` or `asset:<sha256>`); each value written by
-kind, escaped; one renderer for previews, documents and PDFs (Dompdf, remote resources, PHP and JavaScript off). An
-invalid template or ill-fitting data is an error, never a blank.
-
-```yaml
-documents:
-    enabled: true  # everything below is optional
-  fonts: ''  # a folder of the project's fonts; without it Dompdf's DejaVu Sans is used
-  families: {}  # 'Plex Sans': PlexSans reads PlexSans-Regular.ttf, -Bold, -Italic, -BoldItalic there
-  font_cache: '%kernel.project_dir%/var/dompdf-fonts'
-  images: ~  # Document\DocumentImages: stored pictures by asset:<sha256>
-```
-
-A document end to end, a note's slip:
-
-```php
-use CattoPHP\Document\{DocumentRenderer, PageSettings, PdfRenderer, PlaceholderDefinition as P, PlaceholderKind as K, PlaceholderSet};
-
-final class NoteSlip
-{
-  private const HTML = '<h1>{{ note.title }}</h1><p>Written {{ note.written }} by {{ author.name }}.</p>'
-    . '{{#if note.body}}<p>{{ note.body }}</p>{{/if}}';
-  private const CSS = 'body { font-size: 11pt; } h1 { font-size: 18pt; }';
-
-  public function __construct(private readonly DocumentRenderer $renderer, private readonly PdfRenderer $pdf) {}
-
-  public function pdf(array $note): string
-  {
-    $set = new PlaceholderSet([
-      new P('note.title', 'The title', K::Text, true),
-      new P('note.written', 'When it was written', K::Date, true),
-      new P('author.name', 'Who wrote it', K::Text, true),
-      new P('note.body', 'What it says', K::Multiline),
-    ]);
-    $document = $this->renderer->render('note-slip', 'Note slip', $set, self::HTML, self::CSS,
-      new PageSettings('A5', 'portrait', 15, 15, 15, 15),
-      ['note.title' => $note['title'], 'note.written' => new \DateTimeImmutable($note['written_at']),
-       'author.name' => $note['author'], 'note.body' => $note['body']]);
-
-    return $this->pdf->render($document);  // the PDF's bytes
-  }
-}
-```
-
-A controller answers with those bytes as `application/pdf`, `HeaderUtils::makeDisposition(DISPOSITION_ATTACHMENT, ...)`.
-
-- **The placeholder set** (`Document\PlaceholderSet($scalars, $collections)`):
-  `PlaceholderDefinition($name, $description, $kind, $required)`, named `group.name`. Kinds: `Text`, `Multiline` (breaks
-  kept), `Money` (`['minor' => 120000, 'currency' => 'ZAR']`, never a float), `Date` (a `DateTimeInterface` or
-  `YYYY-MM-DD`), `Address` (a list of lines), `Url` (http or https), `Integer`, `Percent` (a string, `"84.50"`). A
-  repeating block is a `CollectionDefinition($name, $alias, $description, $fields)`, fields named by the alias
-  (`item.title`), its data `$data[$name]`, a list of arrays by field (`['title' => ...]`).
-- **The data** is keyed by each placeholder's dotted name; a required one missing or a value of the wrong kind is an
-  error (`DocumentDataException`, each problem in words). An optional one may be null or left out, drawing nothing,
-  `{{#if}}` false (as for blank text or zero money).
-- **Page settings** (`Document\PageSettings($size, $orientation, $top, $right, $bottom, $left)`): A4, A5, Letter or
-  Legal, portrait or landscape, margins 0 to 50 whole mm.
-- **The result:** `render()` gives a `RenderedDocument` (`html`, `body`, `settings`; keep its `reference()` with an
-  issued document); `PdfRenderer::render()` the PDF's bytes, `renderPage($html, $size, $orientation)` a page set out for
-  print, `renderWithLayout()` whether a box overflowed.
-- Money in the installation's locale (`APP_LOCALE`, `en_GB` by default), dates as "6 October 2026" in its time zone
-  (5.4). A project keeps its document types, placeholders, templates and pictures; the owner edits a design in one form
-  with a live preview, never raw HTML, each save a new version.
-
-### 8.13 Search engines and AI
-
-`robots.txt` with the private paths and reasons and a group per AI crawler as a setting chooses (never shutting out
-search engines); the sitemap from the project's sources (an index past 50,000 addresses; none on a demo); `/llms.txt`;
-share pictures drawn from SVG at 1200 by 630 by `rsvg-convert`; schema.org structured data; each public page's head:
-description, canonical address (only its page number past the first), Open Graph and X's card, search results unindexed,
-", page N" after a later page's title, an administrator's own title and description per page.
-
-```yaml
-search:
-  enabled: true
-  private_paths:
-    - { why: 'Signed-in pages.', paths: [/account/, /admin/] }
-  share_pictures: '%kernel.project_dir%/var/share-pictures'
-  rsvg_convert: ~
-  llms_txt: ~  # Search\LlmsTxtContent; without one there is no llms.txt
-  site_picture: ~  # Search\DefaultSharePicture
-  cache: cache.app  # a rendered sitemap is kept an hour
-```
-
-- Settings (group "Search engines and AI"): `SEARCH_AI_CRAWLERS` (`all`; `search`, AI search in and training kept
-  out; `none`), `SEARCH_GOOGLE_CODE`, `SEARCH_BING_CODE`.
-- Extension points: `Search\SitemapSource` (tag `cattophp.sitemap_sources`: `count()`, `entries($limit, $offset)`),
-  `Search\PublicPageProvider` (tag `cattophp.public_pages`), `LlmsTxtContent` (`name()`, `summary()`, `notes()`,
-  `sections($base)`), `DefaultSharePicture` (`url($base)`, `alt()`, `type()`).
-- The project's routes serve `Search\Sitemap::document()` and `page($n)`, `RobotsTxt::document()`,
-  `LlmsTxt::document()`, `SharePictures::bytes($svg)` (made when a cover is saved).
-  `Search\PageHead::complete($page, $meta, $path, $query, $title)` gives the head, its language from the locale (5.4; no
-  `EnvironmentValues` since 1.0). `Search\StructuredData` builds nodes: nothing the page does not show, nothing on an
-  unindexed page, a rating only from approved reviews. A demo site is never indexed; redirects for changed public
-  addresses wait till a site is live.
-
-### 8.14 Payments
-
-Payment gateways through Omnipay, keys as settings, each connection from its last real check, naming no order or
-product. The project requires `omnipay/common`, the gateway's package (such as `rrcatto/omnipay-stitch-express`) and an
-HTTP client Omnipay can discover.
-
-```yaml
-payments:
-  enabled: true
-  gateways:
-    card:  # the project's name for it; its settings group is payment_card
-      omnipay: StitchExpress  # a short name or a class
-      label: Card payments
-      parameters:
-        clientId: { name: CARD_CLIENT_ID, label: Client ID }
-        clientSecret: { name: CARD_CLIENT_SECRET, label: Client secret, secret: true }
-        webhookSecret: { name: CARD_WEBHOOK_SECRET, label: Webhook secret, secret: true, optional: true }
-```
-
-`Payments\PaymentGateways`: `gateway('card')` (parameters from Settings and the request), `configured()`, `missing()`,
-`parameters()`. `Payments\GatewayConnections` (2.10): `check($gateway, $ask)` (refused while a key has no value; `$ask`,
-the project's question to the provider, gives null when the keys are accepted, else its words), `status()`,
-`connected()`, `drop()` (every key forgotten, `.env`'s too), `resetToEnv()`.
-
-### 8.15 Connections to outside services
-
-`Settings\ServiceConnections` keeps each connection's last real try by name (`didit`, a gateway's): when, whether it
-worked, what went wrong, what it learnt, a keyed fingerprint of the details (so details changed since, on the page or in
-`.env`, count as unchecked). States: `none`, `unchecked`, `failed`, `connected`.
-`record($name, $details, $connected, $error, $learnt)`, `status()`, `connected()`, `forget()`; kept in
-`cattophp_connections`. A project's own connection uses it too, its page as 2.10 says.
+The optional modules are parts a project switches on as it needs them, from the scheduler to the Campaign Marketing
+Manager. Each is described in `MODULES-v1.0.md`, the document beside this guide, whose sections keep this section's
+numbers: "Modules 8.9" is its section 8.9, Mailing.
+
+A module is off until `enabled: true` under its key in `config/packages/cattophp.yaml`, and one off costs nothing.
+Switch it on, run `bin/console cattophp:modules` (what it needs and whether that is there), then `cattophp:migrate`;
+what each needs is in Modules 8.1.
+
+- `scheduler`: runs the project's tasks when due (Modules 8.2).
+- `setup`: the steps a new installation needs, in order (Modules 8.3).
+- The network lookup, always there: what an address says of a visitor (Modules 8.4).
+- `protection`: the Site Log, flags, time-outs and lockouts (Modules 8.5).
+- `signup`: each registration judged when sent (Modules 8.6).
+- `identity`: identity checks on Didit's hosted page (Modules 8.7).
+- `inbox`: a contact form's messages as conversations, with replies (Modules 8.8).
+- `mailing`: news to account holders who agreed (Modules 8.9).
+- `telegram`: a bot for the owner's messages and sign-in codes (Modules 8.10).
+- `api`: API tokens with scopes; signed webhooks, always there (Modules 8.11).
+- `documents`: templates, documents and PDFs (Modules 8.12).
+- `search`: `robots.txt`, the sitemap, `/llms.txt`, share pictures, page heads (Modules 8.13).
+- `payments`: payment gateways through Omnipay (Modules 8.14).
+- Connections to outside services, always there: each one's last real try (Modules 8.15).
+- `marketing`: campaigns, tracking links and their figures (Modules 8.16).
+- `theme`: themes (section 7).
 
 ## 9. The checks
 
@@ -2021,8 +1718,8 @@ Every check but the browser's, in one command:
 | `composer analyse` | PHPStan at level 8 over `src`, `tests` and `install` |
 | `composer release-check` | `README.md` and `CHANGELOG.md` name `composer.json`'s version |
 
-Any PHPUnit warning, notice or deprecation fails a run; set `COMPOSER_PROCESS_TIMEOUT=0` for a long one; read PHPUnit's
-own output. The starter's tests survive a rename: they read the theme's published stylesheet and the site's name by
+Any PHPUnit warning, notice or deprecation fails a run (`COMPOSER_PROCESS_TIMEOUT=0` for a long one). The starter's
+tests survive a rename: they read the theme's published stylesheet and the site's name by
 `ApplicationTestCase::themeStylesheet()` and `appName()` (from `phpunit.xml.dist`), `PagesTest` reads the home page's
 one `h1` (its title that heading and the name), `pages.json` pins none for `/`, and `KernelTest` and `MigrateTest` check
 only that the starter's own task, tables, role and modules are there.
@@ -2030,8 +1727,8 @@ only that the starter's own task, tables, role and modules are there.
 ### 9.2 The tests and their database
 
 The tests boot their own kernels as `test`, never from `.env` (`phpunit.xml.dist` forces `APP_ENV=test`, an example
-installation, `MAILER_DSN=null://null`), on `DB_TEST_NAME`, never the site's database. Every class has its tests; a
-page's goes through the page, records made by the services it calls; mail is read with `getMailerMessages()`.
+installation, `MAILER_DSN=null://null`), on `DB_TEST_NAME`. Every class has its tests; a page's goes through the page,
+records made by the services it calls; mail is read with `getMailerMessages()`.
 
 ### 9.3 The contract checks
 
@@ -2039,8 +1736,8 @@ Rules about every use of a component are checked from the source, which a page t
 starter's `tests/Contracts/` runs them, and a project keeps them and adds its own:
 
 - **One owner for each component's markup** (`Ui\Contract\TemplateContract::duplicates($templates +
-  TemplateContract::cattophpTemplates())`): a component's classes only in its own template, `<table>`, `role="dialog"`
-  and `role="progressbar"` only by their components.
+  TemplateContract::cattophpTemplates())`): a component's classes only in its own template, `<table>` and the roles
+  `dialog`, `progressbar` and `timer` only by their components.
 - **An icon on every button** (`withoutIcon()`, `menusWithoutIcon()`); **every icon named in the sprite**
   (`namedIcons()`, `missingSymbols($named, $sprite)`), the sprite as `app:icons` writes it.
 - **The theme paints, never lays out** (`Ui\Contract\SourceAudit::themeGeometry($css, $file, $projectClasses)`, 7.1);
@@ -2059,28 +1756,25 @@ starter's `tests/Contracts/` runs them, and a project keeps them and adds its ow
 ### 9.4 The browser checks
 
 Chromium, through Playwright, opens every page signed out and as the administrator at 1440 and 390 pixels, failing on
-anything a person would see go wrong (steps: `tests/Browser/README.md`). Playwright is installed once outside the
-project (`npm install playwright`, `npx playwright install chromium`, `PLAYWRIGHT_MODULE` at its
-`node_modules/playwright`): no Node dependency.
+anything a person would see go wrong (`tests/Browser/README.md`). Playwright is installed once outside the project
+(`npm install playwright`, `npx playwright install chromium`, `PLAYWRIGHT_MODULE` at its `node_modules/playwright`).
 
 - `tests/Browser/every-page.cjs` follows every link from `pages.json`'s addresses, signed out and as the administrator
-  (a `cattophp:sign-in-link` link, then two-step set up from the key shown). Each page answers 200 (or what `pages.json`
-  expects), has no console or page error, Content-Security-Policy refusal or failed request, never scrolls sideways,
-  cuts no table cell short on a phone (`stack: true`, 6.2; a stacked cell without `data-label` fails, a `fit: false`
-  table is left alone), has every picture and icon, is served laid out by `HtmlLayout`, has one `h1`, answers the same
-  with JavaScript off.
-- **The crawl sees an empty database**, so no link reaches a page showing records: a project's own checks make them
-  through the pages and look.
+  (a `cattophp:sign-in-link` link; two-step set up from the key shown where required). Each page answers 200 (or what
+  `pages.json` expects), has no console or page error, Content-Security-Policy refusal or failed request, never scrolls
+  sideways, cuts no table cell short on a phone (`stack: true`, 6.2; a stacked cell without `data-label` fails, a
+  `fit: false` table is left alone), has every picture and icon, is served laid out by `HtmlLayout`, has one `h1`,
+  answers the same with JavaScript off.
+- **The crawl sees an empty database**: a project's own checks make records through the pages and look.
 - `pages.json` adds what links miss and what a page must show: `start`, `skip` (patterns never opened), `perPattern`,
   `pages` (each `address`, `who`, `status`, `landsOn`, `heading`, `contains`, `selectors`).
 - **A project's own checks**, `tests/Browser/checks/<name>.cjs`, each also run alone (`bin/gate <name>`, `node`): the
-  starter's `account-name.cjs` (a name refused, why beside the field; a new one saved, the old put back) and
-  `member.cjs` (a member who joins by signing in is refused the Activity log until the administrator gives her a new
-  role reading it). `tests/Browser/harness.cjs` gives settings, `signIn(browser, list)` (the administrator),
-  `signInAs(browser, email, list)` (anyone, in a context of its own; returns `{state, statePath, context, page}`),
-  `made(kind, id)` (a record the check made, noted once made), `signOut(page)`, `cleanup(statePath, cookies)`, `php()`,
-  `settle()`, `inspect()`, `layoutFaults()`. In a `finally` a check undoes through the pages what it changed, signs out,
-  calls `harness.cleanup()`.
+  starter's `account-name.cjs` (a name refused, then saved, the old put back) and `member.cjs` (one who joins is refused
+  the Activity log until given a role reading it). `tests/Browser/harness.cjs` gives settings, `signIn(browser, list)`
+  (the administrator), `signInAs(browser, email, list)` (anyone, in a context of its own; returns `{state, statePath,
+  context, page}`), `made(kind, id)` (a record the check made, noted once made), `signOut(page)`, `cleanup(statePath,
+  cookies)`, `php()`, `settle()`, `inspect()`, `layoutFaults()`. In a `finally` a check undoes through the pages what it
+  changed, signs out, calls `harness.cleanup()`.
 - **The clean-up hook**, `tests/Browser/cleanup.php`, returns
   `static function (ContainerInterface $container, array $made): array`: each `{kind, id}` noted, last first, removed
   through the application's services (never by hand in the database), a line of words each; an unknown kind throws.
@@ -2092,16 +1786,15 @@ project (`npm install playwright`, `npx playwright install chromium`, `PLAYWRIGH
   (`BROWSER_WHO=visitor`) once the administrator has two-step.
 - `tests/Browser/fixture.php`: `start <email>` lists the address in `AUTH_SIGNIN_ALLOWED_EMAILS` through Settings when
   `SignInRules::mayJoin()` says no (the gate's site). `cleanup` runs the hook, then each sign-in, last first (the listed
-  addresses put back exactly, then an account the check made deleted through `Accounts::delete()`,
-  `lastAdministrator: true`, or for an existing one only its link, sign-ins and log entries, by SQL in one transaction,
-  so the log names no check address), then the sessions. A project keeping accounts elsewhere changes `ACCOUNTS` at its
-  top, deleting through `AccountRecords::forget()`.
-- A check is judged by its exit code, a line per failure: `FAIL <who> <width> <address>: <what is wrong>`.
+  addresses put back exactly; an account the check made deleted through `Accounts::delete()`, an existing one's link,
+  sign-ins and log entries removed, so the log names no check address), then the sessions. A project keeping accounts
+  elsewhere changes `ACCOUNTS` at its top, deleting through `AccountRecords::forget()`.
+- A check is judged by its exit code, a line per failure (`FAIL <who> <width> <address>: <what is wrong>`).
 
 ### 9.5 The gate
 
-`bin/gate` runs every check in under a minute (the starter's in about 16 seconds), judged by exit codes. Once, install
-Playwright (`PLAYWRIGHT_MODULE`) and let the `.env` database user make databases (`ALTER ROLE <user> CREATEDB`). The
+`bin/gate` runs every check in under a minute (the starter's in about 16 seconds). Once, install Playwright
+(`PLAYWRIGHT_MODULE`) and let the `.env` database user make databases (`ALTER ROLE <user> CREATEDB`). The
 gate checks what it needs (node, Playwright, PHP 8.5.12+, Composer, that right), makes two databases, runs `composer qa`
 on one and, beside it, the crawl on the other (every table made, served by PHP's web server on a free 127.0.0.1 port as
 the tests' installation), then the project's checks by name, one after another, each step `check-<name>` into
@@ -2116,15 +1809,14 @@ PHP and Composer command, such as a container sharing the project's folder and n
 PHP_RUN='podman run --rm -i --init --network host --userns=keep-id -v "$PWD:$PWD" -w "$PWD" -e HOME=/tmp example/php:8.5' bin/gate
 ```
 
-`GATE_OUTPUT` then lies in the shared folders. The gate runs only `composer qa` through Composer, so the project's
-folder is its one mount; a `composer install` there with CattoPHP from `../cattophp` (1.5) also needs
-`-v "$PWD/../cattophp:$PWD/../cattophp"`. A release is made only if the gate passes.
+`GATE_OUTPUT` then lies in the shared folders; the project's folder is the one mount (and CattoPHP's beside it, 1.5,
+when taken from there). A release is made only if the gate passes.
 
 ### 9.6 While building, and before a release
 
-While building: the tests of what changed (`vendor/bin/phpunit --filter NoteTest`), PHPStan when PHP changed, Twig lint
-when templates did (`bin/console lint:twig templates themes`), contract checks it could break, its pages' browser
-checks. Before a release: the whole gate from a cleared cache, and the dependency checks (2.14).
+While building: the tests of what changed (`vendor/bin/phpunit --filter NoteTest`), PHPStan, Twig lint
+(`bin/console lint:twig templates themes`), the contract checks it could break, its pages' browser checks. Before a
+release: the whole gate from a cleared cache, and the dependency checks (2.14).
 
 ## 10. Deploying
 
@@ -2147,15 +1839,15 @@ checked. A database holding tables is emptied only once the username is typed.
 
 ### 10.1 The rootless Podman kit
 
-A pod of three containers behind the server's own web server, which keeps ports 80 and 443 and the certificate: `web`
+Three containers behind the server's own web server (ports 80 and 443, the certificate): `web`
 (unprivileged nginx, pinned: serves the release's `public/`, passes pages to PHP, gzips text with
 `gzip_http_version 1.0`, has browsers keep `css`, `js`, `img`, `themes`, `cattophp`, `vendor` 30 days, runs only
 `index.php`), `php` (PHP-FPM from `Containerfile`, PHP pinned) and `scheduler` (the same image, `--watch`). PHP runs as
-the site's user, the code read-only, so a break-in cannot change it or reach the user's keys, cron or other sites.
+the site's user over read-only code, so a break-in cannot change it or reach the user's keys, cron or other sites.
 PostgreSQL and mail stay on the server, whose `127.0.0.1` the pod reaches at `10.0.2.2` (slirp4netns).
 
-**The server needs** systemd, Podman 4.4+, `slirp4netns`, Git, curl; PostgreSQL 13+ on 127.0.0.1 with password sign-ins;
-a mail server; a web server with the site's certificate.
+**The server needs** systemd, Podman 4.4+, `slirp4netns`, Git, curl; PostgreSQL 13+ on 127.0.0.1 with passwords; a mail
+server; a web server with the site's certificate.
 
 **The steps**, for an application `notes` run by account `notes`:
 
@@ -2175,7 +1867,7 @@ a mail server; a web server with the site's certificate.
    }
    ```
 
-   A control panel rewriting the block may drop the `X-Forwarded-For` line: put it back.
+   A control panel rewriting the block may drop the `X-Forwarded-For` line.
 2. As the site's user: `bash notes-podman.sh install --port 8081`: the newest tag copied, the image built, packages
    installed without the development ones, the settings asked (`10.0.2.2` offered for `DB_HOST`, `smtp://10.0.2.2:25`
    for `MAILER_DSN`), the database checked, the install scripts, `cattophp:migrate`, the cache and `cattophp:modules`
@@ -2212,15 +1904,12 @@ PHP-FPM as the site's account, giving PHP `$realpath_root` so a release is never
 
 ### 10.3 After an install or update
 
-- `APP_ENV` is what it was (`development` for a new site): say so.
-- `cattophp:modules` passes and the scheduler runs.
-- A test email goes through the site's real transport (`cattophp:test-email`).
-- The site answers at its address, signed out and in.
+`APP_ENV` is what it was (`development` for a new site): say so; `cattophp:modules` passes and the scheduler runs; a
+test email goes through the real transport (`cattophp:test-email`); the site answers, signed out and in.
 
 ## 11. Releasing
 
-Nothing here is done without the owner's word (2.1). When the owner says to push, it is done at once: the gate takes
-minutes, and a push asked for is never held for hours.
+Nothing here is done without the owner's word (2.1). A push the owner asks for is done at once: the gate takes minutes.
 
 ### 11.1 Release notes are complete
 
@@ -2234,7 +1923,7 @@ installation kind's update steps; the CattoPHP version required. `README.md` nam
 ### 11.2 The privacy audit
 
 Before any commit and push, 2.2's checks: `git diff --cached --name-only` shows only the project's files, nothing names
-an installation (a person, an address, a secret too).
+an installation.
 
 ### 11.3 Tags and releases
 
@@ -2257,4 +1946,4 @@ schema steps); raise the requirement in `composer.json` for a new minor or major
 record it under the project's Unreleased with the CattoPHP version required.
 
 A change the project needs in CattoPHP is made there, released at the owner's word and taken by updating, never
-patched in the project's `vendor/` or copied into it.
+patched in `vendor/` or copied.

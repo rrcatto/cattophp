@@ -20,8 +20,9 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
  * switches it on (`cattophp.sign_in.sessions: true`). Each sign-in is kept among CattoPHP's sign-ins (Sessions\SessionStore,
  * the table cattophp_sessions with a database) by the hash of a token held in the visitor's session: who signed in, with
  * which address, in which browser, from where (a keyed fingerprint of the network address, never the address), when it
- * began, was last seen and runs out (AUTH_SESSION_TTL after it began). Every request checks it (SignInUserProvider), so a
- * sign-in ended here, or run out, signs that browser out at its next page. The account page lists them with End and End
+ * began, was last visited and runs out (AUTH_SESSION_TTL after that visit if the person stays away: each visit that
+ * counts moves it on, SignInLength::countsAsVisit(), and a shorter setting brings it in at once). Every request checks
+ * it (SignInUserProvider), so a sign-in ended here, or run out, signs that browser out at its next page. The account page lists them with End and End
  * all others.
  *
  * Off by default: a project that keeps its sign-ins itself through the session store (one with sign-in pages of its own)
@@ -32,7 +33,10 @@ final class SignInSessions
     /** Where the visitor's session holds the token its sign-in is kept by. */
     public const TOKEN = '_cattophp_sign_in_session';
 
-    /** How seldom a sign-in's last-seen time is written, in seconds: often enough to say when, seldom enough to cost nothing. */
+    /**
+     * How seldom a sign-in's last-seen time was written, in seconds. It is now written with each visit that moves the
+     * sign-in's end (SignInLength::moveEvery()), and this is no longer used.
+     */
     public const SEEN_EVERY = 300;
 
     /** The longest browser description kept. */
@@ -63,21 +67,34 @@ final class SignInSessions
     }
 
     /**
-     * Whether this browser's sign-in is still going for the account: kept, not ended, not run out. Notes that it was seen,
-     * at most every SEEN_EVERY seconds.
+     * Whether this browser's sign-in is still going for the account: kept, not ended, not run out (endsAt()). Writes
+     * nothing: a visit is noted by visited().
      */
     public function holds(SessionInterface $session, string $accountId): bool
     {
         $current = $this->current($session);
-        if ($current === null || $current->accountId !== $accountId) {
-            return false;
-        }
-        $now = $this->now();
-        if ($now->getTimestamp() - $current->lastSeenAt->getTimestamp() >= self::SEEN_EVERY) {
-            $this->store->touch($current->id, $now, $current->expiresAt);
-        }
 
-        return true;
+        return $current !== null && $current->accountId === $accountId && $this->endsAt($current) > $this->now();
+    }
+
+    /** A visit that counts, at $at: this browser's sign-in was last seen then and now runs out at $ends. */
+    public function visited(SessionInterface $session, DateTimeImmutable $at, DateTimeImmutable $ends): void
+    {
+        $current = $this->current($session);
+        if ($current !== null) {
+            $this->store->touch($current->id, $at, $ends);
+        }
+    }
+
+    /**
+     * When a sign-in runs out if the person stays away: as kept at their last visit, or sooner where the setting has
+     * since been shortened (that visit and the length now).
+     */
+    public function endsAt(SignInSession $signIn): DateTimeImmutable
+    {
+        $shorter = $this->settings->duration('AUTH_SESSION_TTL')->after($signIn->lastSeenAt);
+
+        return $shorter < $signIn->expiresAt ? $shorter : $signIn->expiresAt;
     }
 
     /** This browser's sign-in, while it is going. */
@@ -91,7 +108,9 @@ final class SignInSessions
     /** @return list<SignInSession> the account's sign-ins still going, the newest first */
     public function of(string $accountId): array
     {
-        return $this->store->activeFor($accountId, $this->now());
+        $now = $this->now();
+
+        return array_values(array_filter($this->store->activeFor($accountId, $now), fn (SignInSession $signIn): bool => $this->endsAt($signIn) > $now));
     }
 
     /** Ends one of the account's sign-ins by its public id: whether one was going. Never another account's. */

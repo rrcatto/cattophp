@@ -1,0 +1,9 @@
+{#
+	A benefits section's fields: a heading and words, and up to twelve benefits, each a card with a title and a short
+	explanation.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' %}
+{% include '@CattoPHP/marketing/landing/forms/rows.html.twig' with {rows_legend: 'Benefits', rows_help: 'Each benefit is a card with a title and a short explanation.', rows_most: form.limits.items, rows_spare: form.limits.spare,
+	first: {key: 'title', label: 'Benefit', max: form.limits.title, prose: false}, second: {key: 'text', label: 'Explanation', max: form.limits.explanation, prose: true}} %}
+{% endblock %}{% endembed %}

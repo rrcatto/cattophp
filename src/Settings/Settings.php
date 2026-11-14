@@ -21,6 +21,11 @@ use Throwable;
  * which overrides .env too; one that cannot be blank takes its default when left blank. A secret is stored encrypted and decrypted only
  * when the code asks for it; a secret left blank on the page keeps the one there is. Every change is in the activity
  * log with its old and new values, and a secret's change without them.
+ *
+ * A setting the installation holds fixed (FixedSettings: its configuration, or a project's FixedSettingsProvider) keeps
+ * the value its configuration gives, whatever was saved for it before, and is refused by every way of changing one: save,
+ * set, clear and reset. A length of time with a longest value is read as that longest when .env (or anything saved
+ * before the bound was set) gives one longer.
  */
 final class Settings
 {
@@ -45,6 +50,7 @@ final class Settings
         private readonly EnvironmentValues $environment,
         private readonly ActivityLog $activity,
         private readonly ClockInterface $clock,
+        private readonly ?FixedSettings $fixed = null,
     ) {
     }
 
@@ -59,13 +65,58 @@ final class Settings
         return $this->store->isWritable();
     }
 
+    /**
+     * Why what the Settings page saved could not be read (a damaged or unreadable file), in plain words, or null. While
+     * there is one, every setting has its starting value.
+     */
+    public function readProblem(): ?string
+    {
+        $this->overrides();
+
+        return $this->store instanceof SettingsStoreProblem ? $this->store->readProblem() : null;
+    }
+
+    /** Whether the installation holds the setting fixed, so it keeps its configuration's value and is never changed here. */
+    public function isFixed(string $name): bool
+    {
+        $this->catalogue->setting($name);
+
+        return $this->fixed !== null && $this->fixed->isFixed($this->catalogue, $name);
+    }
+
+    /** Whether the setting is fixed and left off the Settings page altogether. */
+    public function isHidden(string $name): bool
+    {
+        $this->catalogue->setting($name);
+
+        return $this->fixed !== null && $this->fixed->isHidden($this->catalogue, $name);
+    }
+
+    /** Whether every setting of the group is fixed. */
+    public function groupIsFixed(string $groupKey): bool
+    {
+        foreach (array_keys($this->catalogue->group($groupKey)->settings) as $name) {
+            if (!$this->isFixed($name)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** What a refusal of a fixed setting says. */
+    public static function fixedWords(string $label): string
+    {
+        return sprintf('%s is fixed in this installation\'s configuration and cannot be changed here.', $label);
+    }
+
     /** The value in force. A stored secret that can no longer be decrypted is an error, never a quiet fallback. */
     public function get(string $name): string
     {
         $setting = $this->catalogue->setting($name);
         $stored = $this->overrides()[$name] ?? null;
         if ($stored !== null) {
-            return $stored->secret ? $this->cipher->decrypt($stored->value) : $stored->value;
+            return $stored->secret ? $this->cipher->decrypt($stored->value) : self::bounded($setting, $stored->value);
         }
 
         return $this->inherited($setting);
@@ -109,6 +160,19 @@ final class Settings
         $this->catalogue->setting($name);
 
         return isset($this->overrides()[$name]);
+    }
+
+    /** Whether .env's value (or a value saved before) is longer than the setting's longest, so the longest applies. */
+    public function isCutToLongest(string $name): bool
+    {
+        $setting = $this->catalogue->setting($name);
+        if ($setting->longestTime === null || $setting->secret) {
+            return false;
+        }
+        $stored = $this->overrides()[$name] ?? null;
+        $given = $stored !== null ? $stored->value : $this->environment->get($name);
+
+        return $given !== '' && self::bounded($setting, $given) !== $given;
     }
 
     /** Where the value in force comes from: settings, env or default. */
@@ -158,9 +222,19 @@ final class Settings
             throw new SettingsRefused(['' => 'This installation keeps its settings in .env: change them there.']);
         }
         $group = $this->catalogue->group($groupKey);
+        if ($this->groupIsFixed($groupKey)) {
+            throw new SettingsRefused(['' => self::fixedWords($group->label)]);
+        }
         $values = [];
         $errors = [];
         foreach ($group->settings as $name => $setting) {
+            if ($this->isFixed($name)) {
+                // Never changed here: one sent all the same, other than as it is, is refused.
+                if (array_key_exists($name, $input) && !$this->sentAsItIs($setting, $input[$name])) {
+                    $errors[$name] = self::fixedWords($setting->label);
+                }
+                continue;
+            }
             try {
                 $values[$name] = $this->checked($setting, $input[$name] ?? null);
             } catch (InvalidArgumentException $refused) {
@@ -193,6 +267,7 @@ final class Settings
             throw new SettingsRefused(['' => 'This installation keeps its settings in .env: change them there.']);
         }
         $setting = $this->catalogue->setting($name);
+        $this->refuseFixed($setting);
         try {
             $value = $this->checked($setting, $typed);
         } catch (InvalidArgumentException $refused) {
@@ -226,10 +301,11 @@ final class Settings
         return true;
     }
 
-    /** Removes one override, so .env, else the default, applies again. */
+    /** Removes one override, so .env, else the default, applies again. A fixed setting is refused. */
     public function reset(string $name, ?Actor $actor = null): void
     {
         $setting = $this->catalogue->setting($name);
+        $this->refuseFixed($setting);
         if (!isset($this->overrides()[$name])) {
             return;
         }
@@ -250,6 +326,7 @@ final class Settings
             throw new SettingsRefused(['' => 'This installation keeps its settings in .env: change them there.']);
         }
         $setting = $this->catalogue->setting($name);
+        $this->refuseFixed($setting);
         $before = $this->safely($name);
         if ($this->inherited($setting) === '') {
             if (isset($this->overrides()[$name])) {
@@ -264,11 +341,40 @@ final class Settings
         }
     }
 
-    /** Removes every override of a group. */
+    /** Removes every override of a group but its fixed settings'; a group fixed whole is refused. */
     public function resetGroup(string $groupKey, ?Actor $actor = null): void
     {
-        foreach (array_keys($this->catalogue->group($groupKey)->settings) as $name) {
-            $this->reset($name, $actor);
+        $group = $this->catalogue->group($groupKey);
+        if ($this->groupIsFixed($groupKey)) {
+            throw new SettingsRefused(['' => self::fixedWords($group->label)]);
+        }
+        foreach (array_keys($group->settings) as $name) {
+            if (!$this->isFixed($name)) {
+                $this->reset($name, $actor);
+            }
+        }
+    }
+
+    /** @throws SettingsRefused when the setting is fixed */
+    private function refuseFixed(Setting $setting): void
+    {
+        if ($this->isFixed($setting->name)) {
+            throw new SettingsRefused([$setting->name => self::fixedWords($setting->label)]);
+        }
+    }
+
+    /** Whether what a form sent for a fixed setting is the value in force (or a secret left blank), so changes nothing. */
+    private function sentAsItIs(Setting $setting, mixed $typed): bool
+    {
+        if ($setting->secret && ($typed === null || (is_string($typed) && trim($typed) === ''))) {
+            return true;
+        }
+        try {
+            $value = $this->checked($setting, $typed);
+
+            return $value === null || $value === $this->get($setting->name);
+        } catch (Throwable) {
+            return false;
         }
     }
 
@@ -336,8 +442,20 @@ final class Settings
             SettingType::Switch => in_array(strtolower($env), self::TRUE, true) ? 'true' : 'false',
             SettingType::Choice => self::choiceKey($setting, $env) ?? $env,
             SettingType::TimeZone => Installation::timeZoneName($env) ?? $env,
+            SettingType::Duration => self::bounded($setting, $env),
             default => $env,
         };
+    }
+
+    /** A length of time longer than the setting's longest, read as the longest; anything else as it is. */
+    private static function bounded(Setting $setting, string $value): string
+    {
+        if ($setting->type !== SettingType::Duration || $setting->longestTime === null || !Duration::isValid($value)) {
+            return $value;
+        }
+        $longest = Duration::parse($setting->longestTime);
+
+        return Duration::parse($value)->lengthInSeconds() > $longest->lengthInSeconds() ? $longest->text : $value;
     }
 
     /** The choice a value names, whatever its case and spaces around it, as the choice's own key; null for none. */
@@ -417,6 +535,12 @@ final class Settings
                 throw new InvalidArgumentException(sprintf('%s must be at least %s.', $setting->label, $shortest->words()));
             }
         }
+        if ($setting->longestTime !== null) {
+            $longest = Duration::parse($setting->longestTime);
+            if ($length->lengthInSeconds() > $longest->lengthInSeconds()) {
+                throw new InvalidArgumentException(sprintf('%s must be at most %s.', $setting->label, $longest->words()));
+            }
+        }
 
         return $length->text;
     }
@@ -452,7 +576,8 @@ final class Settings
     {
         $now = $this->clock->now()->getTimestamp();
         if ($this->overrides === null || $now - $this->readAt >= self::FRESH_FOR) {
-            $this->overrides = array_filter($this->store->all(), fn (string $name): bool => $this->catalogue->has($name), ARRAY_FILTER_USE_KEY);
+            // What was saved for a setting now fixed is passed over: the configuration's value applies.
+            $this->overrides = array_filter($this->store->all(), fn (string $name): bool => $this->catalogue->has($name) && !$this->isFixed($name), ARRAY_FILTER_USE_KEY);
             $this->readAt = $now;
         }
 

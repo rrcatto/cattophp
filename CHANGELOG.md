@@ -2,6 +2,494 @@
 
 What each version of CattoPHP brought, newest first.
 
+## 1.0.1 · 14 November 2026
+
+**Breaking change**
+
+- Two-step sign-in is each person's choice by default. `AUTH_TWO_STEP` keeps its three choices, `CHOICE` (each person's
+  choice), `ADMINS` (required of administrators) and `EVERYONE` (required of everyone), but when `.env` gives nothing, or
+  a value that is none of the three, it is now `CHOICE` (it was `ADMINS`): the setting's own default in
+  `Settings\FoundationSettings` is `CHOICE`, and `SignIn\SignInRules::twoStepRequired()` reads any other value as
+  `CHOICE`, requiring it of nobody. A choice saved on the Settings page is kept, and its Reset goes back to `.env`'s
+  value, else `CHOICE`. Administrators are no longer asked to set up two-step sign-in at their next sign-in unless the
+  setting says so; they set it up on their Sign-in and security page when they choose.
+
+**On a project's servers:** a project relying on the old default (administrators made to set up two-step sign-in, with
+no `AUTH_TWO_STEP` in `.env`) sets `AUTH_TWO_STEP=ADMINS` in `.env`, or `ADMINS` in its `cattophp.defaults`, or saves
+Required of administrators at Settings > Sign-in. Nothing else changes: no schema step, no new `.env` key.
+
+**Added**
+
+- The Settings page saves on an installation without a database. With `storage.type: files`, what it saves is kept in
+  `settings.json` in the storage folder (`Settings\FileSettingsStore`, in place of `MemorySettingsStore(false)`),
+  readable by the application's account alone (folder 0700, file 0600), written whole to a file beside it and put in
+  place under `settings.json.lock`, a secret encrypted as in the database; `Settings::canSave()` is true, Reset works
+  and each change is in the activity log. A file that cannot be read never stops the application: every setting has
+  its starting value, the fault is logged once, `Settings::readProblem()` and the page say so (the new
+  `Settings\SettingsStoreProblem`), and the next save puts the file aside (`settings.json.damaged-<when>`) and starts
+  afresh; a save that cannot be written is refused in words. Until something is saved there is no file and every value
+  is as before. A `storage.folder` inside `ui.public_root` is refused when the container is built.
+- Settings held fixed: `cattophp.settings.fixed` (shown on the Settings page with their values, saying they are fixed)
+  and `cattophp.settings.hidden` (left off it), each a list of settings by name (`APP_URL`) or groups by key
+  (`sign_in`), and `Settings\FixedSettingsProvider` (tag `cattophp.fixed_settings`, `ServiceTags::FIXED_SETTINGS`;
+  `fixedSettings()`, `hiddenSettings()`) for a project that decides in code; gathered by `Settings\FixedSettings`. A
+  fixed setting keeps its configuration's value whatever was saved for it before, and `Settings::save()`, `set()`,
+  `clear()`, `reset()` and `resetGroup()` refuse it ("... is fixed in this installation's configuration and cannot be
+  changed here."), so a request made by hand changes nothing; `isFixed()`, `isHidden()`, `groupIsFixed()`. On the page
+  a fixed field cannot be changed and has no Reset, a group fixed whole no Save; a hidden setting is not drawn and a
+  group hidden whole answers not found.
+- Facts on the Settings page: a `Settings\FactsProvider` (tag `cattophp.settings_facts`, `ServiceTags::SETTINGS_FACTS`;
+  `settingsFacts()`) gives `Settings\FactGroup`s (key, heading, explanation, lines) of `Settings\Fact`s (label, value),
+  drawn after the settings, each a section `#facts-<key>` with a key-value list, never a form.
+- A longest length of time: `Setting`'s `longestTime` (in Duration's notation, beside `shortest`), refused on save
+  ("How long a sign-in lasts must be at most 365 days."), a starting value beyond it read as the longest with the page
+  saying so (`Settings::isCutToLongest()`), its bounds in the field's help. Checked when a setting is made. Settings
+  without one are unaffected. `AUTH_SESSION_TTL` takes from 5 minutes to 365 days.
+- `SignIn\SignInLength` and `SignIn\SignInLengthStorageFactory`: how long a sign-in lasts governs the browser's session
+  (below, Changed); `sign_in.session_lifetime` (true by default) switches the session part off.
+
+- Two components, `data.column-chart` (amounts over time as columns, one for each slice of a period: `label`, `columns`
+  of `label`, `value` and optionally `words`, `href`, `named`; about six named beneath, half of them on a phone; the
+  same figures in a table under Show the figures; `empty` when every column is nothing) and `data.bar-list` (things
+  compared by one figure: `label`, `rows` of `label`, `value` and optionally `words`, `href`, `note`; bars against the
+  largest or against `max`). Lengths are `cl-share-N` classes, never a style; every figure is in words, to a screen
+  reader too; the bars show with the system's own colours forced. Their classes are in
+  `Ui\Contract\TemplateContract::OWNERS`, so a page drawing its own copy is found. The column chart comes from
+  CattoLMS's money-in and emails-sent charts, the bar list from its distribution chart. No theme needs a change.
+- Two components, `data.rating` (stars out of five, the mean to one decimal and how many reviews it comes from:
+  `count`, `average` from 0 to 5, `compact`, and `empty`, said when there are none, `''` drawing nothing; the same as one
+  sentence for a screen reader, "Rated 4.6 out of 5 from 128 reviews") and `feedback.countdown` (to `ends_at`, a Unix
+  time, by the server's clock, `now` 0 being the clock now: `words`, the time left from `largest`, week or day, down to
+  the seconds, then `until` with the moment in the site's time zone; the time left is drawn hidden, and `cattophp.js`
+  shows it and keeps it ticking from the server's time, so a page without JavaScript says only the moment, never a count
+  that has stopped; nothing once the moment has passed, and at zero the script takes it away, or the element around it
+  marked `data-cl-countdown-scope`; `role="timer"` with `aria-live="off"`). Their classes (`cl-rating-summary`,
+  `cl-ui-countdown`) and `role="timer"` are in `Ui\Contract\TemplateContract`, so a page drawing its own copy is found.
+  The rating comes from CattoLMS's rating summary, with the same markup and `cl-rating-*` classes; the countdown from
+  its site notification's.
+- A list put in order by hand: `data-cl-sortable` in `cattophp.js`, with `@CattoPHP/page/sortable-lines.html.twig` (the
+  keys' help, the status line and the error line), `sortable-handle.html.twig` and `sortable-moves.html.twig` (Move to
+  top, Move up, Move down, Move to bottom, each a form posting `index`, the row's place after the move from 0, `order`,
+  the rows' keys as shown, and `_token`, so the list is put in order without JavaScript or a pointer). With JavaScript a
+  row is dragged by its handle, moved by the arrow keys, Home and End on it, or by its buttons, without a page load: the
+  move shows at once and the server's answer (the list alone or the whole page, found by the list's id, its
+  `data-error` holding a refusal) is swapped in; when the request fails the list as it was comes back. The event
+  `cattophp:sortable-saved` follows each move. From CattoLMS's flat use of its sortable tree. The buttons name the icons
+  `action-move-top`, `action-up`, `action-down` and `action-move-bottom`, the handle `action-drag`: a project's sprite
+  needs them.
+- `Ui\HalfRows::rows($blocks)`: blocks put in rows by their width, two half blocks one after the other side by side
+  and any other block alone (from CattoLMS's `Support\HalfRows`, with its test).
+- The layout of landing pages and their editor in `cattophp.css`, from CattoLMS's: `cl-landing-*` (the hero, the
+  sections in rows of halves, checklists, benefits, questions and answers, the call to action; the editor's fixed hero
+  row, address, repeated rows, a section's width and the drawing of the page beside the list), `cl-page-sketch` (a cell
+  for each section, `data-accent` marking those that sell) and `cl-width-choice` (Half and Full width as two small
+  feature cards side by side however narrow). A theme paints them.
+- `Http\CsvDownload`, a streamed response for Download as CSV: `new CsvDownload('campaigns', $header, $rows, ?$day)`,
+  rows any iterable written as they come; UTF-8 with a byte-order mark; `Content-Disposition: attachment` named
+  `campaigns-2026-11-13.csv` (the name made safe, the day added); `Cache-Control: no-store`; a cell of words starting
+  with `=`, `+`, `-`, `@`, a tab or a carriage return written after an apostrophe so a spreadsheet never runs it, numbers
+  left as numbers, true and false as Yes and No.
+- A module's pages join a project's menu: `Theme\MenuProvider` (tag `cattophp.menu`, `ServiceTags::MENU`,
+  autoconfigured) gives `menuSections()`, each a `Theme\MenuSection` (key, label, icon, entries) of `Theme\MenuEntry`s
+  (`MenuEntry::route()` or `MenuEntry::address()`, each with the permission it needs, if any, and an optional icon).
+  `Theme\Menus::sections()` (always wired, nothing to do without a provider) gives, for the person signed in, each
+  section with an entry they may open, as plain arrays (`key`, `label`, `icon`, `current`, `entries` of `label`, `href`,
+  `icon`, `current`), in tag priority order, the entry closest to the page's path current; a later section with the same
+  key adds its entries to the first. A `PageProject::model()` adds them to its navbar as drop-downs (guide, 7.4).
+- A new optional module, the Campaign Marketing Manager (`cattophp.marketing`, needs the database; its pages below): campaigns (`Marketing\Campaigns`: the list with its status filter, search and sort; make, change, copy,
+  activate, pause, archive, restore, delete only one never published nor opened; the offers each promotes; its history
+  from the activity log), their adverts with a picture checked as a JPEG, PNG or WebP by what it holds (`Adverts`,
+  `Pictures`), publications with a code suggested from the channel (`Publications`: `fb1`, `fb2`), other spend
+  (`Spend`), the channels (`Channels`, twelve to start), the visitors and each opening of a tracking link (`Visitors`,
+  `Touches`), the tracking links themselves (`TrackingLinks` and the public `Marketing\Pages\TrackingLinkController`,
+  routes in `config/routes/marketing_links.php`: `/c/{campaign}` with `?src=` and UTM tags, and
+  `/c/{campaign}/{publication}`), and the figures (`CampaignFigures`: clicks, unique visitors, repeat visits, openings
+  set aside, spend, in total and by campaign, channel, publication, advert, place, country and day, and what needs
+  attention). A link records the touch and forwards with 302; only a person gets a visitor and a first-party cookie
+  holding a random token; a link preview or bot is recorded and set aside; a repeat within the same visit is not a new
+  click; a browser asking not to be tracked is counted with its country alone; a paused or ended campaign still
+  forwards; a failure while recording never stops the visitor. What a project sells and how it names people, orders,
+  promotions and money comes in through `Marketing\MarketingProject` (`marketing.project`; `Marketing\NoProject`
+  otherwise). Settings (group "Campaign Marketing Manager"): `MARKETING_VISITOR_REMEMBERED`,
+  `MARKETING_SALE_COUNTS_WITHIN`, `MARKETING_SALE_COUNTS_FOR`, `MARKETING_SAME_VISIT`, `MARKETING_IP_KEPT`,
+  `MARKETING_HISTORY_KEPT`, `MARKETING_LATEST_SALES`, `MARKETING_ATTENTION_ENDING`, `MARKETING_ATTENTION_NO_CLICKS`,
+  `MARKETING_HONOUR_DO_NOT_TRACK`, `MARKETING_PICTURE_LARGEST`. Permissions `MARKETING.VIEW`, `MARKETING.CAMPAIGN.MANAGE`,
+  `MARKETING.PEOPLE.VIEW`, `MARKETING.SETTINGS.MANAGE`. With the scheduler on, the nightly `marketing_tidy_up` removes
+  old IP addresses and makes old visitors anonymous. Forgetting an account leaves its visitors naming nobody. Schema
+  step `202611132100-marketing-campaigns` (`cattophp:migrate`); a project's access control lets everyone open `^/c/`.
+- The Campaign Marketing Manager's ready-made pages (`Marketing\Pages\`, routes `cattophp_marketing_*` under `/marketing` in
+  `config/routes/marketing.php`, templates `@CattoPHP/marketing/`, on the stock frame through `Http\StockPages`): the
+  overview (`/marketing`: what needs attention; for a period chosen by feature cards or two dates, clicks, unique
+  visitors, repeat visits, link previews set aside and spend; a comparison by campaign, channel, publication, advert or
+  place, sortable, with Download as CSV; clicks over time; countries; refreshing every 30 seconds), the campaigns
+  (status as feature cards, search, sortable headings, pages, CSV), a new and a changed campaign (offers and promotions as
+  feature cards), one campaign (its head facts as badges; Activate, Pause, Edit, Copy, Archive, Restore, Delete; figures;
+  its own tracking link; its publications, each link ready to copy with its QR code; adverts as cards; what it promotes;
+  details; budget and costs, added and removed; history), a publication (channel and advert as feature cards; once saved
+  its link in three forms, its QR code shown and downloaded as `<campaign>-<publication>-qr.svg`; retire, restore,
+  delete), an advert (picture upload, shown only with `MARKETING.VIEW`; retire, restore, delete) and the settings (the
+  module's group saved as Administration > Settings saves one, and the channels: add, change, Up and Down, retire,
+  restore, delete). Page names `marketing-overview`, `marketing-campaigns`, `marketing-campaign-new`,
+  `marketing-campaign-edit`, `marketing-campaign`, `marketing-publication-new`, `marketing-publication`,
+  `marketing-advert-new`, `marketing-advert`, `marketing-settings` (`StockPages::PAGES`). `Marketing\MarketingMenu`
+  (section `marketing`, "Marketing", icon `nav-marketing`: Overview, Campaigns, Settings, each behind its permission,
+  nothing without the routes), `Marketing\MarketingSubjectLinks` (the activity log links a campaign) and
+  `Marketing\MarketingDetailWords` (money, statuses, kinds and channels in words). A project imports the route file
+  beside the tracking links'. A campaign's or a publication's code can no longer be `new`.
+- The Campaign Marketing Manager's pages in a project's own tables: a further line in a table cell (a
+  publication's day and code, a campaign's code, each line of a change in the history) is a `small` or `span` of class
+  `cl-marketing-line`, and the tracking link's copy field is drawn in spans, so a project whose tables keep a cell's
+  blocks on one line still shows them as lines; what can be done to the record a publication's or an advert's form
+  changes (retire, restore, delete) is a row of its own under the form (`cl-marketing-record-actions`); Add an advert has
+  room under it; honouring Do Not Track is two feature cards on Marketing > Settings ("Honour it", "Count it like any
+  other"), never a tick box.
+- Landing pages for the Campaign Marketing Manager, the core (`Marketing\Landing\`; schema step
+  `202611140010-marketing-landing`): a campaign's page, drawn at the campaign's own address `/c/{campaign}`, and an
+  offer's page at `/landing/{slug}` (`cattophp.marketing.landing_prefix`), one each at most (`LandingPages`: made as a
+  draft from a template, its settings, the publish checks, publish, unpublish, delete only one never public, the list
+  with its filter, search and recent visits, `offerRenamed()` and `offerRemoved()` followed everywhere). A page is a flat
+  list of sections, the hero first and full width (`LandingSections`: add, hidden until its first save; save, checked
+  against its kind; show, hide, half or full width, shown always, while the campaign runs or while it is not; remove;
+  move by index or step, an out-of-date order refused; each change one transaction under the page's row lock). Eleven
+  kinds (`Kinds\`: hero, words, picture, video, offers, who it is for, outcomes, benefits, countdown, questions and
+  answers, call to action) and a project's own through `SectionKind` (tag `cattophp.marketing_landing_section`); copy is
+  plain text by `LandingCopy` (from CattoLMS, a refusal naming its field as a `CopyRefused`). Every published state is
+  kept and never changed (`LandingVersions`; the database refuses a change), and an earlier one can be used again.
+  Templates: CattoPHP's two (`BuiltInTemplates`: Several offers, A special with an end date;
+  `cattophp.marketing.landing_builtin_templates`), a project's (`TemplateProvider`, tag
+  `cattophp.marketing_landing_templates`) and those saved from a page, without its offers (`LandingTemplates`). What a
+  page does while its campaign is not running: keep it, keep it with a note, or send visitors elsewhere (`NotRunning`).
+  Pictures come from sources (`PictureSource`, tag `cattophp.marketing_landing_picture_source`: CattoPHP's `upload` and
+  `offer`). How an offer looks and is bought on a page, who may edit an offer's page and what the frame needs come from
+  the project (`LandingProject`, `cattophp.marketing.landing_project`; `GenericLanding` otherwise; `OfferCard`,
+  `OfferAction`, `CardOptions`, `ProjectPart`, `LandingAccess`). The journey's events table (`Marketing\Events`,
+  `Marketing\Journey`: a landing page opened, a person's only, and an offer's button pressed, `LandingPresses::accepted()`
+  after the project's own handler accepted it), announced as `Landing\Events\LandingPageOpened` and
+  `LandingOfferPressed`; every change announced as `LandingPageChanged` and in the activity log
+  (`marketing.landing_page.*`, subject `marketing_landing_page`). Two settings: `MARKETING_LANDING_RECENT` (30d, the
+  list's visits) and `MARKETING_LANDING_PICTURE_CACHED` (1h). No new permission. A campaign's copy takes its page as a
+  draft; a campaign whose page has been public is archived, never deleted. Forgetting an account reaches the events and
+  the pages' records.
+- `Marketing\Offer` may give its own `slug` (the name in its own page's address, last and optional): an offer's landing
+  page made without an address given starts there (`LandingPages::createForOffer()`), and from the offer's label only
+  when it has none, so a project's page for a product keeps the product's own address name.
+- `Marketing\Landing\OfferCard` may give `about` (last and optional): the words a hero left without words of its own
+  shows under its headline, such as a product's whole description (`heroWords()`: `about`, else the card's `line`, which
+  an offers section keeps short). The hero's form shows the same words as its supporting text's placeholder, so the
+  editor sees what the page will show when the field is left empty.
+- Landing pages for visitors (`Marketing\Landing\LandingViewBuilder`, one drawing for the public page, the editor's
+  preview, a kept version and one section alone: `forVisitor()`, `preview()`, `version()`, `sectionPreview()`, `data()`,
+  `draw()`, `drawSection()`, `press()`; the page `landing-page`, template `@CattoPHP/marketing/landing/page.html.twig`
+  with `hero`, `section`, `paragraphs`, `offer-card`, `action` and `sections/<kind>` for the eleven kinds, CattoLMS's
+  DOM and `cl-landing-*` classes, the hero the page's only `h1`). A campaign's tracking link `/c/{campaign}` (and a
+  publication's with no destination of its own) draws the campaign's published page in the same answer, with
+  `no-store` and `X-Robots-Tag: noindex`, its canonical address `/c/{campaign}` whatever link was opened; the click is
+  the touch as before and the visit a `landing_opened` event against the same touch, a person's only, so a link
+  preview gets the page and its Open Graph tags with its touch set aside and no visit. While the campaign is not
+  running the page is kept, kept with a note above the offers, or forwards (302) where its setting says; a draft page
+  or a draft campaign's forwards as the link always did. An offer's page at `/landing/{slug}` is drawn while it and its
+  offer are public, else the site's ordinary not found; its visit gives no cookie. New route file
+  `config/routes/marketing_landing.php` (a project imports it beside `marketing_links.php` and lets everyone open
+  `^/landing/`): the offer's page, and under it and under `/c/{campaign}` the page's pictures (`/picture/{ref}`: only a
+  picture the page names; publicly cached for `MARKETING_LANDING_PICTURE_CACHED` while public, `private, no-store`
+  for its editors before then; nosniff and a sandboxing policy of its own) and its buttons (`/go/{press}`: the press
+  recorded, then 302 only to what the section holds). Every GET button goes through `/go/`; every POST button posts the
+  project's fields with `cattophp_landing` and `cattophp_return`. A video is framed (`youtube-nocookie.com`,
+  `player.vimeo.com`) only when the site's Content-Security-Policy `frame-src` names its host, else it is a link. In a
+  preview every button is disabled ("In a preview the buttons do nothing") and the page is `noindex, nofollow` with no
+  canonical address. The head (`page_meta`: title, description, canonical, robots, og, twitter_card) is the page's own
+  words, else the hero's, the share picture the one chosen, else the hero's, else the offer's;
+  `LandingProject::page()` adds to it or replaces it. A call to action with no way to buy from the page leads to the
+  offer's own page. Its buttons name `action-view`, `action-favourite`, `action-buy`, `action-request`,
+  `action-continue`, `action-orders` and `action-sign-in` when the project gives no icon, and `action-jump-down`,
+  `action-preview`, `action-play` and `action-back`. `LandingView` gains `notice`, `back` and `presses`.
+  `GenericLanding`'s View names `action-view` (it named `eye`, not a sprite symbol). Its layout rules
+  (`cl-landing-offers`, `cl-landing-offer-*`, `cl-landing-figure`, `cl-landing-video`, `cl-landing-badges`,
+  `cl-landing-hero-inner`, `cl-landing-cta-actions`) are in `cattophp.css`.
+- Landing pages' editor (`Marketing\Pages\LandingEditor`, `config/routes/marketing.php`; the menu's Marketing drop-down
+  gains Landing pages). `/marketing/landing-pages` (`marketing-landing-pages`): every page with what it is for, its
+  address, status, sections, last change and visits over `MARKETING_LANDING_RECENT`, narrowed by feature cards, searched,
+  sorted and paged, and the saved templates, each deleted there; `/new` (`marketing-landing-new`): a page for a campaign
+  or an offer without one, from a template chosen as feature cards. A page's editor, `/{reference}`
+  (`marketing-landing-edit`, route `cattophp_marketing_landing_edit`), is one page holding everything: the head (status,
+  what it is for and the address as badges; View or Preview, Publish or Unpublish, Delete while never public), what
+  stops it being published, the sections (the hero fixed at the top, the others put in order by drag, keyboard or menu
+  with the sortable list, each with its width as two feature cards, Edit, Show or Hide, Remove, and their Hidden, Not
+  saved yet, Needs content and Left off the page badges; Add a section as feature cards, a kind held once marked
+  "already on the page"; the drawing of the page), the open section's form (`?section=<reference>`) with its preview
+  drawn by `LandingViewBuilder`, and on a campaign's page when each section is shown; Start from a template and Save as
+  a template; the page's settings (an offer page's address, title, description, share picture, a campaign page's
+  not-running choice as feature cards); Earlier versions with View (`/versions/v<n>`) and Use this version again; the
+  preview (`/preview`). Each kind's fields are `@CattoPHP/marketing/landing/forms/<key>.html.twig`, with shared parts a
+  project's kinds may include (`heading`, `rows`, `picture-field`: a picture posted as `<field>[source]` and
+  `<field>[refs][<source>]`, an upload as `upload[<field>]` with `upload_title[<field>]`, kept by the source that takes
+  uploads). Every action is a form that works without JavaScript, answering with a redirect and a notice (a refusal back
+  as typed with why beside each field); with htmx it answers the part it belongs to (the list, the open section, the
+  settings) and what else it changed as `<hx-partial>`s, a refusal as typed with 422 and a stale move with 409. Campaign
+  pages answer to `MARKETING.VIEW` and `MARKETING.CAMPAIGN.MANAGE`, offer pages to `LandingProject::access()`. A project
+  mounts the editor under its own address with `LandingEditor::routes($routes, $name, $path, $controller,
+  $requirements, $make)` and answers each route with `LandingEditor::answer($request, EditorPlace, $action)`, its
+  `EditorPlace` holding the page (or the offer to make one for), the routes' parameters, what the reader may do
+  (`LandingAccess`), and the head's small line and back link. The campaign's page gains a Landing page card (status,
+  address, visits and buttons pressed, Edit and View, or Make the landing page from a template), the figures Landing
+  page visits and Buttons pressed, and "Its landing page, /c/{campaign}" for where its links lead while it is
+  published. A call to action's form posts the part of the page as `target_section` and the path as `target_address`
+  (`CtaKind` reads either, or `target`). The editor names `action-drag`, `action-hide`, `action-move-bottom`,
+  `action-move-top`, `action-preview`, `action-publish`, `action-restore` and `action-view` (README).
+- The plainest page frame (`@CattoPHP/layout.html.twig`) prints a page's head when the page gives `page_meta`.
+- `Marketing\Offer` has `public` (whether visitors may see it at all), beside `available`.
+- `Marketing\TrackingLinks::recordOpening()` gives what an opening recorded (`TrackedOpening`: the touch, the visitor,
+  the publication, the cookie), so a page drawn in the same answer records its visit against them; `record()` still
+  gives the cookie.
+- `Marketing\Pictures` replaces `AdvertPictures` (and `Picture` replaces `AdvertPicture`): adverts and landing pages keep
+  their pictures in `marketing/pictures/` under the module's files folder, still reading those kept in
+  `marketing/adverts/`, and a picture is removed only when no advert, page, section, kept version or saved template names
+  it.
+- `Marketing\Campaigns::offerRenamed()`.
+- `Ui\QrCode`: a QR code of any text, `svg($text, $label, $class = 'cl-qr-code')` for a page (named for a screen reader,
+  no inline style) and `document($text, $title)` for a file of its own with the XML declaration.
+  `Security\TwoStep\QrPicture` uses it; its output is unchanged.
+- A link to copy, `@CattoPHP/marketing/copy-field.html.twig`: a read-only field to select without JavaScript and a Copy
+  button `cattophp.js` shows where the browser can copy in one press (`data-cl-copy`, the field named by
+  `aria-controls`).
+- The stock frame takes `kicker` (a line above the title) and a `stock_badges` block (the head's facts as badges); a
+  sortable heading takes `end` to sit over numbers set right.
+- `Admin\SettingsPage::group()`, `save()`, `resetGroup()`, `reset()` and `inGroup()`, and the group's form as
+  `@CattoPHP/admin/settings-group.html.twig`, so a module's own page saves its group as Administration > Settings does
+  (a choice given `cards` is drawn as feature cards). Administration > Settings draws and saves the same as before.
+
+- The Campaign Marketing Manager's journey and sales, what they rest on (step 3, its foundations): the schema step
+  `202611141200-marketing-sales` (sales, one for each order a project reports or a connected site reports, unique by
+  site and reference, with their lines and their money's movements, each kept once by its own key, and checks that
+  refuse an amount below nothing, refunds and chargebacks over what was paid, and a paid sale without its moment;
+  connected sites, removed ones kept so the records naming them keep their name, with their reports out and in;
+  visitors given a reference, those already there too; touches a reference for each new one and an arrival's
+  publication code; campaigns the connected site an arrival made one for; events the sale they belong to). The values
+  the next parts build on: `Sales\SaleReport` and `Sales\SaleLine` (how a project describes an order; never refused as
+  they are made, `problems()` says what is wrong, such as lines that do not add up to what is to be paid), `Sales\Sale`
+  (with what it is shown as: waiting for payment, paid, partly refunded, refunded, charged back, cancelled),
+  `Sales\SaleMovement`, `Sales\SaleFilter`, `Sales\ReportedSale` (a connected site's report about a sale, its body
+  written and read), `Sales\SaleChanged`, `Sites\Site`, `Journey\JourneyRecorded` and `Journey\EventInput`.
+  `Visitors::byReference()`, `ofAccount()`, `seen()` and `anonymise()` (one person's visitors); `Touches::byReference()`,
+  `byId()` and `forVisitors()`; `Campaigns::makeForArrival()`; `Events::KINDS` with the journey's and a sale's kinds,
+  `byKey()`, `latest()`, `forPerson()`, `forSale()` and `anonymiseVisitors()`. Four settings: `MARKETING_PROMOTION_COUNTS`
+  (whether a campaign's promotion code gets it a sale only when the customer followed no link, the starting value, or
+  always), `MARKETING_SITE_TOLERANCE` (5m), `MARKETING_SITE_RETRY_LONGEST` (1h) and `MARKETING_SITE_REPORTS_KEPT` (30d);
+  `MARKETING_SALE_COUNTS_WITHIN`'s help says a change counts for sales paid from then on. Configuration
+  `cattophp.marketing.returns` (true) and `returns_excluded` (the starts of paths). The activity log's words for
+  `marketing.site.*`, `marketing.visitor.forgotten` and `marketing.publication.tied` and `.untied`, and its links to a
+  connected site (Marketing > Settings, Connected sites) and a visitor (their journey's page). Forgetting an account
+  unnames the connected sites it added.
+- The Campaign Marketing Manager's visitor journey (step 3). `Marketing\Journey` takes what a visitor does from the
+  project: `viewed($offer)`, `favourited($offer, $on)`, `basketChanged($offer, $added, $quantity)`, `taken($offer)`,
+  `subscribed($listLabel)`, `carry()` (the visitor's reference to keep with a pending registration), `registered($account,
+  $carried)` and `signedIn($account)`, each with an optional request (the current one otherwise) and account (the
+  signed-in reader's otherwise), so a service with no request of its own can call it; each returns nothing and never
+  throws. Only a followed reader's actions are recorded (`Journey\Readers` and `Journey\Reader`, worked out once for each
+  request: a person, not asking not to be tracked, whose cookie names a visitor or whose account a visitor is tied to),
+  each with their current campaign (the latest counted click of their visitors within `MARKETING_SALE_COUNTS_WITHIN`),
+  and announced as a `Journey\JourneyRecorded`. A view, a favourite's state and a sign-in are not recorded again within
+  `MARKETING_SAME_VISIT`; a free offer, each list and a registration once (by their keys). A registration ties to the
+  account both the visitor carried from the browser where the form was filled in and this browser's, each only while
+  it has none, and is recorded only when one of them is the account's. `Journey\VisitorReturns` notices a followed
+  visitor coming back (`came_back`, from where) on the pages they open after a quiet visit, and moves their last seen
+  on; it is on while `cattophp.marketing.returns` is true, and never under the tracking links, `/marketing`,
+  `/webhooks/` or `returns_excluded`. `Journey\PersonJourneys::of($visitor)` reads one person's journey
+  (`Journey\PersonJourney`): all their visitors together, their clicks, events and money movements in time order as
+  `Journey\JourneyLine`s with their words and badges (First touch and Last touch from each paid sale's fixed
+  attribution, Registration, Failed, Sale), their figures (visits, campaigns, orders, paid), their state (Paying
+  customer, Order waiting for payment, Registered, Not registered), devices ("A phone, then a computer") and countries;
+  `ofAccount($account)` too. `Marketing\Events::byId()`.
+- A mailing message counted for a campaign (only with mailing on as well). `Marketing\Mail\MailingPublications`:
+  `tie($message, $campaignCode, $place, $actor)` makes or changes the message's publication (channel email, or other
+  while email is retired; the next `em<N>`; its place the message's lists by name unless one is given; published the
+  day the message started sending), moving it from another campaign; `untie($message)` deletes it while nothing has
+  opened its links and retires it otherwise (tying again puts it back); `forMessage()` and `refresh()`. Each tie and
+  untie is in the campaign's history (`marketing.publication.tied`, `.untied`). `Marketing\Mail\MailedLinks`:
+  `followed($token, $url, $request)`, called from the project's click link after `Mailing\CopyLinks::clicked()`, records
+  a link to a page on this site as the campaign's touch (source email, the link's own `utm_` values, the link's address
+  as where it led; no link in the email is rewritten), ties the copy's person to the visitor and gives the cookie for
+  the redirect; `opened($token)`, from the opening picture, records `email_opened` once for each copy, naming its
+  account and no visitor. A link elsewhere, a message counted for no campaign, a copy without an account, and what the
+  mail project's rules say is not tracked record nothing. The unsubscribe link, the web copy and Forward to a friend are
+  untouched and call neither.
+- The Campaign Marketing Manager's sales (step 3): every order the project reports, whether or not a campaign brought
+  it, and which campaign gets it. `Marketing\Sales\Sales`: `placed($report, $request)` (waiting, with the placing
+  browser's visitor and country when it is followed, and a provisional first and last touch), `paid($report, $at,
+  $how)` (writes the sale if its placing was lost, fixes its attribution counted back from the payment, adds the paid
+  movement), `failed($reference, $attempt, $why, $at)`, `cancelled($reference, $at, $why)` (from waiting only; an order
+  placed again is waiting again), `refunded($reference, $key, $lines, $at, $how)` and `chargedBack($reference, $key,
+  $amount, $at, $lines, $how)` (without lines, shared over what each line has left by largest remainder), each refusing
+  more than was paid line by line. Every call is idempotent: by the sale's reference, the movement's key and the
+  journey event's key (`order_created:<ref>`, `paid:<ref>`, `payment_failed:<ref>:<attempt>`,
+  `order_cancelled:<ref>:<n>`, `refunded:<ref>:<key>`, `charged_back:<ref>:<key>`), so a project may report again what it
+  is not sure was kept (`has()`, `hasMovement()`). A report with problems is refused with the reason in the log; each
+  write runs in its own savepoint, so a fault is rolled back, logged and gives null while the project's own work is
+  committed; `Sales\SaleChanged` is announced inside it. The journey's events of a sale are kept only for a person the
+  module follows. `reported($site, $report)` keeps a connected site's sale for this site's click (by site), each report
+  once. Reads: `get()`, `byId()`, `list()` (sorted, paged, with lines), `count()`, `stateCounts()`, `totals()`
+  (`Sales\SaleTotals`: gross, discounts, wallet credit, refunds, chargebacks, net, paying customers, average, waiting
+  and cancelled; other currencies left out with a note), `offers()` (`Sales\OfferSales`: each offer's orders, units and
+  money, a bundle never its offers), `latest()`, `forCampaign()`, `forAccounts()`, `forPerson()` and `currency()`, all
+  narrowed by a `Sales\SaleFilter` and counted for the first or last touch as `MARKETING_SALE_COUNTS_FOR` says, so no
+  sale counts for two campaigns. `Sales\SaleAttribution::for()` (`Sales\Attribution`): the buyer's visitors' and the
+  placing browser's counted clicks within `MARKETING_SALE_COUNTS_WITHIN`, the first and the last; a campaign's
+  promotion code counting as `MARKETING_PROMOTION_COUNTS` says (`no_link`: only with no counted link; `always`: over
+  another campaign's link), the sale keeping both the links' touches and the promotion's campaign; of several carrying
+  one code, the one running, else the one that started most recently, never a draft. `forgetAccount()` and
+  `forgetAccountsOfAnonymousVisitors()`; forgetting an account (`Account\Records\MarketingRecords`) takes it off its
+  sales, which stay with their money.
+- One visitor's Paid figure says how the sale was paid as a sentence reads it, keeping an abbreviation's capitals ("By EFT",
+  "By card"): `Marketing\Pages\MarketingPages::inSentence()`.
+- A badge in a stacked table's cell (a table drawn with `stack: true`, on a narrow screen) wraps like the rest of the
+  value, so a long one ("Sold through it, not promoted") no longer runs past its card and makes the page scroll sideways.
+- The Marketing menu's Visitors and Sales name their own icons, `nav-visitors` and `nav-sales`; a project whose sprite
+  lacks them draws the section's, as before.
+- A forgotten customer is still one paying customer: forgetting an account (`Sales::forgetAccount()`,
+  `forgetAccountsOfAnonymousVisitors()`, `Account\Records\MarketingRecords`, all through `Sales::unname()`) gives that
+  person's sales one random mark together in place of the account, made at that moment and used only by
+  `Sales::totals()` to count them once; it names nobody and leads to no account. Before, a forgotten person with two
+  paid sales counted as two paying customers. Schema step `202611141500-marketing-forgotten-customers` (the sales'
+  `forgotten_customer`); a project that applies CattoPHP's steps through its own migrations needs one that applies it.
+- Connected sites (step 3): one campaign across two sites, the one that sends it seeing the registrations and sales it
+  brought on the one that sells. `Marketing\Sites\Sites` keeps them (add with a name, an `https://` address and a shared
+  secret, stored encrypted by `Security\SecretCipher`; change; a new secret, the previous one kept and accepted beside it
+  until a message from the other site checks with the new one; remove, refused while reports wait unless they are
+  dropped, kept so its records keep its name, connected again under its old key; `sign()` and `verify()` with
+  `Webhooks\WebhookSignature` within `MARKETING_SITE_TOLERANCE`, a header with more than one time refused). A tracking
+  link whose destination is on a connected site forwards a person's click with `cattophp_from` (base64url JSON: this
+  site's address, the campaign's code and name, the publication's code and channel, the click's reference) and
+  `cattophp_sig` (`Sites\SiteForward`); a preview, a bot, a site whose secret cannot be read and an opening not recorded
+  forward plainly. `Sites\ArrivalListener` (kernel.request, before the router) checks an arrival, finds or makes its
+  campaign (`Campaigns::makeForArrival()`), records the touch once for its click through `TrackingLinks::recordOpening()`
+  (which takes the other site, the click's reference and the publication's code there), gives the cookie, and always
+  answers 302 to the address without the two values; a refused one records nothing and only the site's card says why.
+  `Sites\SiteReports` queues a report to the site a reader's current click came from on a registration or a
+  subscription (`JourneyRecorded`), and on each change to a sale whose first or last touch came from one (`SaleChanged`:
+  `order_placed`, `order_cancelled`, `sale_paid`, `sale_refunded`, `sale_charged_back`), in the same transaction under a
+  savepoint, once by its key; codes, amounts and lines only, never a person, an account or an IP address. The scheduled
+  task `marketing_site_reports` (`Sites\MarketingSiteReportsTask`, every minute) sends each site's due reports, 50 to a
+  signed POST, tries again after `MARKETING_SITE_RETRY_FIRST` (new, 1m to start, shortest 10s) and twice as long each
+  time up to `MARKETING_SITE_RETRY_LONGEST`, names the problem (a signature not accepted, clocks too far apart from the
+  answer's `Date`, a site not reached), gives up after `MARKETING_SITE_REPORTS_KEPT` and removes old reports.
+  `Sites\ReportReceiver` and `Marketing\Pages\SiteReportsController` (routes in the new
+  `config/routes/marketing_sites.php`: `POST /webhooks/marketing`, `GET /webhooks/marketing/check`) answer an unknown
+  sender, a bad signature or a stale time with a bare 401, skip a report received before, keep one naming an unknown
+  click, record an event for the click's visitor and campaign and hand a sale to `Sales\Sales::reported()`. Marketing >
+  Settings gains the Connected sites card (`#connected-sites`; `templates/marketing/settings-sites.html.twig`): each
+  site's state in words (Connected, Not connected with why, Not checked yet), the secret as asterisks, the clocks, its
+  reports and the last refusal with its reason; Connect a site, Make a secret (shown once, to copy), Check the
+  connection, Change its name or address, Change the shared secret, Send them again and Drop connection (routes under
+  `/marketing/settings/sites`). Reports need `symfony/http-client`; without it nothing is sent and the card says so.
+  `Touches::byOrigin()`.
+- The Campaign Marketing Manager's Visitors and Sales pages (step 3; `Marketing\Pages\VisitorsController`,
+  `SalesController`, routes in `config/routes/marketing.php`, both in the Marketing menu between Landing pages and
+  Settings). **Visitors** (`marketing-visitors`, `/marketing/visitors`, needs `MARKETING.PEOPLE.VIEW`): one row for each
+  person with all their visitors together and one for each visitor not known yet (`Pages\VisitorList`), with their
+  state, visits, campaigns, country, devices and first and last seen; the period they were last seen in, their state as
+  feature cards, a campaign, a country and a search by name, email address, account reference
+  (`MarketingProject::accountsMatching()`) or a visitor's reference; totals of visitors, known people and paying
+  customers; `/marketing/visitors.csv`. **One visitor** (`marketing-visitor`, `/marketing/visitors/{reference}`): their
+  journey oldest first (`Journey\PersonJourneys`) with `/journey.csv`, which campaign gets each paid sale, who they are
+  (no IP address ever shown), the other visitors, and Forget this visitor's journey (confirmed; also needs
+  `MARKETING.CAMPAIGN.MANAGE`; every visitor of the person made anonymous, their events and sales no longer naming them,
+  the clicks and money kept; logged as `marketing.visitor.forgotten`). **Sales** (`marketing-sales`, `/marketing/sales`,
+  `MARKETING.VIEW`; a customer named only with `MARKETING.PEOPLE.VIEW`, else "A customer"): every sale with or without a
+  campaign, with the period, its state (paid to start), "A sale counts for" (first or last touch, from the setting) and,
+  with a connected site, Where sold as feature cards, the campaign (any, none or one), publication, channel, offer and
+  country, a search by order reference, the totals of the same filter (`Sales::totals()`: sales, paying customers, gross,
+  discounts, wallet credit, refunds, chargebacks, net and the average order, what waits for payment apart, a sale in
+  another currency left out and named), and two downloads, `/marketing/sales.csv` (the rows and totals shown) and
+  `/marketing/sales-lines.csv` (their lines). **One sale** (`marketing-sale`, `/marketing/sales/{reference}`, a connected
+  site's at `/marketing/sales/{site}/{reference}`): its facts, lines, money as it moved, both touches and which counts now,
+  and what was reported of it to connected sites, with Open the order and Open the customer's journey. A campaign's page
+  gains Registrations, Paying customers, Net revenue and Back for every R1, each publication's paid sales and net
+  revenue, each advert's net revenue and clicks, each offer's views, favourites, units sold and net revenue (and the
+  offers sold through it it does not promote), Customers and their orders with See all its sales, and the same "A sale
+  counts for" cards; a publication made from a mailing message says so, linked by `MarketingProject::publicationSource()`.
+  The overview gains Latest sales (paid since the start of the day `MARKETING_LATEST_SALES` ago, ten, with All sales).
+  `Http\StockPages::PAGES` names the four pages; they draw `action-view` and `action-view-all` too.
+
+**On a project's servers:** to use connected sites, import `@CattoPHPBundle/config/routes/marketing_sites.php`, let
+everyone reach `^/webhooks/` in the access control, keep the scheduler on, and have `symfony/http-client`; then each
+site's administrator connects the other in Marketing > Settings with the same secret.
+
+**Changed**
+
+- A sign-in now lasts `AUTH_SESSION_TTL` without a visit, counted from the person's last visit, not from signing in:
+  coming back within it keeps them signed in, and they are signed out once they have stayed away that long; closing the
+  browser no longer signs them out, and there is no overall limit. Each visit that counts moves three things on
+  together (`SignIn\SignInLength`, at the response): the sign-in's end in the session (`SignInFlow::LAST_VISIT` and
+  `SIGNED_IN_UNTIL`; `signedIn()` takes the end, `visited()` moves it, `endsAt()` reads it), the stored session's
+  lifetime and the session cookie's expiry. What counts is decided in one place, `SignInLength::countsAsVisit()`: every
+  request the signed-in person's browser makes, a page's own refresh included, so a page left open that refreshes itself
+  keeps them signed in while it stays open. A shorter setting applies at once, from the last visit; a longer one from
+  the next visit. The end is moved only once it would move by a hundredth of the length or more, at most an hour
+  (`SignInLength::moveEvery()`), so most requests write nothing and send no cookie: a page refreshing every 15 seconds
+  writes once an hour with a long sign-in. A sign-in from before the update counts from signing in until its next visit.
+  With `sign_in.session_lifetime`, each request's session storage is given the length as `gc_maxlifetime` and no
+  cookie lifetime (decorating `session.storage.factory`, over `framework.yaml`'s): until someone signs in, the session
+  cookie ends when the browser is closed; at signing in it is sent again lasting the sign-in's length; signing out clears
+  it. The cookie keeps the flags Symfony gives it (`SignIn\SessionCookieOptionsPass` hands it framework.session's options). `SignInController` takes
+  `SignInLength` as its last argument. `AUTH_SESSION_TTL`'s help says "after this long without a visit".
+- With `sign_in.sessions`, a kept sign-in's last seen and runs out move with each visit that counts
+  (`SignInSessions::visited()`), and `holds()` writes nothing (`SEEN_EVERY` is no longer used); the Sign-in and security
+  page's "Runs out" is when it would end if the person stayed away, a shorter setting brought in at once
+  (`SignInSessions::endsAt()`), and a sign-in past that is no longer listed or held.
+- The Settings page (`Admin\SettingsController`, `SettingsPage`, `admin/settings.html.twig`,
+  `admin/settings-group.html.twig`) draws fixed settings, hides hidden ones, adds the project's facts and says when saved
+  settings could not be read; a Reset that is refused says so rather than failing. `SettingsPage` takes the facts
+  providers as its last argument and gains `shows()` and `facts()`.
+- `Marketing\TouchAgent` reads the email link scanners and mail apps' fetchers that name themselves (a mail server's
+  link scanner, Microsoft Office's link check, a mail app's picture fetcher) as bots, however much their description
+  reads as a browser's, so their openings of a message's links are never a click.
+
+- The Campaign Marketing Manager's wiring is its own, `Marketing\MarketingWiring`, out of `CattoPHPBundle` and unchanged,
+  with a file for each of its parts to add its services to (`Journey\JourneyWiring`, `Mail\MailWiring`,
+  `Sales\SalesWiring`, `Sites\SitesWiring`, `Pages\PagesWiring`).
+- `Marketing\MarketingProject` gains `organisation($reference)` (a buying company's name, reference and page),
+  `accountsMatching($search, $limit)` (the project's own search of its people, as account ids, for finding a customer by
+  name, email address or reference) and `publicationSource($type, $reference)` (the name and page of the project's
+  record a publication was made from, such as a mailing message). A project's own implementation adds the three;
+  `Marketing\NoProject` answers nothing.
+- `Marketing\Visitors::identify()` ties a visitor to an account only while it has none, and says whether it did: a
+  browser two people use keeps the first person it was tied to (it used to take the latest).
+- `Marketing\Events::record()` takes a `Journey\EventInput`, which also names the event's sale; the arguments one by one
+  are still taken. A repeated idempotency key changes nothing and leaves a caller's transaction usable (it used to be
+  a refused insert, which ends a PostgreSQL transaction).
+- Each new visitor and touch is given its reference without a refused insert on the rare clash, for the same reason.
+- The guide's section on the optional modules is now its own document, `MODULES-v1.0.md`, beside the guide.
+
+**On a project's servers:** take `cookie_lifetime` and `gc_maxlifetime` out of `framework.session` in `framework.yaml`
+(the setting now wins; keep `cookie_secure` and `cookie_samesite`), and keep sessions in the project's own folder
+(`handler_id: session.handler.native_file`, `save_path: '%kernel.project_dir%/var/sessions'`), not PHP's shared one,
+which some systems clean by `php.ini`'s 24 minutes.
+An installation with files and a Settings page needs nothing more: its saved settings appear in the storage folder at
+the first save. No schema step, no new `.env` key.
+
+**Fixed**
+
+- A connected site's failed check reads as one sentence ("Example Shop is not connected: the other site did not accept
+  this site's signature."), without a capital after the colon.
+- The landing page editor's preview of the open section (`LandingViewBuilder::sectionPreview()`, a `LandingView` whose
+  new `sectionOnly` is true) is drawn as a part of the editor's page: no preview notice, no page head unless the section
+  is the hero, and the hero's headline a paragraph rather than a second `h1`. The Earlier versions table's actions take
+  the row's whole width when it stacks on a phone, so Use this version again no longer stands out of it.
+- A landing page's hero badges (`cl-landing-badges`) are as far apart, and as far above the headline, as the
+  utilities they replaced drew them on Bootstrap 6 (`gap-3`, `mb-5`: 0.5rem and 1rem, not 1rem and 3rem), so a page's
+  head is the height it was on a phone.
+- `feedback.progress` drew its bar full whatever its value in a project whose own stylesheet did not size it: CattoPHP's
+  stylesheet now gives `.cl-ui-progress-bar.cl-share` its width.
+- A landing page's visit and an offer's button press (`Marketing\Journey::opened()`, `pressed()`) named the signed-in
+  reader's account even when their browser asked not to be tracked, with `MARKETING_HONOUR_DO_NOT_TRACK` on: such a
+  visit or press is now counted with its country and names no visitor and no account, as step 1's rule says.
+
+**The guide** says how to use the three additions (5.1, 5.12, 6.2, 7.4), and no longer describes requiring `^0.3` or
+the starter taking CattoPHP from a folder beside it, which stopped being true with 1.0.0.
+It also corrects 5.2 (with files, what the Settings page saves is kept in the storage folder, no longer in `.env`
+alone), documents settings held fixed, the Settings page's facts and a longest length of time (2.4, 5.3, 5.11), and
+says how long a sign-in lasts without a visit, that every request is one, and what wins over `framework.yaml` (5.6, 5.8).
+
 ## 1.0.0 · 13 November 2026
 
 ### Upgrading from 0.3

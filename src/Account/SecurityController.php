@@ -291,7 +291,7 @@ final class SecurityController
                 'browser' => $agent->label . ($agent->device !== '' ? ', a ' . $agent->device : ''),
                 'started' => $this->when($signIn->startedAt),
                 'last_seen' => $this->when($signIn->lastSeenAt),
-                'ends' => $this->when($signIn->expiresAt),
+                'ends' => $this->when($this->sessions->endsAt($signIn)),
                 'current' => $signIn->publicId === $current,
             ];
         }

@@ -1,0 +1,14 @@
+{#
+	A count down to a moment, by the server's clock. The time left is drawn here in its units (those before the first
+	that is not nothing hidden) and kept hidden until cattophp.js shows it and keeps it ticking, so a page without
+	JavaScript never shows a count that has stopped; the moment itself, in the site's time zone, is always shown. The
+	numbers are text and the hidden units the hidden attribute, never a style. role timer with aria-live off: a screen
+	reader reads the time left when asked, never every second. At zero the script hides the countdown, or the element
+	around it marked data-cl-countdown-scope; a moment already passed draws nothing.
+#}
+{% if not props.ended %}
+<div class="cl-ui-countdown" role="timer" aria-live="off" data-cl-countdown="{{ props.ends_at }}" data-cl-now="{{ props.now }}">
+<span class="cl-ui-countdown-count" data-cl-countdown-count hidden>{% if props.words %}<span class="cl-ui-countdown-words">{{ props.words }}</span> {% endif %}{% for unit in props.units %}<span class="cl-ui-countdown-unit" data-unit="{{ unit.name }}"{% if not unit.shown %} hidden{% endif %}><strong>{{ unit.count }}</strong> <span data-one="{{ unit.name }}" data-many="{{ unit.name }}s">{{ unit.words }}</span></span>{% if not loop.last %} {% endif %}{% endfor %}</span>
+<span class="cl-ui-countdown-until">{% if props.until %}{{ props.until }} {% endif %}<time datetime="{{ props.datetime }}">{{ props.moment }}</time></span>
+</div>
+{% endif %}

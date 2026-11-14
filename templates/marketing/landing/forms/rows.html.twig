@@ -1,0 +1,21 @@
+{#
+	Rows of two fields a section kind's form repeats (benefits, questions and answers, who it is for): each saved row, and
+	two spare ones, up to the kind's most. A row left empty is dropped; save to get more empty rows. Variables: values,
+	errors, rows_legend, rows_help, rows_most, rows_spare, first (key, label, max, prose) and second (key, label, max,
+	prose), row_label (such as Question).
+#}
+{% set saved = values.items is iterable ? values.items : [] %}
+{% set count = min(rows_most, (saved|length) + rows_spare) %}
+<fieldset class="cl-landing-rows">
+<legend>{{ rows_legend }}</legend>
+<p class="cl-ui-field-help">{{ rows_help }} Leave a row empty to remove it; save to get more empty rows. At most {{ rows_most }}.</p>
+{% for n in range(0, max(count, 1) - 1) %}
+{% set item = saved[n] ?? {} %}
+{% set item = item is iterable ? item : {(second.key): item} %}
+<div class="cl-landing-row">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: first.label ~ ' ' ~ (n + 1), for: 'landing-item-' ~ n ~ '-' ~ first.key, error: errors['items.' ~ n ~ '.' ~ first.key]|default('')})} %}{% block control %}{% if first.prose %}<textarea class="cl-input" id="landing-item-{{ n }}-{{ first.key }}" name="items[{{ n }}][{{ first.key }}]" rows="3" maxlength="{{ first.max }}" {{ ui_field_attrs(props) }}>{{ item[first.key]|default('') }}</textarea>{% else %}<input class="cl-input" type="text" id="landing-item-{{ n }}-{{ first.key }}" name="items[{{ n }}][{{ first.key }}]" value="{{ item[first.key]|default('') }}" maxlength="{{ first.max }}" {{ ui_field_attrs(props) }}>{% endif %}{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: second.label ~ ' ' ~ (n + 1), for: 'landing-item-' ~ n ~ '-' ~ second.key, error: errors['items.' ~ n ~ '.' ~ second.key]|default('')})} %}{% block control %}{% if second.prose %}<textarea class="cl-input" id="landing-item-{{ n }}-{{ second.key }}" name="items[{{ n }}][{{ second.key }}]" rows="3" maxlength="{{ second.max }}" {{ ui_field_attrs(props) }}>{{ item[second.key]|default('') }}</textarea>{% else %}<input class="cl-input" type="text" id="landing-item-{{ n }}-{{ second.key }}" name="items[{{ n }}][{{ second.key }}]" value="{{ item[second.key]|default('') }}" maxlength="{{ second.max }}" {{ ui_field_attrs(props) }}>{% endif %}{% endblock %}{% endembed %}
+</div>
+{% endfor %}
+{% if errors.items|default('') %}<p class="cl-landing-note" role="alert">{{ errors.items }}</p>{% endif %}
+</fieldset>

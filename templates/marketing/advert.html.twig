@@ -1,0 +1,60 @@
+{#
+	An advert of a campaign: its name, its kind as feature cards (words, a picture or a video), headline, words, a picture
+	uploaded (a JPEG, PNG or WebP, shown only to someone who may see the Campaign Marketing Manager), an outside address
+	such as a video's, and notes. Once saved it can be retired, restored, and deleted while no publication uses it.
+	Someone who may only look sees its facts instead of the form.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{% if advert and advert.retired %}{{ ui('feedback.badge', {label: 'Retired'}) }}{% endif %}
+{% endblock %}
+{% block stock_actions %}{{ ui('action.link', {label: 'Back to the campaign', href: back_href, icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="advert">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'advert-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The advert', heading_id: 'advert-heading', summary: 'What people see where the campaign is published. An advert already published keeps its history when it changes.'}) }}
+{% if advert and advert.picture %}
+<figure class="cl-marketing-picture"><img src="{{ advert.picture }}" alt="The picture of the advert {{ advert.name }}"></figure>
+{% endif %}
+{% if may_manage %}
+<form method="post" action="{{ action }}" enctype="multipart/form-data">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'advert-name', required: true, help: 'Yours, up to 120 characters, such as Spring picture.', error: errors.name})} %}{% block control %}<input class="cl-input" id="advert-name" type="text" name="name" value="{{ typed.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'kind', legend: 'Kind', id: 'advert-kind', items: kind_cards, selected: typed.kind, required: true, error: errors.kind, size: 'small'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Headline', for: 'advert-headline', help: 'Up to 200 characters.', error: errors.headline})} %}{% block control %}<input class="cl-input" id="advert-headline" type="text" name="headline" value="{{ typed.headline }}" maxlength="200" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Words', for: 'advert-words', full_width: true, help: 'What it says, up to 5,000 characters.', error: errors.words})} %}{% block control %}<textarea class="cl-input" id="advert-words" name="words" rows="5" maxlength="5000" {{ ui_field_attrs(props) }}>{{ typed.words }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: has_picture ? 'A new picture' : 'Picture', for: 'advert-picture', help: 'A JPEG, PNG or WebP picture, up to ' ~ largest ~ '.' ~ (has_picture ? ' Choosing one replaces the picture there is.' : ''), error: errors.picture})} %}{% block control %}<input class="cl-input" id="advert-picture" type="file" name="picture" accept="image/jpeg,image/png,image/webp" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if has_picture %}
+{{ ui('form.picture-choice', {legend: 'The picture there is', id: 'advert-remove-picture', items: [{value: 'remove_picture', label: 'Remove the picture', icon: lucide('trash-2'), note: 'Left unticked, the picture stays.'}], multiple: true, selected: [], size: 'small'}) }}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Outside address', for: 'advert-media-address', help: 'Such as the video\'s, starting with https://. Needed for a video.', error: errors.media_address})} %}{% block control %}<input class="cl-input" id="advert-media-address" type="url" name="media_address" value="{{ typed.media_address }}" maxlength="2000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Notes', for: 'advert-notes', full_width: true, help: 'For you, such as who made it.', error: errors.notes})} %}{% block control %}<textarea class="cl-input" id="advert-notes" name="notes" rows="2" maxlength="5000" {{ ui_field_attrs(props) }}>{{ typed.notes }}</textarea>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: save_label, type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: back_href, icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% if advert %}
+<div class="cl-card-form cl-marketing-record-actions">
+{% if advert.retired %}
+<form method="post" action="{{ advert.restore_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="advert">{{ ui('action.button', {label: 'Restore it', type: 'submit', icon: 'action-enable'}) }}</form>
+{% else %}
+<form method="post" action="{{ advert.retire_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="advert">{{ ui('action.button', {label: 'Retire it', type: 'submit', icon: 'action-disable'}) }}</form>
+{% endif %}
+{% if advert.may_delete %}
+<form method="post" action="{{ advert.delete_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="advert">{{ ui('action.button', {label: 'Delete it', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: 'Delete the advert ' ~ advert.name ~ '? No publication uses it. This cannot be undone.'}) }}</form>
+{% endif %}
+</div>
+{% endif %}
+{% else %}
+{{ ui('data.key-value-list', {items: advert.facts}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

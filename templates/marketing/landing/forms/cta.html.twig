@@ -1,0 +1,17 @@
+{#
+	A call to action's fields: a heading and words, what its one button does as feature cards (buy an offer of the page,
+	with the site's own purchase box; view an offer; go to a part of the page; go to a page of the site), the offer it is
+	about, the part of the page or the path, and the button's words.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' with {text_label: 'Supporting text (optional)'} %}
+{{ ui('form.picture-choice', {name: 'button', legend: 'What the button does', id: 'landing-button', size: 'small', selected: values.button|default('buy'), error: errors.button|default(''), items: form.buttons|map((words, key) => {value: key, label: words, icon: lucide({buy: 'shopping-cart', view: 'eye', section: 'arrow-down', address: 'link'}[key]|default('square'))})}) }}
+{% if form.offers %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The offer it is about', for: 'landing-offer', help: 'For buying or viewing. Left as the first, it is the page\'s first.', error: errors.offer|default('')})} %}{% block control %}<select class="cl-select" id="landing-offer" name="offer" {{ ui_field_attrs(props) }}><option value="">The page's first</option>{% for key, label in form.offers %}<option value="{{ key }}"{{ values.offer|default('') == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% set section_target = values.target_section ?? (values.button|default('') == 'section' ? values.target|default('') : '') %}
+{% set address_target = values.target_address ?? (values.button|default('') == 'address' ? values.target|default('') : '') %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The part of the page', for: 'landing-target-section', help: 'When it goes to a part of the page.', error: values.button|default('') == 'section' ? errors.target|default('') : ''})} %}{% block control %}<select class="cl-select" id="landing-target-section" name="target_section" {{ ui_field_attrs(props) }}><option value="">Choose a part</option>{% for value, label in section.targets %}<option value="{{ value }}"{{ section_target == value ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The page of the site', for: 'landing-target-address', help: 'When it goes to a page of the site: a path starting with /, such as /offers.', error: values.button|default('') == 'address' ? errors.target|default('') : ''})} %}{% block control %}<input class="cl-input" type="text" id="landing-target-address" name="target_address" value="{{ address_target }}" maxlength="2000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The button\'s words (optional)', for: 'landing-label', help: 'At most ' ~ form.limits.label ~ ' characters. Left empty, it says what it does; a buy button uses the site\'s own words.', error: errors.label|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-label" name="label" value="{{ values.label|default('') }}" maxlength="{{ form.limits.label }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}

@@ -1,0 +1,8 @@
+{#
+	An outcomes section's fields: a heading and words, and up to twenty outcomes, one a line.
+#}
+{% set lines = values.items is iterable ? values.items|map(item => item is iterable ? item.text|default('') : item)|join("\n") : values.items|default('') %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Outcomes', for: 'landing-items', help: 'One a line, such as Plan a vegetable bed through the seasons. At most ' ~ form.limits.items ~ ' lines of ' ~ form.limits.item ~ ' characters.', error: errors.items|default('')})} %}{% block control %}<textarea class="cl-input" id="landing-items" name="items" rows="8" {{ ui_field_attrs(props) }}>{{ lines }}</textarea>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}

@@ -60,6 +60,7 @@ final class SignInFlowTest extends TestCase
 
     public function testTheOwnerSignsInWithTheLinkThenSetsUpTheCodeThenUsesIt(): void
     {
+        $this->restart(['AUTH_TWO_STEP' => 'ADMINS']);
         $link = $this->askForALink('owner@example.com', '/settings');
         self::assertStringContainsString('without your one-time code as well', (string) $this->transport()->last()->getTextBody());
 
@@ -106,9 +107,9 @@ final class SignInFlowTest extends TestCase
     {
         $link = $this->askForALink('owner@example.com');
         $page = $this->browser->request('GET', $link);
-        $form = $page->filter('form')->form();
-        $this->browser->submit($form);
-        $this->browser->submit($form);
+        $this->browser->submit($page->filter('form')->form());
+        self::assertSame('/', $this->browser->getResponse()->headers->get('Location'), 'Signed in by the link alone: two-step is each person\'s choice by default.');
+        $this->browser->request('GET', $link);
 
         self::assertStringContainsString('That link has been used or has run out', (string) $this->browser->getResponse()->getContent());
     }
@@ -175,9 +176,9 @@ final class SignInFlowTest extends TestCase
         self::assertSame([], $this->transport()->sent);
     }
 
-    public function testWithoutTwoStepALinkIsEnough(): void
+    /** Two-step sign-in is each person's choice unless the setting says otherwise: by default the administrator is not asked to set it up. */
+    public function testByDefaultALinkIsEnoughForTheAdministratorToo(): void
     {
-        $this->restart(['AUTH_TWO_STEP' => 'CHOICE']);
         $this->openLink($this->askForALink('owner@example.com', '/settings'), false);
 
         self::assertSame('/settings', $this->browser->getResponse()->headers->get('Location'));

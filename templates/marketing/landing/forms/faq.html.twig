@@ -1,0 +1,9 @@
+{#
+	A questions and answers section's fields: a heading and words, and up to twenty questions, each opening to show its
+	answer.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' %}
+{% include '@CattoPHP/marketing/landing/forms/rows.html.twig' with {rows_legend: 'Questions and answers', rows_help: 'Each question opens to show its answer.', rows_most: form.limits.items, rows_spare: form.limits.spare,
+	first: {key: 'question', label: 'Question', max: form.limits.question, prose: false}, second: {key: 'answer', label: 'Answer', max: form.limits.answer, prose: true}} %}
+{% endblock %}{% endembed %}

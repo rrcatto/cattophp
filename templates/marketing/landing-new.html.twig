@@ -1,0 +1,35 @@
+{#
+	A new landing page: for a campaign or one of the offers (feature cards), which campaign or offer (those without a page
+	of their own), and the template it starts from (feature cards, each saying which pages it suits). It is made as a
+	draft, and the editor opens.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{{ ui('action.link', {label: 'Every landing page', href: back_href, icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="landing-new">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'landing-new-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The page', heading_id: 'landing-new-heading', summary: 'A campaign has at most one page, and so has each of the ' ~ offers_heading|lower ~ '.'}) }}
+{% if not campaigns and not offers %}
+{{ ui('feedback.empty', {heading: 'Every campaign and offer has a page', summary: 'Make a campaign first, or open a page from the list to change it.'}) }}
+{% else %}
+<form method="post" action="{{ action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'for', legend: 'A page for', id: 'landing-new-for', items: for_cards, selected: for, error: errors.for, size: 'small', required: true}) }}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Campaign', for: 'landing-new-campaign', help: campaigns ? 'For a campaign\'s page. Its page is shown at its tracking link\'s address.' : 'Every campaign has a page already.', error: errors.campaign})} %}{% block control %}<select class="cl-select" id="landing-new-campaign" name="campaign" {{ ui_field_attrs(props) }}><option value="">Choose a campaign</option>{% for one in campaigns %}<option value="{{ one.value }}"{{ one.value == campaign ? ' selected' : '' }}>{{ one.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% if offers %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: offers_heading, for: 'landing-new-offer', help: 'For a page of one of the ' ~ offers_heading|lower ~ ', at an address of its own.', error: errors.offer})} %}{% block control %}<select class="cl-select" id="landing-new-offer" name="offer" {{ ui_field_attrs(props) }}><option value="">Choose one</option>{% for one in offers %}<option value="{{ one.value }}"{{ one.value == offer ? ' selected' : '' }}>{{ one.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% if template_cards %}
+{{ ui('form.picture-choice', {name: 'template', legend: 'Start from', id: 'landing-new-template', items: template_cards, selected: template, error: errors.template, size: 'small'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Make the landing page', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: back_href, icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

@@ -42,9 +42,9 @@ final class FoundationSettings implements SettingsProvider
             yield new SettingGroup('sign_in', 'Sign-in', 'Emailed sign-in links, who may sign in, two-step sign-in and how long a sign-in lasts.', [
                 new Setting('AUTH_SIGNIN', 'Who can sign in', SettingType::Choice, 'ADMIN', choices: ['ADMIN' => 'Administrators and the listed addresses', 'EVERYONE' => 'Everyone with an account']),
                 new Setting('AUTH_SIGNIN_ALLOWED_EMAILS', 'Listed addresses', SettingType::Paragraph, optional: true, help: 'Email addresses that may sign in when only administrators can, separated by commas.'),
-                new Setting('AUTH_TWO_STEP', 'Two-step sign-in', SettingType::Choice, 'ADMINS', choices: ['CHOICE' => 'Each person\'s choice', 'ADMINS' => 'Required of administrators', 'EVERYONE' => 'Required of everyone']),
+                new Setting('AUTH_TWO_STEP', 'Two-step sign-in', SettingType::Choice, 'CHOICE', choices: ['CHOICE' => 'Each person\'s choice', 'ADMINS' => 'Required of administrators', 'EVERYONE' => 'Required of everyone']),
                 new Setting('AUTH_MAGIC_LINK_TTL', 'How long a sign-in link works', SettingType::Duration, '30m', shortest: '1m'),
-                new Setting('AUTH_SESSION_TTL', 'How long a sign-in lasts', SettingType::Duration, '1d', shortest: '5m'),
+                new Setting('AUTH_SESSION_TTL', 'How long a sign-in lasts', SettingType::Duration, '1d', help: 'A person is signed out after this long without a visit. Coming back sooner, or leaving a page open that refreshes itself, keeps them signed in; closing the browser does not sign them out.', shortest: '5m', longestTime: '365d'),
                 new Setting('AUTH_REQUEST_LIMIT_EMAIL', 'Links one address may ask for', SettingType::Number, '5', min: 1, max: 1000),
                 new Setting('AUTH_REQUEST_LIMIT_IP', 'Links one network address may ask for', SettingType::Number, '20', min: 1, max: 10000),
                 new Setting('AUTH_REQUEST_WINDOW', 'In how long', SettingType::Duration, '15m', shortest: '1m'),

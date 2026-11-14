@@ -25,7 +25,8 @@ Require it from GitHub in the project's `composer.json`:
 ```
 
 What a project installs is the package alone (`bin/`, `config/`, `public/`, `resources/`, `src/`, `templates/`, the
-guide, the README, the changelog and the licence): `.gitattributes` leaves the rest out of an archive of it, which
+guide (`GUIDE-v1.0.md`) and the modules' document beside it (`MODULES-v1.0.md`), the README, the changelog and the
+licence): `.gitattributes` leaves the rest out of an archive of it, which
 GitHub's zips and a Composer path repository's mirror follow.
 
 Copy its browser files into the web root after every install and update, in the project's `composer.json`:
@@ -58,12 +59,16 @@ cattophp:
     layout: base.html.twig                      # the template CattoPHP's pages extend without themes (block body, or page_body)
     starting_values: {}                         # values in place of .env's, by name: APP_NAME: Example
     defaults: { APP_LOCALE: en_ZA }             # the project's own defaults, used when .env and the Settings page give nothing
+    settings:
+        fixed: []                               # settings (APP_URL) or groups (sign_in) shown on the Settings page but never changed there
+        hidden: []                              # fixed too, and left off the page
     sign_in:
         accounts: App\Security\Accounts         # the application's accounts (CattoPHP\SignIn\SignInAccounts, and JoiningAccounts where people join by signing in)
         after: /                                # where a person goes after signing in
         recovery_codes: true
         two_step_file: ~                        # with files: the two-step key's file, {account} for one per account (one file holds one person's)
         sessions: false                         # true keeps each sign-in for the person to see and end; off where the project keeps its own
+        session_lifetime: true                  # AUTH_SESSION_TTL sets the session cookie's and stored session's lifetimes too; false leaves them to framework.yaml
     security_headers:
         policy: {}                              # Content-Security-Policy directives replaced or added
         referrer_policy: strict-origin-when-cross-origin
@@ -253,7 +258,11 @@ value the server or the container sets wins over `.env`, which loading `.env` ne
   ever saves), a saved secret as asterisks (left as they are, it is kept, even one that can no longer be read). A choice
   or a time zone `.env` writes in another case is the one it names (`AUTH_TWO_STEP=everyone` is `EVERYONE`), and a value
   in force that is no option (an older time zone name, or something unknown) is shown selected as it stands, so saving
-  its group for another reason never puts another value in its place.
+  its group for another reason never puts another value in its place. With a database the overrides are in it; with
+  files, in `settings.json` in the storage folder (`Settings\FileSettingsStore`), so the page saves on an installation
+  without a database too. A project holds settings or whole groups fixed (`settings.fixed`, shown and refused however a
+  change is sent; `settings.hidden`, left off the page; or a `Settings\FixedSettingsProvider`) and shows facts the page
+  never changes (a `Settings\FactsProvider`). A length of time may have a longest value (`Setting`'s `longestTime`).
 - **The installation** (`Installation\Installation`): `APP_NAME`, `APP_ORGANISATION`, `APP_URL`, `APP_ADMIN_EMAIL`,
   `APP_TIMEZONE` and `APP_LOCALE` (`locale()`: how amounts are written and the pages' language, `en_GB` unless it says
   otherwise; a project gives its own under `defaults`; `language()` is it as HTML's `lang` names it, `en_ZA` as `en-ZA`,
@@ -269,12 +278,15 @@ value the server or the container sets wins over `.env`, which loading `.env` ne
   `APP_SITE_MODE`, demo or live, which a demo site says on every page and in every email.
 - **Sign-in** (`SignIn\`): an emailed link that works once and is kept only as a hash; who may sign in
   (`AUTH_SIGNIN`, `AUTH_SIGNIN_ALLOWED_EMAILS`); two-step sign-in with a QR code drawn on the server and recovery
-  codes (`AUTH_TWO_STEP`); limits on asking for links (`AUTH_REQUEST_*`); links that work once of any purpose, such as
-  a registration before there is an account (`Links\LinkStore`); the store of sign-ins (`Sessions\SessionStore`), which a
+  codes (`AUTH_TWO_STEP`: each person's choice, `CHOICE`, unless it says `ADMINS` or `EVERYONE`); limits on asking for
+  links (`AUTH_REQUEST_*`); links that work once of any purpose, such as a registration before there is an account
+  (`Links\LinkStore`); the store of sign-ins (`Sessions\SessionStore`), which a
   project with its own sign-in pages keeps its sign-ins in, and in which CattoPHP's sign-in keeps each one where the
   project switches it on (`sign_in.sessions: true`, `SignIn\SignInSessions`): checked on every request, so one ended or
   run out signs that browser out, and listed on the person's Sign-in and security page with End and End all others; how
-  long a link and a sign-in last (`AUTH_MAGIC_LINK_TTL`, `AUTH_SESSION_TTL`); `cattophp:sign-in-link` and
+  long a link and a sign-in last (`AUTH_MAGIC_LINK_TTL`; `AUTH_SESSION_TTL`, without a visit, every request moving the
+  sign-in's end, the session cookie and the stored session on, a page left open refreshing itself too, so closing the
+  browser does not sign anyone out); `cattophp:sign-in-link` and
   `cattophp:two-step-reset` for when email or a phone is lost. The application says who its accounts are with a
   `SignIn\SignInAccounts`; `SignIn\OwnerOnlyAccounts` is a page with one owner. Where people join by signing in for the
   first time, the accounts service implements `SignIn\JoiningAccounts` as well: an address with no account that may join
@@ -505,7 +517,7 @@ value the server or the container sets wins over `.env`, which loading `.env` ne
   under a name that counts (`recovery_codes`, `tokens_left`) is how many there are, and is kept.
 
 Its own pages (`templates/`: signing in, the error page, Administration's Settings, Roles and Activity log, a person's
-Sign-in and security) extend `@CattoPHP/page/stock.html.twig`. In a project with themes (`theme.pages`) they wear the
+Sign-in and security, the Campaign Marketing Manager's) extend `@CattoPHP/page/stock.html.twig`. In a project with themes (`theme.pages`) they wear the
 theme: the theme's frame, CattoPHP's page head with the identity band, what the reader's last form did (kept under
 CattoPHP's own names in Symfony's session, so never shown twice), then the page's rows, drawn with the components. In
 any other they extend `cattophp.layout` and fill its block body. Should the theme fail while drawing the error page, it
@@ -528,12 +540,31 @@ theme's wrapper (`pages/<family>.html.twig`). The names, in `Http\StockPages::PA
   `@CattoPHP/account/security.html.twig`);
 - `account-two-step`: setting two-step sign-in up, `/account/security/two-step` (`@CattoPHP/account/two-step.html.twig`);
 - `account-recovery-codes`: new recovery codes, shown once, `/account/security/recovery-codes`
-  (`@CattoPHP/account/recovery-codes.html.twig`).
+  (`@CattoPHP/account/recovery-codes.html.twig`);
+- the Campaign Marketing Manager's (`config/routes/marketing.php`, `Marketing\Pages\`, `@CattoPHP/marketing/*.html.twig`),
+  for a project with the marketing module on: `marketing-overview` (`/marketing`), `marketing-campaigns`
+  (`/marketing/campaigns`), `marketing-campaign-new` and `marketing-campaign-edit` (`/marketing/campaigns/new`,
+  `/{code}/edit`), `marketing-campaign` (`/marketing/campaigns/{code}`), `marketing-publication-new` and
+  `marketing-publication` (`/{code}/publications/new`, `/{publication}`), `marketing-advert-new` and `marketing-advert`
+  (`/{code}/adverts/new`, `/{reference}`), `marketing-landing-pages` and `marketing-landing-new`
+  (`/marketing/landing-pages`, `/new`), `marketing-landing-edit` (a landing page's editor, `/{reference}`, or wherever a
+  project mounts it with `Marketing\Pages\LandingEditor::routes()`), `landing-page` (a landing page as visitors see it,
+  `/c/{campaign}` and `/landing/{slug}`, and its editor's preview and kept versions), `marketing-visitors` and
+  `marketing-visitor` (`/marketing/visitors`, `/{reference}`: one visitor's journey), `marketing-sales` and
+  `marketing-sale` (`/marketing/sales`, `/{reference}`, and a connected site's sale at `/{site}/{reference}`) and
+  `marketing-settings` (`/marketing/settings`).
 
 The Administration pages and the account page need Symfony's session and sign-in. These pages draw icons the project's
 sprite holds: `action-add`, `action-back`, `action-disable`, `action-done`, `action-email`, `action-enable`,
 `action-filter`, `action-generate`, `action-grant`, `action-open`, `action-remove`, `action-reset`, `action-revoke` and
-`action-save` (and the pager's and the live refresh's, as every list has).
+`action-save` (and the pager's and the live refresh's, as every list has). The Campaign Marketing Manager's pages add
+`action-archive`, `action-copy`, `action-down`, `action-download`, `action-edit`, `action-pause`, `action-play` and
+`action-up`, the search box's `action-search` and `action-clear`, and its menu section `nav-marketing`; the Visitors
+and Sales pages, a visitor's and a sale's, add `action-view` and `action-view-all`; a landing
+page's editor adds `action-drag`, `action-hide`, `action-move-bottom`, `action-move-top`, `action-preview`,
+`action-publish`, `action-restore` and `action-view`, and a landing page as visitors see it `action-jump-down` and
+`action-play`, with `action-buy`, `action-continue`, `action-favourite`, `action-orders`, `action-request` and
+`action-sign-in` for the buttons the project's cards give no icon of their own.
 
 ## Developing it
 
@@ -550,11 +581,18 @@ podman pod create --name cattophp-test --userns=keep-id
 podman run -d --pod cattophp-test --name cattophp-test-postgres --user "$(id -u):$(id -g)" \
     -e POSTGRES_USER=cattophp -e POSTGRES_PASSWORD=cattophp-test -e POSTGRES_DB=cattophp_test -e PGDATA=/tmp/pgdata \
     docker.io/library/postgres:18.6-trixie
+podman exec cattophp-test-postgres psql -U cattophp -d cattophp_test -c 'CREATE DATABASE cattophp_test_2'
 podman run --rm --pod cattophp-test -v "$PWD":/app -w /app \
     -e CATTOPHP_TEST_DATABASE_URL=pdo-pgsql://cattophp:cattophp-test@127.0.0.1:5432/cattophp_test \
+    -e CATTOPHP_TEST_DATABASE_URL_2=pdo-pgsql://cattophp:cattophp-test@127.0.0.1:5432/cattophp_test_2 \
     <a PHP 8.5.12 image with pdo_pgsql> composer check
 podman pod rm -f cattophp-test
 ```
+
+The test of two connected sites (`MarketingSitesTwoSiteTest`: one site sending a campaign, another selling, each on
+its own database, talking through Symfony's `MockHttpClient`) needs a second database kept for it alone, named by
+`CATTOPHP_TEST_DATABASE_URL_2` and emptied as the first is. Without it that test is skipped, saying why, and the rest
+run as before.
 
 `composer test:unit` runs the tests that need no database.
 

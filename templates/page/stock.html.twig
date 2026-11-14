@@ -1,25 +1,32 @@
 {#
-	The frame of CattoPHP's own pages: signing in, the error page, Administration's Settings, Roles and Activity log, and a
-	person's Sign-in and security. In a project with themes, whose page renderer gives the page its `layout`, the page wears
-	the theme: CattoPHP's page head (the page's only h1 and its lead, with the identity band), what the reader's last form
-	did, then the page's own rows. In any other it extends the project's layout (`cattophp.layout`) and fills its block body.
-	A page extends this and fills stock_main, and may put its own main actions in stock_actions (they sit in the page head);
-	its data gives title and lead, and cattophp_notices (tone and text) say what the reader's last form did. A project that wants its own look for one of them replaces that template under
+	The frame of CattoPHP's own pages: signing in, the error page, Administration's Settings, Roles and Activity log, a
+	person's Sign-in and security, and the Campaign Marketing Manager's pages. In a project with themes, whose page renderer
+	gives the page its `layout`, the page wears the theme: CattoPHP's page head (the page's only h1 and its lead, with the
+	identity band), what the reader's last form did, then the page's own rows. In any other it extends the project's layout
+	(`cattophp.layout`) and fills its block body. A page extends this and fills stock_main, and may put its own main
+	actions in stock_actions (they sit in the page head) and the facts its head shows as badges in stock_badges; its data
+	gives title and lead, optionally kicker (a line above the title), and cattophp_notices (tone and text) say what the
+	reader's last form did. A project that wants its own look for one of them replaces that template under
 	templates/bundles/CattoPHPBundle/.
 #}
 {% extends layout is defined ? layout : cattophp.layout %}
 {% block page_body %}
 {% set ph_title = title %}
 {% set ph_lead = lead|default('') %}
+{% set ph_kicker = kicker|default('') %}
 {% set ph_actions %}{{ block('stock_actions') }}{% endset %}
+{% set ph_badges %}{{ block('stock_badges') }}{% endset %}
 {% include '@CattoPHP/page/head.html.twig' %}
 {{ block('stock_notices') }}
 {{ block('stock_main') }}
 {% endblock %}
 {% block body %}
 <main class="cl-stock-page">
+{% if kicker|default('') %}<p class="cl-kicker">{{ kicker }}</p>{% endif %}
 <h1>{{ title }}</h1>
 {% if lead|default('') %}<p class="cl-lead">{{ lead }}</p>{% endif %}
+{% set stock_badges_drawn %}{{ block('stock_badges') }}{% endset %}
+{% if stock_badges_drawn|trim %}<div class="cl-page-head-badges">{{ stock_badges_drawn }}</div>{% endif %}
 {% set stock_actions_drawn %}{{ block('stock_actions') }}{% endset %}
 {% if stock_actions_drawn|trim %}<div class="cl-page-head-actions">{{ stock_actions_drawn }}</div>{% endif %}
 {{ block('stock_notices') }}
@@ -36,4 +43,5 @@
 {% endif %}
 {% endblock %}
 {% block stock_actions %}{% endblock %}
+{% block stock_badges %}{% endblock %}
 {% block stock_main %}{% endblock %}

@@ -36,12 +36,17 @@ final class SignInSessionsTest extends TestCase
 
         $site->clock->modify('+10 minutes');
         self::assertTrue($sessions->holds($here, '7'));
+        self::assertSame($kept->lastSeenAt->getTimestamp(), $sessions->current($here)?->lastSeenAt->getTimestamp(), 'Checking writes nothing.');
+        // A visit that counts (SignInLength's to decide) moves it on: last seen now, running out twelve hours from now.
+        $sessions->visited($here, $site->clock->now(), $site->clock->now()->modify('+12 hours'));
         $seen = $sessions->current($here);
         self::assertNotNull($seen);
-        self::assertSame($site->clock->now()->getTimestamp(), $seen->lastSeenAt->getTimestamp(), 'Seen, every few minutes at most.');
-        self::assertSame($kept->expiresAt->getTimestamp(), $seen->expiresAt->getTimestamp(), 'It still runs out when it began to.');
-        $site->clock->modify('+12 hours');
-        self::assertFalse($sessions->holds($here, '7'), 'Run out.');
+        self::assertSame($site->clock->now()->getTimestamp(), $seen->lastSeenAt->getTimestamp());
+        self::assertSame($site->clock->now()->modify('+12 hours')->getTimestamp(), $sessions->endsAt($seen)->getTimestamp());
+        $site->clock->modify('+11 hours');
+        self::assertTrue($sessions->holds($here, '7'), 'Still going, eleven hours after the visit.');
+        $site->clock->modify('+1 hour');
+        self::assertFalse($sessions->holds($here, '7'), 'Run out, twelve hours after the visit.');
     }
 
     public function testOneIsEndedOrEveryOneButThisAndSigningOutEndsThisOne(): void

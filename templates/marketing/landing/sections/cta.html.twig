@@ -1,0 +1,15 @@
+{#
+	A call to action's one button: the project's own purchase box (its template and data, with the page's reference and
+	address for its forms and whether it is a preview), else the offer's buy button or what takes its place, its View,
+	a part of the page or a page of the site; a note when the offer cannot be had now.
+#}
+{% if section.part %}
+{% include section.part.template with section.part.data|merge({landing_fields: {(landing.page_field): landing.reference, (landing.return_field): landing.path}, landing_inert: landing.preview}) only %}
+{% elseif section.actions or section.jump %}
+<div class="cl-landing-cta-actions">
+{% for act in section.actions %}{% include '@CattoPHP/marketing/landing/action.html.twig' with {act: act} only %}{% endfor %}
+{% if section.jump %}{{ ui('action.link', {label: section.jump.label, href: section.jump.href, variant: 'primary', icon: 'action-jump-down'}) }}{% endif %}
+</div>
+{% elseif section.offer_note %}
+<p class="cl-landing-offer-note">{{ section.offer_note }}</p>
+{% endif %}

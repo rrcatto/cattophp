@@ -1,0 +1,18 @@
+{#
+	One landing page section on its card: its heading and introduction, then what its kind draws (the kind's own template,
+	a fixed name in its class: @CattoPHP/marketing/landing/sections/<key>.html.twig for CattoPHP's kinds, the project's for
+	its own). A section without a heading is named for a screen reader by its kind. The copy is plain text and everything
+	else comes resolved from LandingViewBuilder; nothing here reads anything more. Its anchor is its kind's name, with its
+	reference added for a second of a kind.
+#}
+<section class="cl-landing-section cl-landing-section--{{ section.type }}" id="{{ section.anchor }}"{% if section.heading %} aria-labelledby="{{ section.anchor }}-heading"{% else %} aria-label="{{ section.label }}"{% endif %}{% if section.type == 'countdown' %} data-cl-countdown-scope{% endif %}>
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+{% if section.heading or section.paragraphs %}
+<div class="cl-landing-section-head">
+{% if section.heading %}<h2 class="cl-landing-section-heading" id="{{ section.anchor }}-heading">{{ section.heading }}</h2>{% endif %}
+{% include '@CattoPHP/marketing/landing/paragraphs.html.twig' with {paragraphs: section.paragraphs, paragraph_class: 'cl-landing-intro'} only %}
+</div>
+{% endif %}
+{% include section.template with {section: section, landing: landing} only %}
+{% endblock %}{% endembed %}
+</section>

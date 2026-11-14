@@ -55,6 +55,7 @@ final class ModulesKernelTest extends TestCase
             'identity verification' => [['identity' => true], ['identity']],
             'the Inbox' => [['inbox' => true], ['inbox']],
             'mailing' => [['mailing' => true], ['mailing']],
+            'the Campaign Marketing Manager' => [['marketing' => true], ['marketing']],
         ];
     }
 
@@ -68,7 +69,7 @@ final class ModulesKernelTest extends TestCase
         $folder = Foundations::folder();
         $on2 = static fn(string $key): bool => $switches[$key] ?? false;
         $kernel = new TestKernel($folder, (string) getenv('CATTOPHP_TEST_DATABASE_URL'), scheduler: $on2('scheduler'), setup: $on2('setup'), protection: $on2('protection'), telegram: $on2('telegram'),
-            search: $on2('search'), documents: $on2('documents'), api: $on2('api'), signup: $on2('signup'), identity: $on2('identity'), inbox: $on2('inbox'), mailing: $on2('mailing'));
+            search: $on2('search'), documents: $on2('documents'), api: $on2('api'), signup: $on2('signup'), identity: $on2('identity'), inbox: $on2('inbox'), mailing: $on2('mailing'), marketing: $on2('marketing'));
         try {
             $kernel->boot();
             $application = new Application($kernel);

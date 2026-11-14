@@ -1,0 +1,35 @@
+{#
+	A landing page's settings in its editor: an offer's page's address (changing it breaks links to the old one), or a
+	campaign's page's fixed one; the title and description search engines and shared links show (each optional); the
+	picture used when the page is shared; and, on a campaign's page, what it does while the campaign is not running, as
+	three feature cards, with where it sends visitors. Saved in place by htmx, or as an ordinary form.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'settings', labelledby: 'settings-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Page settings', heading_id: 'settings-heading', summary: 'Where the page lives, and what search engines and shared links show for it. Left empty, the title and description come from the hero and the ' ~ (landing.kind == 'campaign' ? 'campaign' : 'offer') ~ '.'}) }}
+{% if settings_notice %}{{ ui('feedback.notice', {tone: settings_notice[0], heading: settings_notice[1]}) }}{% endif %}
+{% if may_edit %}<form method="post" action="{{ urls.settings }}"{% if may_upload and settings.share.upload %} enctype="multipart/form-data" hx-encoding="multipart/form-data"{% endif %} hx-post="{{ urls.settings }}" hx-target="#settings" hx-swap="outerHTML">
+<input type="hidden" name="_token" value="{{ form_token() }}">{% else %}<div>{% endif %}
+<fieldset class="cl-landing-fields"{% if not may_edit %} disabled{% endif %}>
+<legend class="visually-hidden">Page settings</legend>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% if settings.offer_page %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address', for: 'landing-slug', required: true, help: 'Small letters, digits and hyphens: the page is at ' ~ settings.prefix ~ ' followed by this. Changing it breaks links to the old address.', error: settings.errors.slug})} %}{% block control %}<div class="cl-landing-slug"><span aria-hidden="true">{{ settings.prefix }}</span><input class="cl-input" type="text" id="landing-slug" name="slug" value="{{ settings.slug }}" maxlength="120" required pattern="[a-z0-9]+(-[a-z0-9]+)*" spellcheck="false" {{ ui_field_attrs(props) }}></div>{% endblock %}{% endembed %}
+{% else %}
+{{ ui('data.key-value-list', {items: [{label: 'Address', value: settings.campaign_address ~ ': the campaign\'s code. Each publication\'s link adds its own ending.'}]}) }}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Page title (optional)', for: 'landing-meta-title', help: 'Shown in the browser tab, search results and shared links. At most 120 characters.', error: settings.errors.meta_title})} %}{% block control %}<input class="cl-input" type="text" id="landing-meta-title" name="meta_title" value="{{ settings.meta_title }}" maxlength="120" placeholder="{{ settings.title_placeholder }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (optional)', for: 'landing-meta-description', help: 'One or two sentences for search results and shared links, at most 300 characters.', error: settings.errors.meta_description})} %}{% block control %}<textarea class="cl-input" id="landing-meta-description" name="meta_description" rows="3" maxlength="300" {{ ui_field_attrs(props) }}>{{ settings.meta_description }}</textarea>{% endblock %}{% endembed %}
+{% include '@CattoPHP/marketing/landing/forms/picture-field.html.twig' with {picture: settings.share, legend: 'Picture used when the page is shared', help: 'Left as No picture, the hero\'s picture is used, else the offer\'s.', error: settings.errors.share_picture, may_upload: may_upload} only %}
+{% if not settings.offer_page %}
+{{ ui('form.picture-choice', {name: 'not_running', legend: 'When the campaign is not running', id: 'landing-not-running', help: 'Before it starts, while it is paused and after it ends.', items: settings.not_running_cards, selected: settings.not_running, error: settings.errors.not_running, size: 'small'}) }}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where it sends visitors', for: 'landing-not-running-to', help: 'Only when it sends them to another page: a path on this site, such as /offers. Left empty, the campaign\'s own destination, ' ~ settings.destination ~ '.', error: settings.errors.not_running_to})} %}{% block control %}<input class="cl-input" type="text" id="landing-not-running-to" name="not_running_to" value="{{ settings.not_running_to }}" maxlength="2000" spellcheck="false" placeholder="{{ settings.destination }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% endblock %}{% endembed %}
+</fieldset>
+{% if may_edit %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the settings', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% else %}
+</div>
+{% endif %}
+{% endblock %}{% endembed %}

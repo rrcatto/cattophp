@@ -67,6 +67,7 @@
             "!/README.md",
             "!/CHANGELOG.md",
             "!/GUIDE-v*.md",
+            "!/MODULES-v*.md",
             "!/LICENSE"
         ]
     },

@@ -22,6 +22,10 @@ use CattoPHP\Schema\Steps\Step202611122310CattoMail;
 use CattoPHP\Schema\Steps\Step202611122320MailingLists;
 use CattoPHP\Schema\Steps\Step202611122330MailingCampaigns;
 use CattoPHP\Schema\Steps\Step202611122340MailingForwards;
+use CattoPHP\Schema\Steps\Step202611132100MarketingCampaigns;
+use CattoPHP\Schema\Steps\Step202611140010MarketingLanding;
+use CattoPHP\Schema\Steps\Step202611141200MarketingSales;
+use CattoPHP\Schema\Steps\Step202611141500MarketingForgottenCustomers;
 
 /**
  * Every optional module and what it needs, in one place. A project switches a module on in its configuration
@@ -60,6 +64,10 @@ final class Modules
                 database: true, usesIfOn: ['scheduler' => 'reads answers from the mailbox every minute'], schemaSteps: [Step202611122300Inbox::class]),
             new Module('mailing', 'Mailing', 'Lists and who agreed to them, campaigns and each person\'s copy, the sender, the addresses never emailed, and a mail server or catto-mail.',
                 database: true, packages: self::HTTP_CLIENT, schemaSteps: [Step202611122310CattoMail::class, Step202611122320MailingLists::class, Step202611122330MailingCampaigns::class, Step202611122340MailingForwards::class]),
+            new Module('marketing', 'The Campaign Marketing Manager', 'Campaigns, their adverts and publications, tracking links and the visitors they bring, landing pages, spend and the figures that compare them.',
+                database: true, usesIfOn: ['scheduler' => 'removes old IP addresses and makes old visitors anonymous every night, and sends reports to connected sites every minute'],
+                schemaSteps: [Step202611132100MarketingCampaigns::class, Step202611140010MarketingLanding::class, Step202611141200MarketingSales::class,
+                    Step202611141500MarketingForgottenCustomers::class]),
             new Module('payments', 'Payments', 'Payment gateways through Omnipay, each one\'s keys in Settings, and each one\'s connection from its last check.',
                 packages: ['Omnipay\Common\GatewayFactory' => 'omnipay/common'], schemaSteps: [Step202611130200Connections::class]),
             new Module('theme', 'Themes', 'Theme packages checked, installed, chosen and previewed, and the page renderer.'),

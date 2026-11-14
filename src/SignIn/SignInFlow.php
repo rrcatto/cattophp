@@ -9,11 +9,15 @@ use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
 /**
  * Where a sign-in has got to, in the visitor's session: the link opened (for ten minutes), the key being set up, the
- * wrong codes so far, and when the sign-in finished, which decides how long it lasts.
+ * wrong codes so far, when the sign-in finished, the person's last visit and when the sign-in ends if they stay away:
+ * AUTH_SESSION_TTL after that visit, as the setting was then. A later, longer setting applies from their next visit;
+ * a shorter one applies at once, counted from their last visit.
  */
 final class SignInFlow
 {
     public const SIGNED_IN_AT = '_cattophp_signed_in_at';
+    public const SIGNED_IN_UNTIL = '_cattophp_signed_in_until';
+    public const LAST_VISIT = '_cattophp_signed_in_last_visit';
     private const ACCOUNT = '_cattophp_sign_in_account';
     private const OPENED_AT = '_cattophp_sign_in_opened_at';
     private const RETURN = '_cattophp_sign_in_return';
@@ -82,11 +86,46 @@ final class SignInFlow
         }
     }
 
-    public function signedIn(SessionInterface $session, int $now): void
+    /**
+     * The sign-in finished at $now, the first visit, ending at $until (a moment in seconds) unless the person comes back
+     * first; with $until null, as the setting says.
+     */
+    public function signedIn(SessionInterface $session, int $now, ?int $until = null): void
     {
         $this->clear($session);
         $session->set(self::SIGNED_IN_AT, $now);
+        $this->visited($session, $now, $until);
     }
+
+    /** A visit at $now: the sign-in now ends at $until unless the person comes back first (null: as the setting says). */
+    public function visited(SessionInterface $session, int $now, ?int $until): void
+    {
+        $session->set(self::LAST_VISIT, $now);
+        if ($until !== null) {
+            $session->set(self::SIGNED_IN_UNTIL, $until);
+        } else {
+            $session->remove(self::SIGNED_IN_UNTIL);
+        }
+    }
+
+    /**
+     * When the session's sign-in ends if the person stays away, in seconds, or null when it holds none: the end set at
+     * their last visit, never later than $lasts seconds after that visit (the setting now), so a shorter setting applies
+     * at once and a longer one from the next visit. A sign-in from before visits were kept counts from signing in.
+     */
+    public static function endsAt(SessionInterface $session, int $lasts): ?int
+    {
+        $at = $session->get(self::SIGNED_IN_AT);
+        if (!is_int($at)) {
+            return null;
+        }
+        $visit = $session->get(self::LAST_VISIT);
+        $visit = is_int($visit) ? $visit : $at;
+        $until = $session->get(self::SIGNED_IN_UNTIL);
+
+        return is_int($until) ? min($until, $visit + $lasts) : $visit + $lasts;
+    }
+
 
     /** @param list<string> $codes */
     public function showRecoveryCodes(SessionInterface $session, array $codes): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CattoPHP\Ui;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 use LogicException;
 use Twig\Environment;
@@ -70,10 +72,28 @@ final class Components
         'data.list-item' => ['template' => 'data/list-item', 'defaults' => []],
         'data.key-value-list' => ['template' => 'data/key-value-list', 'defaults' => ['items' => null]],
         'data.person' => ['template' => 'data/person', 'defaults' => ['name' => null, 'reference' => '', 'href' => '', 'email' => '', 'full' => false]],
+        // Amounts over time as columns, one for each slice of a period, the empty ones included: label names the chart,
+        // columns are each label and value (words, href and named optional). top is the scale's top in words (the
+        // largest column's words unless given); label_heading and value_heading head the table of the same figures under
+        // the chart (table: false leaves it out); empty is what is said when every column is nothing.
+        'data.column-chart' => ['template' => 'data/column-chart', 'defaults' => ['label' => null, 'columns' => null, 'top' => '', 'label_heading' => 'Period', 'value_heading' => 'Amount', 'empty' => 'Nothing to show for this period.', 'table' => true]],
+        // Things compared by one figure, a row each: its label (a link with href), its value in words and a bar of it
+        // against the largest (or against max, such as a total), with an optional note under the value.
+        'data.bar-list' => ['template' => 'data/bar-list', 'defaults' => ['label' => null, 'rows' => null, 'max' => 0, 'empty' => 'Nothing to show yet.']],
+        // A rating out of five: the stars, the mean to one decimal and how many reviews it comes from (count), the same in
+        // words for a screen reader. With none, empty's words (nothing at all when empty is ''), never a row of empty
+        // stars, which would read as a rating of nothing. compact: smaller, for a card.
+        'data.rating' => ['template' => 'data/rating', 'defaults' => ['average' => 0, 'count' => null, 'compact' => false, 'empty' => 'No reviews yet']],
         'feedback.badge' => ['template' => 'feedback/badge', 'defaults' => ['label' => null, 'tone' => 'neutral', 'size' => 'normal']],
         'feedback.notice' => ['template' => 'feedback/notice', 'defaults' => ['tone' => 'info', 'heading' => '', 'section_spacing' => false, 'flash' => false, 'solid' => false, 'icon' => '']],
         'feedback.empty' => ['template' => 'feedback/empty-state', 'defaults' => ['heading' => '', 'summary' => '']],
         'feedback.progress' => ['template' => 'feedback/progress', 'defaults' => ['value' => null, 'min' => 0, 'max' => 100, 'label' => null, 'show_value' => false, 'size' => 'normal']],
+        // A count down to a moment (ends_at, a Unix time) by the server's own clock (now; 0: the clock now), so a
+        // visitor's wrong clock cannot change it: words, then the time left from the largest unit (week or day) down to
+        // the seconds, shown and ticking with JavaScript; then until and the moment in the site's time zone, shown always,
+        // so without JavaScript the page still says when. Nothing once the moment has passed; at zero the script takes it
+        // away, with the element around it marked data-cl-countdown-scope if there is one.
+        'feedback.countdown' => ['template' => 'feedback/countdown', 'defaults' => ['ends_at' => null, 'now' => 0, 'words' => 'Time left:', 'until' => 'Until', 'largest' => 'week'], 'props' => ['largest' => ['week', 'day']]],
         'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post', 'upload' => false, 'open' => false]],
         // eyebrow and icon: a category line above the heading and an SVG icon before both. workspace and section_key:
         // data-<workspace>-section="<section_key>", for the project's script that remembers which sections were open.
@@ -263,6 +283,10 @@ final class Components
         if ($component === 'data.table') {
             $enums['stack'] = [true, false];
         }
+        if ($component === 'data.column-chart') {
+            // A chart's columns are its figures, checked by columnChart(), not a grid's number of columns.
+            unset($enums['columns']);
+        }
         foreach ($enums as $key => $allowed) {
             if (array_key_exists($key, $values) && !in_array($values[$key], $allowed, true)) {
                 throw new InvalidArgumentException('Invalid semantic UI value: ' . $component . '.' . $key);
@@ -275,6 +299,18 @@ final class Components
             }
             if ($values['max'] <= $values['min']) throw new InvalidArgumentException('Invalid progress range.');
             $values['value'] = max($values['min'], min($values['max'], $values['value']));
+        }
+        if ($component === 'data.column-chart') {
+            $values = self::columnChart($values);
+        }
+        if ($component === 'data.bar-list') {
+            $values = self::barList($values);
+        }
+        if ($component === 'data.rating') {
+            $values = self::rating($values);
+        }
+        if ($component === 'feedback.countdown') {
+            $values = self::countdown($values);
         }
         if ($component === 'form.tree-select') {
             if (!is_string($values['id']) || preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1 || !is_string($values['name']) || $values['name'] === '' || !is_string($values['selected'])
@@ -376,6 +412,214 @@ final class Components
             }
         }
         return $values;
+    }
+
+    /**
+     * A column chart's values checked, and what its template draws worked out: each column's height as a share of the
+     * tallest, the words a screen reader and a pointer get ("3 Nov: 12 clicks"), which columns are named beneath (about
+     * six, half of them on a phone), the scale's top, and whether there is anything to draw at all.
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function columnChart(array $values): array
+    {
+        foreach (['label', 'label_heading', 'value_heading'] as $key) {
+            if (!is_string($values[$key]) || trim($values[$key]) === '') throw new InvalidArgumentException('A column chart needs ' . $key . ' in words.');
+        }
+        if (!is_string($values['top']) || !is_string($values['empty']) || !is_bool($values['table'])) {
+            throw new InvalidArgumentException('A column chart\'s top and empty are words and its table true or false.');
+        }
+        if (!is_array($values['columns']) || !array_is_list($values['columns'])) throw new InvalidArgumentException('A column chart\'s columns are a list.');
+        $columns = $values['columns'];
+        foreach ($columns as $position => $column) {
+            $problem = self::keyProblem($column, ['label', 'value'], ['words', 'href', 'named']) ?? (is_array($column) ? self::figureProblem($column) : null);
+            if ($problem === null && is_array($column) && !is_bool($column['named'] ?? false)) {
+                $problem = 'has a named that is not true or false';
+            }
+            if ($problem !== null) {
+                throw new InvalidArgumentException('Each column of a column chart has a label and a value, and optionally words, href and named, in any order: column ' . ($position + 1) . ' ' . $problem . '.');
+            }
+        }
+        /** @var list<array{label:string,value:int|float,words?:string,href?:string,named?:bool}> $columns */
+        $count = count($columns);
+        $tallest = max([0, ...array_map(static fn (array $column): int|float => $column['value'], $columns)]);
+        // About six named beneath, the first among them; each one the page names itself is named whatever the step.
+        $step = $count <= 8 ? 1 : (int) ceil($count / 6);
+        $drawn = [];
+        $named = 0;
+        $top = '';
+        foreach ($columns as $position => $column) {
+            $words = ($column['words'] ?? '') !== '' ? (string) $column['words'] : self::numberWords($column['value']);
+            $isNamed = $column['named'] ?? ($position % $step === 0);
+            $drawn[] = [
+                'label' => $column['label'],
+                'value' => $column['value'],
+                'words' => $words,
+                'href' => $column['href'] ?? '',
+                'named' => $isNamed,
+                // On a phone every other name is left out, so the names beneath never run into each other.
+                'wide' => $isNamed && $named++ % 2 === 1,
+                'share' => $tallest > 0 ? $column['value'] / $tallest * 100 : 0,
+                'title' => $column['label'] . ': ' . $words,
+            ];
+            if ($top === '' && $column['value'] === $tallest) {
+                $top = $words;
+            }
+        }
+        if ($named <= 4) {
+            foreach ($drawn as $position => $column) $drawn[$position]['wide'] = false;
+        }
+        $values['columns'] = $drawn;
+        $values['top'] = $values['top'] !== '' ? $values['top'] : ($top !== '' ? $top : '0');
+        $values['blank'] = $tallest <= 0;
+        // Many columns stand closer together, so a year of days still fits a phone.
+        $values['dense'] = $count > 48;
+
+        return $values;
+    }
+
+    /**
+     * A bar list's values checked, and each bar's length worked out as a share of the longest, or of max when the page
+     * gives one (a total, so each bar is its part of it).
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function barList(array $values): array
+    {
+        if (!is_string($values['label']) || trim($values['label']) === '') throw new InvalidArgumentException('A bar list needs label in words.');
+        if (!is_string($values['empty'])) throw new InvalidArgumentException('A bar list\'s empty is words.');
+        if (!(is_int($values['max']) || is_float($values['max'])) || !is_finite((float) $values['max']) || $values['max'] < 0) {
+            throw new InvalidArgumentException('A bar list\'s max is a number of nothing or more (nothing: the largest value).');
+        }
+        if (!is_array($values['rows']) || !array_is_list($values['rows'])) throw new InvalidArgumentException('A bar list\'s rows are a list.');
+        $rows = $values['rows'];
+        foreach ($rows as $position => $row) {
+            $problem = self::keyProblem($row, ['label', 'value'], ['words', 'href', 'note']) ?? (is_array($row) ? self::figureProblem($row) : null);
+            if ($problem === null && is_array($row) && !is_string($row['note'] ?? '')) {
+                $problem = 'has a note that is not words';
+            }
+            if ($problem !== null) {
+                throw new InvalidArgumentException('Each row of a bar list has a label and a value, and optionally words, href and note, in any order: row ' . ($position + 1) . ' ' . $problem . '.');
+            }
+        }
+        /** @var list<array{label:string,value:int|float,words?:string,href?:string,note?:string}> $rows */
+        $scale = $values['max'] > 0 ? $values['max'] : max([0, ...array_map(static fn (array $row): int|float => $row['value'], $rows)]);
+        $values['rows'] = array_map(static fn (array $row): array => [
+            'label' => $row['label'],
+            'value' => $row['value'],
+            'words' => ($row['words'] ?? '') !== '' ? (string) $row['words'] : self::numberWords($row['value']),
+            'href' => $row['href'] ?? '',
+            'note' => $row['note'] ?? '',
+            'share' => $scale > 0 ? $row['value'] / $scale * 100 : 0,
+        ], $rows);
+        $values['blank'] = $rows === [];
+
+        return $values;
+    }
+
+    /**
+     * A rating's values checked, and what its template writes worked out: the mean to one decimal, the whole stars to
+     * fill (the mean rounded), the number of reviews with thousands marked, and review or reviews.
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function rating(array $values): array
+    {
+        if (!is_int($values['count']) || $values['count'] < 0) throw new InvalidArgumentException('A rating\'s count is a whole number of nothing or more.');
+        $average = $values['average'];
+        if (!(is_int($average) || is_float($average)) || !is_finite((float) $average) || $average < 0 || $average > 5) {
+            throw new InvalidArgumentException('A rating\'s average is a number from 0 to 5.');
+        }
+        if (!is_bool($values['compact']) || !is_string($values['empty'])) throw new InvalidArgumentException('A rating\'s compact is true or false and its empty is words.');
+        $values['average_words'] = number_format((float) $average, 1);
+        $values['filled'] = $values['count'] > 0 ? (int) round((float) $average) : 0;
+        $values['count_words'] = number_format($values['count']);
+        $values['noun'] = $values['count'] === 1 ? 'review' : 'reviews';
+
+        return $values;
+    }
+
+    /**
+     * A countdown's values checked, and what its template draws worked out: the time left in its units by the server's
+     * clock (the script keeps them ticking from there), whether the moment has passed, and the moment in words and as a
+     * machine-readable time, in PHP's time zone (the installation's, which CattoPHP sets at each request).
+     *
+     * @param array<string,mixed> $values
+     * @return array<string,mixed>
+     */
+    private static function countdown(array $values): array
+    {
+        if (!is_int($values['ends_at']) || $values['ends_at'] < 1 || !is_int($values['now']) || $values['now'] < 0) {
+            throw new InvalidArgumentException('A countdown\'s ends_at is a moment as a Unix time, and its now one too, or 0 for the server\'s clock now.');
+        }
+        if (!is_string($values['words']) || !is_string($values['until'])) throw new InvalidArgumentException('A countdown\'s words and until are words.');
+        if (!in_array($values['largest'], ['week', 'day'], true)) throw new InvalidArgumentException('Invalid semantic UI value: feedback.countdown.largest');
+        $now = $values['now'] > 0 ? $values['now'] : time();
+        $ends = (new DateTimeImmutable('@' . $values['ends_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()));
+        $values['now'] = $now;
+        $values['ended'] = $values['ends_at'] <= $now;
+        $values['units'] = self::timeLeft($values['ends_at'] - $now, $values['largest']);
+        $values['moment'] = $ends->format('j F Y \a\t H:i T');
+        $values['datetime'] = $ends->format(DATE_ATOM);
+
+        return $values;
+    }
+
+    /**
+     * The time left in units from the largest down to the seconds, each with its number and its name in words; those
+     * before the first that is not nothing are not shown, and the seconds always are. All are given, for the script to
+     * show as they are needed.
+     *
+     * @return list<array{name:string,count:int,words:string,shown:bool}>
+     */
+    private static function timeLeft(int $seconds, string $largest): array
+    {
+        $lengths = ['week' => 604800, 'day' => 86400, 'hour' => 3600, 'minute' => 60, 'second' => 1];
+        if ($largest === 'day') unset($lengths['week']);
+        $left = max(0, $seconds);
+        $units = [];
+        $shown = false;
+        foreach ($lengths as $name => $length) {
+            $count = intdiv($left, $length);
+            $left -= $count * $length;
+            $shown = $shown || $count > 0 || $name === 'second';
+            $units[] = ['name' => $name, 'count' => $count, 'words' => $count === 1 ? $name : $name . 's', 'shown' => $shown];
+        }
+
+        return $units;
+    }
+
+    /**
+     * What is wrong with a figure's label, value, words and link, as a column or a bar row has them; null when nothing.
+     *
+     * @param array<mixed> $figure
+     */
+    private static function figureProblem(array $figure): ?string
+    {
+        $value = $figure['value'] ?? null;
+        $href = $figure['href'] ?? '';
+
+        return match (true) {
+            !is_string($figure['label'] ?? null) || trim($figure['label']) === '' => 'has no label in words',
+            !(is_int($value) || is_float($value)) || !is_finite((float) $value) || $value < 0 => 'has a value that is not a number of nothing or more',
+            !is_string($figure['words'] ?? '') => 'has words that are not words',
+            // A link is a path on this site or a web address, never a script.
+            !is_string($href) || ($href !== '' && preg_match('#^(/(?!/)|https?://[^\s/])[^\s]*$#i', $href) !== 1) => 'has an href that is neither a path on this site nor a web address',
+            default => null,
+        };
+    }
+
+    /** A number as a page writes it when it is given no words: whole numbers with thousands marked, others to two places. */
+    private static function numberWords(int|float $value): string
+    {
+        if (is_int($value) || floor($value) === $value) {
+            return number_format($value);
+        }
+
+        return rtrim(rtrim(number_format($value, 2), '0'), '.');
     }
 
     /**

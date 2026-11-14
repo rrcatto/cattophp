@@ -1,0 +1,98 @@
+{#
+	A publication: one place the campaign was published. A new one is its form (its channel and advert as feature cards,
+	where exactly, when, where it can be seen, what it cost, its code and where its link leads). Once saved, its page shows
+	its tracking link ready to copy, the same link with ?src= and with UTM tags, its QR code (shown, and downloaded as an
+	SVG file for a printed advert) and its clicks, then the form to change it and Retire, Restore or Delete. Someone who
+	may only look sees its facts instead of the form. Last, the campaign's other publications.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{% if publication %}
+{{ ui('feedback.badge', {label: publication.retired ? 'Retired' : 'In use', tone: publication.retired ? 'neutral' : 'success'}) }}
+{{ ui('feedback.badge', {label: 'Code ' ~ publication.code}) }}
+{% endif %}
+{% endblock %}
+{% block stock_actions %}{{ ui('action.link', {label: 'Back to the campaign', href: campaign.href, icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+{% if publication %}
+<section class="cl-page-section" id="tracking-link">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'tracking-link-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Its tracking link', heading_id: 'tracking-link-heading', summary: 'Use it where this publication is. All three forms count the same click; a scan of the QR code is a click too.'}) }}
+<div class="cl-marketing-link">
+<div class="cl-marketing-link-forms">
+{% include '@CattoPHP/marketing/copy-field.html.twig' with {cf_id: 'link-short', cf_label: 'The short link', cf_value: publication.short, cf_help: 'Short enough to type or say aloud.'} only %}
+{% include '@CattoPHP/marketing/copy-field.html.twig' with {cf_id: 'link-source', cf_label: 'With ?src=', cf_value: publication.source, cf_help: 'The campaign\'s own link, naming this publication.'} only %}
+{% include '@CattoPHP/marketing/copy-field.html.twig' with {cf_id: 'link-utm', cf_label: 'With UTM tags', cf_value: publication.utm, cf_help: 'For a channel\'s own reports, which read these tags.'} only %}
+{{ ui('data.key-value-list', {items: [{label: 'Clicks', value: publication.clicks}, {label: 'Unique visitors', value: publication.unique_visitors}, {label: 'Set aside', value: publication.set_aside ~ ' (link previews and robots)'}]}) }}
+</div>
+<figure class="cl-marketing-qr">
+<div class="cl-qr-code-frame">{{ publication.qr|raw }}</div>
+<figcaption>For printed adverts and slides.</figcaption>
+{{ ui('action.link', {label: 'Download the QR code', href: publication.qr_href, icon: 'action-download'}) }}
+</figure>
+</div>
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section" id="publication">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'publication-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The publication', heading_id: 'publication-heading', summary: 'One place you publish the campaign, such as one group, one email or one stack of flyers.'}) }}
+{% if may_manage %}
+<form method="post" action="{{ action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'channel', legend: 'Channel', id: 'publication-channel', items: channel_cards, selected: typed.channel, required: true, error: errors.channel, size: 'small'}) }}
+{{ ui('form.picture-choice', {name: 'advert', legend: 'Advert', id: 'publication-advert', items: advert_cards, selected: typed.advert, error: errors.advert, size: 'small', help: advert_cards|length > 1 ? 'Which of the campaign\'s adverts it showed.' : 'The campaign has no advert yet: add one, or save it without.'}) }}
+<p class="cl-marketing-aside">{{ ui('action.link', {label: 'Add an advert', href: advert_new_href, icon: 'action-add', size: 'small'}) }}</p>
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where exactly', for: 'publication-place', help: 'Your own words, so you can tell two of the same channel apart, such as the name of a group.', error: errors.place})} %}{% block control %}<input class="cl-input" id="publication-place" type="text" name="place" value="{{ typed.place }}" maxlength="200" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Published on', for: 'publication-published-on', help: 'Leave it empty if it is not out yet.', error: errors.published_on})} %}{% block control %}<input class="cl-input" id="publication-published-on" type="date" name="published_on" value="{{ typed.published_on }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where it can be seen', for: 'publication-published-address', help: 'Optional: paste the address once the advert is up, starting with https://, so you can find it again.', error: errors.published_address})} %}{% block control %}<input class="cl-input" id="publication-published-address" type="url" name="published_address" value="{{ typed.published_address }}" maxlength="2000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it cost' ~ (currency ? ' (' ~ currency ~ ')' : ''), for: 'publication-cost', help: 'Such as 250 or 250.50. Leave it empty for a free post; you can add it later.', error: errors.cost})} %}{% block control %}<input class="cl-input" id="publication-cost" type="text" name="cost" value="{{ typed.cost }}" maxlength="24" inputmode="decimal" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if code_fixed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its code', for: 'publication-code', help: 'People have opened its link, so its code stays ' ~ code_fixed ~ '.'})} %}{% block control %}<input class="cl-input" id="publication-code" type="text" name="code" value="{{ code_fixed }}" readonly {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% else %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its code', for: 'publication-code', help: 'The last part of its tracking link: 1 to 12 small letters and digits. Leave it empty for the channel\'s next, such as fb2.', error: errors.code})} %}{% block control %}<input class="cl-input" id="publication-code" type="text" name="code" value="{{ typed.code }}" maxlength="12" pattern="[A-Za-z0-9]{1,12}" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its link leads to', for: 'publication-destination', help: 'Leave it empty for where the campaign\'s links lead (' ~ campaign.destination ~ '), or type a page of this site, such as /offers, or a whole address starting with https://.', error: errors.destination})} %}{% block control %}<input class="cl-input" id="publication-destination" type="text" name="destination" value="{{ typed.destination }}" maxlength="2000" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Notes', for: 'publication-notes', full_width: true, help: 'For you, such as who to ask about it.', error: errors.notes})} %}{% block control %}<textarea class="cl-input" id="publication-notes" name="notes" rows="2" maxlength="5000" {{ ui_field_attrs(props) }}>{{ typed.notes }}</textarea>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: save_label, type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: back_href, icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% if publication %}
+<div class="cl-card-form cl-marketing-record-actions">
+{% if publication.retired %}
+<form method="post" action="{{ publication.restore_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="publication">{{ ui('action.button', {label: 'Restore it', type: 'submit', icon: 'action-enable'}) }}</form>
+{% else %}
+<form method="post" action="{{ publication.retire_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="publication">{{ ui('action.button', {label: 'Retire it', type: 'submit', icon: 'action-disable', confirm: 'Retire ' ~ publication.code ~ '? Its link still leads where it did, and its clicks stay with the campaign.'}) }}</form>
+{% endif %}
+{% if publication.may_delete %}
+<form method="post" action="{{ publication.delete_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="back" value="publication">{{ ui('action.button', {label: 'Delete it', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: 'Delete ' ~ publication.code ~ '? Nobody has opened its link yet. This cannot be undone.'}) }}</form>
+{% endif %}
+</div>
+{% endif %}
+{% else %}
+{{ ui('data.key-value-list', {items: publication.facts}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% if others %}
+<section class="cl-page-section" id="others">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'others-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: publication ? 'The campaign\'s other publications' : 'The campaign\'s publications so far', heading_id: 'others-heading', summary: 'Newest first. Each has its own tracking link.'}) }}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The campaign\'s publications, newest first', stack: true})} %}
+{% block header %}<tr><th scope="col">Published</th><th scope="col">Code</th><th scope="col">Channel</th><th scope="col">Where exactly</th><th scope="col">Tracking link</th></tr>{% endblock %}
+{% block body %}
+{% for other in others %}
+<tr><td data-label="Published">{{ other.day }}</td><td data-label="Code"><a href="{{ other.href }}">{{ other.code }}</a></td><td data-label="Channel">{{ other.channel }}</td><td class="cell-text" data-label="Where exactly">{{ other.place }}</td><td class="cell-text" data-label="Tracking link"><code>{{ other.link }}</code></td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

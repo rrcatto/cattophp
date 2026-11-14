@@ -1,0 +1,9 @@
+{#
+	A picture section's fields: an optional heading, the picture (a source as feature cards, its pictures, an upload) and
+	its caption.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Heading (optional)', for: 'landing-heading', help: 'At most ' ~ form.limits.heading ~ ' characters. Left empty, the picture stands alone.', error: errors.heading|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-heading" name="heading" value="{{ values.heading|default('') }}" maxlength="{{ form.limits.heading }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% include '@CattoPHP/marketing/landing/forms/picture-field.html.twig' with {picture: pictures.picture, legend: 'Picture', error: errors.picture|default(''), may_upload: may_upload} only %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Caption (optional)', for: 'landing-caption', help: 'Under the picture, at most ' ~ form.limits.caption ~ ' characters.', error: errors.caption|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-caption" name="caption" value="{{ values.caption|default('') }}" maxlength="{{ form.limits.caption }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}

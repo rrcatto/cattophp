@@ -4,27 +4,35 @@ declare(strict_types=1);
 
 namespace CattoPHP\Admin;
 
+use CattoPHP\Activity\Actor;
 use CattoPHP\Foundation\Duration;
 use CattoPHP\Installation\Installation;
+use CattoPHP\Settings\Fact;
+use CattoPHP\Settings\FactsProvider;
 use CattoPHP\Settings\Setting;
 use CattoPHP\Settings\SettingGroup;
 use CattoPHP\Settings\Settings;
 use CattoPHP\Settings\SettingType;
+use CattoPHP\Settings\SettingsRefused;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use Throwable;
 
 /**
  * The Settings page's groups as the page draws them: every setting of every group CattoPHP and the project provide, its
  * field, the value in force (never a secret's: a saved one shows as asterisks), where that value comes from in words
  * (saved here, when and by whom; .env; or its default) with what Reset goes back to, and for a refused form what was typed
- * and why it was refused.
+ * and why it was refused. A setting the installation holds fixed is shown with its value, saying so, and nothing to change
+ * it with; one it hides, and a group whose every setting it hides, is not drawn at all. The project's facts
+ * (Settings\FactsProvider) follow the groups, shown and never changed.
  */
 final class SettingsPage
 {
     /** What a secret's field shows when one is set: asterisks, never blank and never the browser's dots. */
     public const SECRET_SHOWN = '************';
 
-    public function __construct(private readonly Settings $settings, private readonly Installation $installation, private readonly AccountNames $names)
+    /** @param iterable<FactsProvider> $facts */
+    public function __construct(private readonly Settings $settings, private readonly Installation $installation, private readonly AccountNames $names, private readonly iterable $facts = [])
     {
     }
 
@@ -37,24 +45,144 @@ final class SettingsPage
     {
         $groups = [];
         foreach ($this->settings->catalogue()->groups() as $group) {
-            $sent = $typed($group->key);
-            $settings = [];
-            foreach ($group->settings as $setting) {
-                $settings[] = $this->setting($setting, $sent, $errors[$setting->name] ?? '');
+            if ($this->shows($group->key)) {
+                $groups[] = $this->drawn($group, $typed($group->key), $errors);
             }
-            $saved = count(array_filter($settings, static fn (array $setting): bool => $setting['overridden'] === true));
-            $groups[] = [
-                'key' => $group->key,
-                'label' => $group->label,
-                'description' => $group->description,
-                'summary' => self::summary($saved, count($settings)),
-                'saved' => $saved,
-                'refused' => array_intersect_key($errors, $group->settings) !== [],
-                'settings' => $settings,
-            ];
         }
 
         return $groups;
+    }
+
+    /** Whether the page shows the group: false when the installation hides every setting in it. */
+    public function shows(string $group): bool
+    {
+        foreach (array_keys($this->settings->catalogue()->group($group)->settings) as $name) {
+            if (!$this->settings->isHidden($name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The project's facts, each group with its heading, its explanation and its lines, in the order of its providers.
+     *
+     * @return list<array{key:string,heading:string,explanation:string,summary:string,items:list<array{label:string,value:string}>}>
+     */
+    public function facts(): array
+    {
+        $groups = [];
+        foreach ($this->facts as $provider) {
+            foreach ($provider->settingsFacts() as $group) {
+                $items = array_map(static fn (Fact $fact): array => ['label' => $fact->label, 'value' => $fact->value], $group->facts);
+                $groups[] = [
+                    'key' => $group->key,
+                    'heading' => $group->heading,
+                    'explanation' => $group->explanation,
+                    'summary' => 'Shown only: ' . (count($items) === 1 ? '1 fact' : count($items) . ' facts') . ' this page cannot change.',
+                    'items' => $items,
+                ];
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * One group as a page draws it, for a module's own page that saves its group as this page does (the Campaign
+     * Marketing Manager's Settings): the same values, words and Resets.
+     *
+     * @param array<string,mixed> $sent what a refused form sent, by setting name
+     * @param array<string,string> $errors why each setting was refused, by its name
+     * @return array<string,mixed>
+     */
+    public function group(string $key, array $sent, array $errors): array
+    {
+        return $this->drawn($this->settings->catalogue()->group($key), $sent, $errors);
+    }
+
+    /**
+     * Saves a group as its form sent it, a saved secret's asterisks left as they are keeping it, and says what was done
+     * in words ("Mail: 1 setting saved.").
+     *
+     * @param array<string,mixed> $input
+     * @throws SettingsRefused
+     */
+    public function save(string $group, array $input, ?Actor $actor): string
+    {
+        $label = $this->settings->catalogue()->group($group)->label;
+        foreach ($this->secretNames($group) as $name) {
+            // The asterisks a saved secret shows are not a new secret: left as they are, it is kept.
+            if (($input[$name] ?? null) === self::SECRET_SHOWN) {
+                $input[$name] = '';
+            }
+        }
+        $changed = $this->settings->save($group, $input, $actor);
+
+        return match (count($changed)) {
+            0 => $label . ': nothing had changed, so nothing was saved.',
+            1 => $label . ': 1 setting saved.',
+            default => $label . ': ' . count($changed) . ' settings saved.',
+        };
+    }
+
+    /** Puts every setting of a group back to .env's value or its default, and says so. */
+    public function resetGroup(string $group, ?Actor $actor): string
+    {
+        $label = $this->settings->catalogue()->group($group)->label;
+        $this->settings->resetGroup($group, $actor);
+
+        return $label . ': every setting is back to .env\'s value or its default.';
+    }
+
+    /** Whether a setting of this name is in the group and shown on the page. */
+    public function inGroup(string $group, string $name): bool
+    {
+        $catalogue = $this->settings->catalogue();
+
+        return $catalogue->has($name) && $catalogue->groupOf($name) === $group && !$this->settings->isHidden($name);
+    }
+
+    /** Puts one setting of a group back to .env's value or its default, and says so. */
+    public function reset(string $group, string $name, ?Actor $actor): string
+    {
+        $catalogue = $this->settings->catalogue();
+        if (!$this->inGroup($group, $name)) {
+            throw new InvalidArgumentException('There is no such setting.');
+        }
+        $this->settings->reset($name, $actor);
+
+        return $catalogue->group($group)->label . ': ' . $catalogue->setting($name)->label . ' is back to ' . ($this->settings->envValue($name) !== '' ? '.env\'s value.' : 'its default.');
+    }
+
+    /**
+     * @param array<string,mixed> $sent
+     * @param array<string,string> $errors
+     * @return array<string,mixed>
+     */
+    private function drawn(SettingGroup $group, array $sent, array $errors): array
+    {
+        $settings = [];
+        foreach ($group->settings as $setting) {
+            if (!$this->settings->isHidden($setting->name)) {
+                $settings[] = $this->setting($setting, $sent, $errors[$setting->name] ?? '');
+            }
+        }
+        $saved = count(array_filter($settings, static fn (array $setting): bool => $setting['overridden'] === true));
+        $fixed = count(array_filter($settings, static fn (array $setting): bool => $setting['fixed'] === true));
+
+        return [
+            'key' => $group->key,
+            'label' => $group->label,
+            'description' => $group->description,
+            'summary' => $fixed > 0 && $fixed === count($settings) ? 'Fixed in this installation\'s configuration.' : self::summary($saved, count($settings)),
+            'saved' => $saved,
+            // Every setting shown is fixed: nothing to save or reset.
+            'fixed' => $fixed > 0 && $fixed === count($settings),
+            'refused' => array_intersect_key($errors, $group->settings) !== [],
+            'settings' => $settings,
+        ];
     }
 
     /** @return list<string> the names of a group's secret settings, which a refused form never keeps */
@@ -89,8 +217,9 @@ final class SettingsPage
         } else {
             $value = array_key_exists($name, $sent) && is_scalar($sent[$name]) ? (string) $sent[$name] : $this->settings->get($name);
         }
-        $help = trim($setting->help . ($setting->type === SettingType::Duration && !str_contains($setting->help, Duration::HOW) ? ' ' . Duration::HOW : ''));
-        $source = $this->source($setting, $problem);
+        $fixed = $this->settings->isFixed($name);
+        $help = $fixed ? $setting->help : trim($setting->help . ($setting->type === SettingType::Duration && !str_contains($setting->help, Duration::HOW) ? ' ' . Duration::HOW : '') . self::bounds($setting));
+        $source = ($fixed ? 'Fixed in this installation\'s configuration: it cannot be changed here. ' : '') . $this->source($setting, $problem);
         $overridden = $this->settings->isOverridden($name);
 
         return [
@@ -110,6 +239,7 @@ final class SettingsPage
             'secret_set' => $secretSet,
             'shown' => $setting->secret && $secretSet ? self::SECRET_SHOWN : '',
             'overridden' => $overridden,
+            'fixed' => $fixed,
             'reset_label' => $this->settings->envValue($name) !== '' ? 'Reset to .env' : 'Reset to its default',
             'reset_confirm' => 'Put ' . $setting->label . ' back to ' . ($this->settings->envValue($name) !== '' ? '.env\'s value' : 'its default') . '? What is saved here goes.',
             'error' => $error,
@@ -135,6 +265,13 @@ final class SettingsPage
         $name = $setting->name;
         if ($problem !== null) {
             return 'Saved here, but it cannot be read: ' . $problem . ' Save it again, or reset it to .env.';
+        }
+        if ($this->settings->isCutToLongest($name)) {
+            $longest = Duration::parse((string) $setting->longestTime)->words();
+
+            return $this->settings->isOverridden($name)
+                ? 'Saved here as longer than the longest it may be, so ' . $longest . ' applies. Reset goes back to .env\'s value or its default.'
+                : '.env (' . $name . ') gives ' . self::shown($this->settings->envValue($name)) . ', longer than the longest it may be, so ' . $longest . ' applies.';
         }
 
         return match ($this->settings->source($name)) {
@@ -163,6 +300,17 @@ final class SettingsPage
         $env = $this->settings->envValue($setting->name);
 
         return $words . ', overriding .env. Reset goes back to ' . ($env !== '' ? '.env\'s ' . self::shown($env) : ($setting->default !== '' ? 'its default, ' . self::shown($setting->default) : 'nothing')) . '.';
+    }
+
+    /** A length of time's bounds in words, where it has a longest: " It may be from 5 minutes to 365 days.", or none. */
+    private static function bounds(Setting $setting): string
+    {
+        if ($setting->type !== SettingType::Duration || $setting->longestTime === null) {
+            return '';
+        }
+        $longest = Duration::parse($setting->longestTime)->words();
+
+        return $setting->shortest !== null ? ' It may be from ' . Duration::parse($setting->shortest)->words() . ' to ' . $longest . '.' : ' It may be at most ' . $longest . '.';
     }
 
     /** The control a setting is typed or chosen in. */

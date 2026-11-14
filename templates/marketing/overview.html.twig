@@ -1,0 +1,113 @@
+{#
+	The Campaign Marketing Manager's overview: what needs attention, then for the period chosen the totals, a comparison by
+	campaign, channel, publication, advert or place (sortable, Download as CSV), clicks over time and the countries the
+	clicks came from, and the latest sales (paid within MARKETING_LATEST_SALES, with All sales). The period and the
+	comparison are feature cards in GET forms that change the page in place (htmx) or load it without JavaScript; the page
+	refreshes itself every 30 seconds, with Pause.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}
+{% if may_manage %}{{ ui('action.link', {label: 'New campaign', href: path('cattophp_marketing_campaign_new'), icon: 'action-add', variant: 'primary'}) }}{% endif %}
+{{ ui('action.link', {label: 'Every campaign', href: path('cattophp_marketing_campaigns'), icon: 'action-open'}) }}
+{% endblock %}
+{% block stock_main %}
+{% if attention %}
+<section class="cl-page-section" id="attention">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'attention-heading', tone: 'warning'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Needs your attention', heading_id: 'attention-heading', summary: 'Campaigns ending soon or over their budget, and publications nobody has followed yet.'}) }}
+{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+{% for item in attention %}
+{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}{{ ui('feedback.badge', {label: item.kind, tone: item.tone}) }} <a href="{{ item.href }}">{{ item.name }}</a>: {{ item.words }}{% endblock %}
+{% block actions %}{{ ui('action.link', {label: item.action, href: item.action_href, icon: 'action-open', size: 'small'}) }}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section" id="period">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'period-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The figures for ' ~ period_words, heading_id: 'period-heading', summary: 'Choose a period, or two dates. Both dates are included; leave one empty for an open end.'}) }}
+{% if period_problem %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ period_problem }}</p>{% endblock %}{% endembed %}
+{% endif %}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+<input type="hidden" name="by" value="{{ by }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'period', legend: 'Period', id: 'marketing-period', items: period_cards, selected: period, size: 'small', legend_hidden: true}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', for: 'marketing-from', help: 'Such as 2026-11-01.'})} %}{% block control %}<input class="cl-input" id="marketing-from" type="date" name="from" value="{{ from }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', for: 'marketing-to', help: 'Such as 2026-11-30.'})} %}{% block control %}<input class="cl-input" id="marketing-to" type="date" name="to" value="{{ to }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show the figures', type: 'submit', icon: 'action-filter', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 30} %}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}{% block body %}
+{% for figure in totals %}{{ ui('data.stat-card', {label: figure.label, value: figure.value, note: figure.note}) }}{% endfor %}
+{% endblock %}{% endembed %}
+{% if not_counted %}<p class="cl-marketing-note">{{ not_counted }}</p>{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="figures">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'figures-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Compare', heading_id: 'figures-heading', summary: 'The most clicks first. A heading sorts by it; a name opens what it counts.'})} %}
+{% block section_actions %}{{ ui('action.link', {label: 'Download as CSV', href: csv_href, icon: 'action-download'}) }}{% endblock %}
+{% endembed %}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+<input type="hidden" name="period" value="{{ period }}">
+{% if period == 'dates' %}<input type="hidden" name="from" value="{{ from }}"><input type="hidden" name="to" value="{{ to }}">{% endif %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'by', legend: 'Compare by', id: 'marketing-by', items: by_cards, selected: by, size: 'small'}) }}
+{% endblock %}{% endembed %}
+<noscript>{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Compare', type: 'submit', icon: 'action-filter'}) }}{% endblock %}{% endembed %}</noscript>
+</form>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'figures'})} %}{% block results %}
+{% if rows %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Clicks, unique visitors, repeat visits and spend by ' ~ (by == 'place' ? 'place' : by) ~ ', for ' ~ period_words, stack: true})} %}
+{% block header %}<tr>{% for header in headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: header, sort_region: 'figures-region', sort_results: 'figures-results'} only %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for row in rows %}
+<tr><td class="cell-text" data-label="{{ headers[0].label }}">{% if row.href %}<a href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}{% if row.context %}<small class="cl-marketing-line">{{ row.context }}</small>{% endif %}</td><td class="text-end" data-label="Clicks">{{ row.clicks }}</td><td class="text-end" data-label="Unique visitors">{{ row.unique_visitors }}</td><td class="text-end" data-label="Repeat visits">{{ row.repeat_visits }}</td><td class="text-end" data-label="Spend">{{ row.spend }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing to compare yet', summary: 'Once people follow a campaign\'s tracking links, or a cost is added, its figures are here. Try a longer period, or add a publication to a campaign.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="over-time">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side'})} %}{% block body %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'over-time-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Clicks over time', heading_id: 'over-time-heading', summary: 'Each day, or each month over a longer period.'}) }}
+{{ ui('data.column-chart', {label: 'Clicks for ' ~ period_words, columns: columns, label_heading: chart_heading, value_heading: 'Clicks', empty: 'No clicks in this period yet.'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'countries', labelledby: 'countries-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Where the clicks came from', heading_id: 'countries-heading', summary: 'Each country by its clicks.'}) }}
+{{ ui('data.bar-list', {label: 'Clicks by country, for ' ~ period_words, rows: countries, empty: 'No clicks in this period yet.'}) }}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="latest-sales">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'latest-sales-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Latest sales', heading_id: 'latest-sales-heading', summary: 'Paid in the last ' ~ latest_words ~ ', the newest first, with or without a campaign. A name opens that person\'s journey.'})} %}
+{% block section_actions %}{% if latest_href %}{{ ui('action.link', {label: 'All sales', href: latest_href, icon: 'action-view-all'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% if latest %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The latest sales, the newest first: when each was paid, who bought what, the amount, its campaign and what it came through', stack: true})} %}
+{% block header %}<tr><th scope="col">Paid</th><th scope="col">Customer</th><th scope="col">Bought</th><th scope="col" class="text-end">Amount</th><th scope="col">Campaign</th><th scope="col">Came through</th></tr>{% endblock %}
+{% block body %}
+{% for sale in latest %}
+<tr><td data-label="Paid"><a href="{{ sale.href }}">{{ sale.when }}</a></td><td class="cell-text" data-label="Customer">{% if sale.customer_href %}<a href="{{ sale.customer_href }}">{{ sale.customer }}</a>{% else %}{{ sale.customer }}{% endif %}</td><td class="cell-text" data-label="Bought">{{ sale.bought }}</td><td class="text-end" data-label="Amount">{{ sale.gross }}</td><td class="cell-text" data-label="Campaign">{% if sale.campaign_href %}<a href="{{ sale.campaign_href }}">{{ sale.campaign }}</a>{% else %}{{ sale.campaign }}{% endif %}</td><td class="cell-text" data-label="Came through">{{ sale.through }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No sale in the last ' ~ latest_words, summary: 'Each order is here once it is paid, whether or not a campaign brought it.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

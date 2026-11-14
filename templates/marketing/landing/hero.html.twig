@@ -1,0 +1,51 @@
+{#
+	The top of a landing page, built as a page head is: the hero's picture (a file at the page's own picture address, an
+	address the offer gives, or the offer's own drawing) fills the head, the width of the cards below, and over it the
+	offer's badges, the small line above the heading, the headline (the campaign's or the offer's name unless one is
+	written), the words, the rating and the optional second button (to a part of the page, or to a place the offer's card
+	gives, such as a free preview). There is no buy box in the head: buying is in the sections. A hero hidden or removed
+	shows the same name and badges in the page-head band without a picture. The page's only h1 (a paragraph in the
+	editor's preview of the hero alone, hero_heading 'p', since the editor has its own).
+#}
+{% set hero_copy %}
+{% if hero.badges %}
+<div class="cl-landing-badges">
+{% for badge in hero.badges %}{{ ui('feedback.badge', {label: badge, tone: 'neutral'}) }}{% endfor %}
+</div>
+{% endif %}
+{% if hero.kicker %}<p class="cl-kicker">{{ hero.kicker }}</p>{% endif %}
+{% if hero_heading|default('h1') == 'p' %}
+<p class="cl-landing-headline" id="landing-title">{{ hero.headline }}</p>
+{% else %}
+<h1 class="cl-landing-headline" id="landing-title">{{ hero.headline }}</h1>
+{% endif %}
+{% if hero.shown %}
+{% include '@CattoPHP/marketing/landing/paragraphs.html.twig' with {paragraphs: hero.paragraphs, paragraph_class: 'cl-lead'} only %}
+{% if hero.rating %}{{ ui('data.rating', {average: hero.rating.average, count: hero.rating.count, empty: ''}) }}{% endif %}
+{% if hero.secondary %}
+<p class="cl-landing-secondary">
+{% if hero.secondary.inert %}
+{{ ui('action.button', {label: hero.secondary.label, type: 'button', disabled: true, title: 'In a preview the buttons do nothing', icon: hero.secondary.icon}) }}
+{% else %}
+{{ ui('action.link', {label: hero.secondary.label, variant: 'secondary', size: 'normal', href: hero.secondary.href, icon: hero.secondary.icon}) }}
+{% endif %}
+</p>
+{% endif %}
+{% endif %}
+{% endset %}
+<section class="cl-page-head cl-landing-hero" aria-labelledby="landing-title">
+<div class="cl-container cl-landing-hero-inner">
+{% if hero.shown and hero.picture %}
+<div class="cl-picture-head cl-landing-picture-head">
+{% if hero.picture.kind == 'svg' %}
+<div class="cl-picture-head-art" aria-hidden="true">{{ hero.picture.markup|authored }}</div>
+{% else %}
+<div class="cl-picture-head-art"><img src="{{ hero.picture.src }}" alt="{{ hero.picture.alt }}" width="960" height="640" decoding="async"></div>
+{% endif %}
+<div class="cl-picture-head-text cl-landing-hero-copy">{{ hero_copy }}</div>
+</div>
+{% else %}
+<div class="cl-landing-hero-copy">{{ hero_copy }}</div>
+{% endif %}
+</div>
+</section>

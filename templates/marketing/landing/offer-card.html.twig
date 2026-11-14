@@ -1,0 +1,42 @@
+{#
+	One offer's card in an offers section, as the project draws it for this reader (Landing\LandingProject::card()): its
+	picture, "First" when the section marks the first, its badges, its name (a link to its page when View is ticked), its
+	line and facts, its price with a "was" price or, while the campaign runs and the section asks, the promotion's price
+	with the usual one struck through, the saving, a note (why it cannot be had now), its rating, and what the reader can
+	do now. Words only: the project's drawing is markup it vouches for.
+#}
+<li class="cl-landing-offer{% if card.first %} is-first{% endif %}">
+{% if card.picture %}
+<div class="cl-landing-offer-picture">
+{% if card.picture.kind == 'svg' %}<div aria-hidden="true">{{ card.picture.markup|authored }}</div>{% else %}<img src="{{ card.picture.src }}" alt="{{ card.picture.alt }}" loading="lazy" decoding="async">{% endif %}
+</div>
+{% endif %}
+<div class="cl-landing-offer-body">
+{% if card.first or card.badges %}
+<div class="cl-landing-offer-badges">
+{% if card.first %}{{ ui('feedback.badge', {label: 'First', tone: 'info'}) }}{% endif %}
+{% for badge in card.badges %}{{ ui('feedback.badge', {label: badge, tone: 'neutral'}) }}{% endfor %}
+</div>
+{% endif %}
+<h3 class="cl-landing-offer-name">{% if card.name_href and not landing.preview %}<a href="{{ card.name_href }}">{{ card.label }}</a>{% else %}{{ card.label }}{% endif %}</h3>
+{% if card.line %}<p class="cl-landing-offer-line">{{ card.line }}</p>{% endif %}
+{% if card.facts %}
+<ul class="cl-landing-offer-facts">
+{% for fact in card.facts %}<li>{{ fact }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if card.rating %}{{ ui('data.rating', {average: card.rating.average, count: card.rating.count, compact: true, empty: ''}) }}{% endif %}
+{% if card.show_promotion %}
+<p class="cl-landing-offer-price"><strong>{{ card.promotion_price }}</strong>{% if card.price %} <del>{{ card.price }}</del>{% endif %}</p>
+{% elseif card.price %}
+<p class="cl-landing-offer-price"><strong>{{ card.price }}</strong>{% if card.was %} <del>{{ card.was }}</del>{% endif %}</p>
+{% endif %}
+{% if card.saving and not card.show_promotion %}<p class="cl-landing-offer-saving">{{ card.saving }}</p>{% endif %}
+{% if card.note %}<p class="cl-landing-offer-note">{{ card.note }}</p>{% endif %}
+{% if card.actions %}
+<div class="cl-landing-offer-actions">
+{% for act in card.actions %}{% include '@CattoPHP/marketing/landing/action.html.twig' with {act: act} only %}{% endfor %}
+</div>
+{% endif %}
+</div>
+</li>

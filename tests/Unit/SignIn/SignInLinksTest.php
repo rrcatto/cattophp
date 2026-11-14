@@ -29,7 +29,7 @@ final class SignInLinksTest extends TestCase
 
     public function testTheOwnerGetsALinkAndAnyOtherAddressNothing(): void
     {
-        $site = new Foundations(['APP_SITE_MODE' => 'live']);
+        $site = new Foundations(['APP_SITE_MODE' => 'live', 'AUTH_TWO_STEP' => 'ADMINS']);
         $links = $site->signInLinks($this->folder);
 
         self::assertSame(SignInLinks::NO_ACCOUNT, $links->request('stranger@example.org', '203.0.113.5'));
@@ -40,7 +40,7 @@ final class SignInLinksTest extends TestCase
         self::assertSame('Sign in to Example Site', $email->getSubject());
         self::assertMatchesRegularExpression('#https://example\.com/sign-in/link/[0-9a-f]{64}#', (string) $email->getTextBody());
         self::assertStringContainsString('for 30 minutes', (string) $email->getTextBody());
-        self::assertStringContainsString('without your one-time code as well', (string) $email->getTextBody(), 'the owner is an administrator, who must use two-step');
+        self::assertStringContainsString('without your one-time code as well', (string) $email->getTextBody(), 'the owner is an administrator, who must use two-step where the setting says ADMINS');
     }
 
     public function testALinkWorksOnceAndOnlyWhileItLasts(): void
@@ -213,7 +213,38 @@ final class SignInLinksTest extends TestCase
         self::assertFalse($rules('ADMINS')->mustUseTwoStep($person));
         self::assertTrue($rules('EVERYONE')->mustUseTwoStep($person));
         self::assertFalse($rules('CHOICE')->mustUseTwoStep($administrator));
-        self::assertTrue($rules('anything else')->mustUseTwoStep($administrator), 'anything else is the safe one');
+        self::assertFalse($rules('anything else')->mustUseTwoStep($administrator), 'anything else is each person\'s choice');
+    }
+
+    /**
+     * Two-step sign-in is each person's choice unless the setting says otherwise (owner, 13 November 2026): with
+     * AUTH_TWO_STEP missing, empty or no choice at all it is CHOICE, so the administrator is not asked to set it up and
+     * their sign-in email says so; a choice saved in Settings is kept, and Reset goes back to .env's value or CHOICE.
+     */
+    public function testTwoStepIsEachPersonsChoiceUnlessTheSettingSaysOtherwise(): void
+    {
+        $administrator = new SignInAccount('1', 'owner@example.com', 'Owner', true);
+        $person = new SignInAccount('7', 'ada@example.org', 'Ada', false);
+        foreach (['missing' => [], 'empty' => ['AUTH_TWO_STEP' => ''], 'no choice at all' => ['AUTH_TWO_STEP' => 'sometimes']] as $case => $env) {
+            $rules = new SignInRules((new Foundations($env))->settings);
+            self::assertFalse($rules->mustUseTwoStep($administrator), $case . ': the administrator is not asked to set it up.');
+            self::assertFalse($rules->mustUseTwoStep($person), $case);
+        }
+        $site = new Foundations();
+        self::assertSame('CHOICE', $site->catalogue->setting('AUTH_TWO_STEP')->default);
+        self::assertSame('CHOICE', $site->settings->get('AUTH_TWO_STEP'));
+
+        self::assertSame(SignInLinks::SENT, $site->signInLinks($this->folder)->request('owner@example.com', '203.0.113.5'));
+        self::assertStringContainsString('you can ignore this email', (string) $site->transport->last()->getTextBody(), 'The link alone signs the administrator in.');
+
+        self::assertTrue($site->settings->set('AUTH_TWO_STEP', 'ADMINS'));
+        self::assertTrue((new SignInRules($site->settings))->mustUseTwoStep($administrator), 'A choice saved in Settings is kept.');
+        $site->settings->reset('AUTH_TWO_STEP');
+        self::assertSame('CHOICE', $site->settings->get('AUTH_TWO_STEP'), 'Reset: .env gives nothing, so CHOICE.');
+        $fromEnv = new Foundations(['AUTH_TWO_STEP' => 'everyone']);
+        $fromEnv->settings->set('AUTH_TWO_STEP', 'CHOICE');
+        $fromEnv->settings->reset('AUTH_TWO_STEP');
+        self::assertSame('EVERYONE', $fromEnv->settings->get('AUTH_TWO_STEP'), 'Reset: .env\'s value.');
     }
 
     /** @return iterable<string,array{0:?string,1:?string}> */

@@ -1,0 +1,14 @@
+{#
+	A video section's fields: a heading and words, one of the campaign's video adverts or a video's address typed, its
+	title and its length in words. A YouTube or Vimeo video is played on the page when the site allows it; otherwise its
+	title is a link "Watch the video".
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/forms/heading.html.twig' %}
+{% if form.adverts %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'One of the campaign\'s video adverts', for: 'landing-advert', help: 'Chosen, its address is used and the one below is not.', error: errors.advert|default('')})} %}{% block control %}<select class="cl-select" id="landing-advert" name="advert" {{ ui_field_attrs(props) }}><option value="">None: the address below</option>{% for reference, name in form.adverts %}<option value="{{ reference }}"{{ values.advert|default('') == reference ? ' selected' : '' }}>{{ name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The video\'s address', for: 'landing-address', help: 'Its whole address, starting with https://, such as a YouTube or Vimeo video\'s.', error: errors.address|default('')})} %}{% block control %}<input class="cl-input" type="url" id="landing-address" name="address" value="{{ values.address|default('') }}" maxlength="2000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its title', for: 'landing-title', help: 'At most ' ~ form.limits.title ~ ' characters, such as A tour of the garden.', error: errors.title|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-title" name="title" value="{{ values.title|default('') }}" maxlength="{{ form.limits.title }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its length (optional)', for: 'landing-length', help: 'In words, such as 2 minutes.', error: errors.length|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-length" name="length" value="{{ values.length|default('') }}" maxlength="{{ form.limits.length }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}

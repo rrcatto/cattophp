@@ -1,0 +1,17 @@
+{#
+	A row's moves in a list put in order by hand (data-cl-sortable): Move to top, Move up, Move down and Move to bottom,
+	each a form, so the list is put in order without JavaScript or a pointer. Each posts the row's place after the move
+	(index, from 0) and the order the page shows (order, the rows' keys joined by commas, so a list changed elsewhere is
+	refused, never guessed at), with the form token. A move that cannot be made (up from the top) is disabled. With
+	JavaScript, cattophp.js sends the same form without a page load, and a drag sends the row's first move form with
+	its index replaced. Variables: sm_action (the address the row's moves post to), sm_position (the row's place, from
+	0), sm_count (how many rows), sm_order (the rows' keys in the order shown) and sm_label (the row's name).
+#}
+{% for move in [
+	{direction: 'top', label: 'Move to top', words: 'to the top', index: 0, allowed: sm_position > 0},
+	{direction: 'up', label: 'Move up', words: 'up', index: sm_position - 1, allowed: sm_position > 0},
+	{direction: 'down', label: 'Move down', words: 'down', index: sm_position + 1, allowed: sm_position < sm_count - 1},
+	{direction: 'bottom', label: 'Move to bottom', words: 'to the bottom', index: sm_count - 1, allowed: sm_position < sm_count - 1},
+] %}
+<form method="post" action="{{ sm_action }}" data-cl-sortable-move="{{ move.direction }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="index" value="{{ move.index }}"><input type="hidden" name="order" value="{{ sm_order|join(',') }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed, icon: {top: 'action-move-top', up: 'action-up', down: 'action-down', bottom: 'action-move-bottom'}[move.direction], aria_label: 'Move ' ~ sm_label ~ ' ' ~ move.words}) }}</form>
+{% endfor %}

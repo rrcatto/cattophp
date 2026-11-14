@@ -1,0 +1,43 @@
+{#
+	A new campaign, or one changed: its name, code (made from the name when left empty, and fixed once people have opened
+	its links), description and objective, dates, budget, where its links lead, the promotion it carries when the project
+	has any, and what it promotes, as feature cards to tick. A refused form comes back as typed, why beside each field.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{{ ui('action.link', {label: back_label, href: back_href, icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'campaign-form-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The campaign', heading_id: 'campaign-form-heading', summary: 'Only the name is needed now; the rest can follow.'}) }}
+<form method="post" action="{{ action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'campaign-name', required: true, help: 'What you call it, up to 120 characters, such as Spring sale.', error: errors.name})} %}{% block control %}<input class="cl-input" id="campaign-name" type="text" name="name" value="{{ typed.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if code_fixed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Code for its links', for: 'campaign-code', help: 'People have opened its links, so the code stays ' ~ code_fixed ~ '.'})} %}{% block control %}<input class="cl-input" id="campaign-code" type="text" name="code" value="{{ code_fixed }}" readonly {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% else %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Code for its links', for: 'campaign-code', help: 'In its tracking links, such as example.com/c/spring-sale: 2 to 40 small letters, digits and hyphens. Leave it empty to make one from the name.', error: errors.code})} %}{% block control %}<input class="cl-input" id="campaign-code" type="text" name="code" value="{{ typed.code }}" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9-]{1,39}" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', for: 'campaign-description', full_width: true, help: 'For you and your team. Visitors never see it.', error: errors.description})} %}{% block control %}<textarea class="cl-input" id="campaign-description" name="description" rows="3" maxlength="5000" {{ ui_field_attrs(props) }}>{{ typed.description }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Objective', for: 'campaign-objective', full_width: true, help: 'What you want from it, in your own words, such as 60 sales by the end of the month.', error: errors.objective})} %}{% block control %}<textarea class="cl-input" id="campaign-objective" name="objective" rows="2" maxlength="2000" {{ ui_field_attrs(props) }}>{{ typed.objective }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Starts', for: 'campaign-starts', help: 'Its clicks count from the start of this day. Leave it empty to start when it is made active.', error: errors.starts_at})} %}{% block control %}<input class="cl-input" id="campaign-starts" type="date" name="starts_at" value="{{ typed.starts_at }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Ends', for: 'campaign-ends', help: 'Its clicks count to the end of this day; its links keep working after. Leave it empty for no end.', error: errors.ends_at})} %}{% block control %}<input class="cl-input" id="campaign-ends" type="date" name="ends_at" value="{{ typed.ends_at }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Budget' ~ (currency ? ' (' ~ currency ~ ')' : ''), for: 'campaign-budget', help: 'Such as 1500 or 1500.50. Leave it empty if you are not setting one.', error: errors.budget})} %}{% block control %}<input class="cl-input" id="campaign-budget" type="text" name="budget" value="{{ typed.budget }}" maxlength="24" inputmode="decimal" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where its links lead', for: 'campaign-destination', help: 'A page of this site, such as / or /offers, or a whole address starting with https://. A publication may lead somewhere of its own.', error: errors.destination})} %}{% block control %}<input class="cl-input" id="campaign-destination" type="text" name="destination" value="{{ typed.destination }}" maxlength="2000" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% if promotion_cards %}
+{{ ui('form.picture-choice', {name: 'promotion', legend: 'Promotion', id: 'campaign-promotion', items: promotion_cards, selected: typed.promotion, help: 'A discount code this campaign carries, if any.', error: errors.promotion, size: 'small'}) }}
+{% endif %}
+{% if offer_cards %}
+{{ ui('form.picture-choice', {legend: offers_heading ~ ' it promotes', id: 'campaign-offers', items: offer_cards, multiple: true, list: 'offers', selected: typed.offers, help: 'Tick each one. Leaving all unticked promotes nothing in particular.', error: errors.offers, size: 'small'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: save_label, type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: back_href, icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

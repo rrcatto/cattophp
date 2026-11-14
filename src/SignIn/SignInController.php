@@ -53,6 +53,7 @@ final class SignInController
         private readonly ?PageRenderer $pages = null,
         private readonly ?SignInSessions $sessions = null,
         private readonly ?AfterResponse $afterResponse = null,
+        private readonly ?SignInLength $length = null,
     ) {
     }
 
@@ -212,7 +213,9 @@ final class SignInController
     {
         $session = $request->getSession();
         $this->security->login(SignInUser::of($account, $this->rules->isAdministrator($account)), SignInAuthenticator::class);
-        $this->flow->signedIn($session, $this->now());
+        $now = $this->now();
+        // It ends AUTH_SESSION_TTL from now unless the person comes back first (SignInLength moves it at each visit).
+        $this->flow->signedIn($session, $now, $this->length?->endFrom($now));
         // Kept among the sign-ins the person can see and end, where the project keeps them (sign_in.sessions).
         $this->sessions?->begin($session, $account, $request);
         $this->activity->record('sign_in.signed_in', [], 'account', $account->id);

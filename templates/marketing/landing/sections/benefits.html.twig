@@ -1,0 +1,9 @@
+{# The benefits as cards: each a title and its paragraphs. #}
+<ul class="cl-landing-benefits">
+{% for item in section.items %}
+<li class="cl-landing-benefit">
+<h3 class="cl-landing-benefit-title">{{ item.title }}</h3>
+{% include '@CattoPHP/marketing/landing/paragraphs.html.twig' with {paragraphs: item.paragraphs, paragraph_class: ''} only %}
+</li>
+{% endfor %}
+</ul>

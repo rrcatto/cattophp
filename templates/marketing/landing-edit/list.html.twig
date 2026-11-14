@@ -1,0 +1,33 @@
+{#
+	A landing page's sections in its editor: the hero fixed at the top, then the others in page order, each a row put in
+	order by hand (data-cl-sortable-item, cattophp.js), and a small drawing of the page as visitors see it, all drawn again
+	after every change. A move, a width, Show, Hide and Remove each answer with this list (with the stored list and why in
+	data-error when a move was refused), so the drawing always shows what is saved.
+#}
+<div class="cl-tree cl-tree--landing" id="landing-section-list" data-cl-sortable-list data-error="{{ list_error }}">
+{% if list_error %}{{ ui('feedback.notice', {tone: 'danger', heading: list_error}) }}{% endif %}
+{% if hero %}
+<div class="cl-landing-fixed">
+{% include '@CattoPHP/marketing/landing-edit/row.html.twig' with {row: hero} %}
+</div>
+{% endif %}
+{% if rows %}
+<ol class="cl-tree-list" aria-label="The sections after the hero, in page order">
+{% for row in rows %}
+<li class="cl-tree-node" data-cl-sortable-item="{{ row.reference }}">
+{% include '@CattoPHP/marketing/landing-edit/row.html.twig' with {row: row} %}
+</li>
+{% endfor %}
+</ol>
+{% else %}
+{{ ui('feedback.empty', {heading: 'No sections after the hero', summary: may_edit ? 'Use Add a section to put the offers, questions and answers or your own words on the page.' : 'Someone who may change the page adds its sections.'}) }}
+{% endif %}
+<aside class="cl-landing-sketch" aria-labelledby="landing-sketch-heading">
+<h3 class="h6" id="landing-sketch-heading">The page, as visitors see it</h3>
+<div class="cl-page-sketch" aria-hidden="true">
+{% if hero_shown %}<span class="cl-page-sketch-fixed">Hero</span>{% endif %}
+{% for sketch_row in sketch %}{% for cell in sketch_row %}<span data-width="{{ cell.width }}" data-block="{{ cell.kind }}"{% if cell.kind == 'cta' %} data-accent{% endif %}>{{ cell.label }}</span>{% endfor %}{% endfor %}
+</div>
+<p>Two half sections one after the other share a row and are the same height. Hidden sections are left out, and on a phone every section is full width.</p>
+</aside>
+</div>

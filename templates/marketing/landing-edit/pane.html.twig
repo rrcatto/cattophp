@@ -1,0 +1,62 @@
+{#
+	The open section beside a landing page's sections (?section=<reference>): what its last form did, when it is shown on
+	a campaign's page (three small feature cards, saved in place), its form (its kind's fields, inside this form; a
+	refused form comes back as typed with why beside each field), and its preview drawn by the page's own templates from
+	the saved section, its buttons doing nothing. Loaded here by htmx when Edit is pressed, the address following; without
+	JavaScript Edit opens the same page with the section open. With no section open it says how to open one.
+#}
+<div class="cl-landing-column" id="landing-edit-pane">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'landing-edit', labelledby: 'landing-edit-heading'})} %}{% block surface_body %}
+{% if pane %}
+{{ ui('layout.section-head', {heading: (may_edit ? 'Edit: ' : '') ~ pane.label, heading_id: 'landing-edit-heading', summary: pane.description}) }}
+{% if pane_notice %}{{ ui('feedback.notice', {tone: pane_notice[0], heading: pane_notice[1]}) }}{% endif %}
+{% if pane.invalid %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Its saved copy no longer passes: ' ~ pane.invalid ~ ' Save it again to put it right; until then it is left off the page.'}) }}{% endif %}
+{% if not pane.enabled %}{{ ui('feedback.notice', {tone: 'info', heading: pane.unsaved ? 'This section is new: it is hidden until you save it.' : 'This section is hidden: the page does not show it until you show it again.'}) }}{% endif %}
+{% if not pane.known %}
+<p>{{ pane.description }}</p>
+{% if may_edit %}<form method="post" action="{{ pane.remove_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Remove it', type: 'submit', icon: 'action-remove', variant: 'danger', confirm: pane.remove_confirm}) }}</form>{% endif %}
+{% else %}
+{% if pane.campaign_page and not pane.is_hero and may_edit %}
+<form class="cl-landing-shown-when" method="post" action="{{ pane.shown_when_action }}" data-choose-submits hx-post="{{ pane.shown_when_action }}" hx-target="#landing-section-list" hx-swap="outerHTML">
+<input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="open" value="{{ pane.reference }}">
+{{ ui('form.picture-choice', {name: 'shown_when', legend: 'Shown', size: 'small', selected: pane.shown_when, items: shown_when_cards}) }}
+<noscript>{{ ui('action.button', {label: 'Set when it is shown', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-save'}) }}</noscript>
+</form>
+{% endif %}
+{% set uploads = may_upload and pane.pictures|filter(picture => picture.upload)|length > 0 %}
+{# Someone who may only look sees the fields as they are, greyed, and no form. #}
+{% if may_edit %}<form class="cl-landing-section-form" method="post" action="{{ pane.action }}"{% if uploads %} enctype="multipart/form-data" hx-encoding="multipart/form-data"{% endif %} hx-post="{{ pane.action }}" hx-target="#landing-edit-pane" hx-swap="outerHTML">
+<input type="hidden" name="_token" value="{{ form_token() }}">{% else %}<div class="cl-landing-section-form">{% endif %}
+<fieldset class="cl-landing-fields"{% if not may_edit %} disabled{% endif %}>
+<legend class="visually-hidden">{{ pane.label }}</legend>
+{% include pane.form_template with {values: pane.values, form: pane.form, errors: pane.errors, pictures: pane.pictures, section: pane, may_upload: may_upload} only %}
+</fieldset>
+{% if may_edit %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: pane.cancel_href, icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% else %}
+</div>
+{% endif %}
+{% endif %}
+{% else %}
+{{ ui('layout.section-head', {heading: 'Edit a section', heading_id: 'landing-edit-heading'}) }}
+{% if pane_notice %}{{ ui('feedback.notice', {tone: pane_notice[0], heading: pane_notice[1]}) }}{% endif %}
+{{ ui('feedback.empty', {heading: 'No section open', summary: may_edit ? 'Press Edit beside a section to change it here, with its preview under it.' : 'Press Open beside a section to see what it holds.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% if pane and pane.known %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'landing-section-preview', labelledby: 'landing-section-preview-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Preview of this section', heading_id: 'landing-section-preview-heading', summary: 'As it was last saved, drawn as the page draws it. Its buttons do nothing here.'}) }}
+{% if pane.preview %}
+<div class="cl-landing-preview" inert>
+{{ pane.preview|raw }}
+</div>
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing to show yet', summary: 'A section with nothing to draw is left off the page. Fill it in and save it.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endif %}
+</div>

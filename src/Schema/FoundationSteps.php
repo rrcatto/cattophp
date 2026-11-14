@@ -28,6 +28,10 @@ use CattoPHP\Schema\Steps\Step202611122340MailingForwards;
 use CattoPHP\Schema\Steps\Step202611130100IdentityConnection;
 use CattoPHP\Schema\Steps\Step202611130200Connections;
 use CattoPHP\Schema\Steps\Step202611130300ScheduledJobTrials;
+use CattoPHP\Schema\Steps\Step202611132100MarketingCampaigns;
+use CattoPHP\Schema\Steps\Step202611140010MarketingLanding;
+use CattoPHP\Schema\Steps\Step202611141200MarketingSales;
+use CattoPHP\Schema\Steps\Step202611141500MarketingForgottenCustomers;
 
 /**
  * The schema steps of CattoPHP's records in one list: the foundations' (always applied) and each module's (applied only when
@@ -47,7 +51,7 @@ final class FoundationSteps
     /** @return list<SchemaStep> every step, the foundations' and every module's, in the order they were written */
     public static function all(): array
     {
-        return [new Step202611091000Settings(), new Step202611091001Activity(), new Step202611091002Access(), new Step202611091003SignIn(), new Step202611091004ActivityLookups(), new Step202611091005AccessBoundary(), new Step202611091006Links(), new Step202611091007Sessions(), new Step202611120900ScheduledJobs(), new Step202611121400SetupSteps(), new Step202611121600SiteProtection(), new Step202611121800Telegram(), new Step202611122000SearchPages(), new Step202611122100ApiTokens(), new Step202611122200SignupAttempts(), new Step202611122201IdentityChecks(), new Step202611122300Inbox(), new Step202611122310CattoMail(), new Step202611122320MailingLists(), new Step202611122330MailingCampaigns(), new Step202611122340MailingForwards(), new Step202611130100IdentityConnection(), new Step202611130200Connections(), new Step202611130300ScheduledJobTrials()];
+        return [new Step202611091000Settings(), new Step202611091001Activity(), new Step202611091002Access(), new Step202611091003SignIn(), new Step202611091004ActivityLookups(), new Step202611091005AccessBoundary(), new Step202611091006Links(), new Step202611091007Sessions(), new Step202611120900ScheduledJobs(), new Step202611121400SetupSteps(), new Step202611121600SiteProtection(), new Step202611121800Telegram(), new Step202611122000SearchPages(), new Step202611122100ApiTokens(), new Step202611122200SignupAttempts(), new Step202611122201IdentityChecks(), new Step202611122300Inbox(), new Step202611122310CattoMail(), new Step202611122320MailingLists(), new Step202611122330MailingCampaigns(), new Step202611122340MailingForwards(), new Step202611130100IdentityConnection(), new Step202611130200Connections(), new Step202611130300ScheduledJobTrials(), new Step202611132100MarketingCampaigns(), new Step202611140010MarketingLanding(), new Step202611141200MarketingSales(), new Step202611141500MarketingForgottenCustomers()];
     }
 
     /** @return list<class-string<SchemaStep>> */

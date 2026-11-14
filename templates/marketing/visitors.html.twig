@@ -1,0 +1,67 @@
+{#
+	The visitors: one row for each person (all their devices together) and one for each visitor not known by name yet.
+	The period they were last seen in, their state as feature cards, a campaign and a country are one GET form that
+	changes the page in place (htmx) or loads it without JavaScript; the search finds a name, an email address, an
+	account reference or a visitor's reference. The totals are of the rows the filters hold, and change with the search.
+	Sortable headings, pages, Download as CSV (the same rows and totals, every page); the page refreshes itself every 30
+	seconds, with Pause.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}
+{{ ui('action.link', {label: 'Download as CSV', href: csv_href, icon: 'action-download'}) }}
+{% endblock %}
+{% block stock_main %}
+<section class="cl-page-section" id="filters">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'filters-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Visitors last seen ' ~ period_words, heading_id: 'filters-heading', summary: 'Choose a period, or two dates, and who to show. Both dates are included; leave one empty for an open end.'}) }}
+{% if period_problem %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ period_problem }}</p>{% endblock %}{% endembed %}
+{% endif %}
+<form method="get" action="{{ base }}" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: base} only %}>
+{% if searched %}<input type="hidden" name="visitors_q" value="{{ searched }}">{% endif %}
+<input type="hidden" name="visitors_sort" value="{{ sort }}">
+<input type="hidden" name="visitors_dir" value="{{ direction }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'period', legend: 'Period', id: 'visitors-period', items: period_cards, selected: period, size: 'small', legend_hidden: true}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', for: 'visitors-from', help: 'Such as 2026-11-01.'})} %}{% block control %}<input class="cl-input" id="visitors-from" type="date" name="from" value="{{ from }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', for: 'visitors-to', help: 'Such as 2026-11-30.'})} %}{% block control %}<input class="cl-input" id="visitors-to" type="date" name="to" value="{{ to }}" data-sets-field="period" data-sets-value="dates" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'state', legend: 'Show', id: 'visitors-state', items: state_cards, selected: state, size: 'small'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Came by the campaign', for: 'visitors-campaign'})} %}{% block control %}<select class="cl-select" id="visitors-campaign" name="campaign" {{ ui_field_attrs(props) }}><option value="">Any campaign</option>{% for option in campaign_options %}<option value="{{ option.value }}"{{ option.value == campaign ? ' selected' : '' }}>{{ option.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Seen in', for: 'visitors-country'})} %}{% block control %}<select class="cl-select" id="visitors-country" name="country" {{ ui_field_attrs(props) }}><option value="">Any country</option>{% for option in country_options %}<option value="{{ option.code }}"{{ option.code == country ? ' selected' : '' }}>{{ option.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show the visitors', type: 'submit', icon: 'action-filter', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 30} %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="visitors">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'visitors-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Who came', heading_id: 'visitors-heading', summary: 'The last seen first. A heading sorts by it; a name opens that person\'s journey.'}) }}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'visitors', search: search, pagination: rows ? pagination : null})} %}{% block results %}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}{% block body %}
+{% for figure in totals %}{{ ui('data.stat-card', {label: figure.label, value: figure.value, note: figure.note}) }}{% endfor %}
+{% endblock %}{% endembed %}
+{% if rows %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Visitors, each with their state, visits, campaigns, country, devices and when they were first and last seen', stack: true})} %}
+{% block header %}<tr>{% for header in headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: header, sort_region: 'visitors-region', sort_results: 'visitors-results'} only %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for row in rows %}
+<tr><td class="cell-text" data-label="Visitor"><a href="{{ row.href }}">{{ row.name }}</a></td><td data-label="State">{{ ui('feedback.badge', {label: row.state, tone: row.tone, size: 'small'}) }}</td><td class="text-end" data-label="Visits">{{ row.visits }}</td><td class="text-end" data-label="Campaigns">{{ row.campaigns }}</td><td class="cell-text" data-label="Country">{{ row.country }}</td><td class="cell-text" data-label="Devices">{{ row.devices }}</td><td class="text-end" data-label="First seen">{{ row.first_seen }}</td><td class="text-end" data-label="Last seen">{{ row.last_seen }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% elseif not any %}
+{{ ui('feedback.empty', {heading: 'No visitors yet', summary: 'A visitor is here once a person follows one of a campaign\'s tracking links. Publish a campaign and share its links.'}) }}
+{% else %}
+{{ ui('feedback.empty', {heading: searched ? 'Nobody matches' : 'Nobody here', summary: searched ? 'Try other words or a visitor\'s reference, or clear the search.' : 'Nobody was last seen in this period with these choices. Try a longer period, or show everyone.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

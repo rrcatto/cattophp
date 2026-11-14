@@ -1,0 +1,72 @@
+{#
+	The Campaign Marketing Manager's settings: its group of settings, saved here as Administration > Settings saves a group
+	(@CattoPHP/admin/settings-group.html.twig: where each value comes from, Reset), and the channels a publication can go
+	on, in their order, each with Up and Down, Change, Retire or Restore, and Delete while no publication has used it; a
+	form to add one, and one to change the channel chosen (?channel=); and the Connected sites card (settings-sites).
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_actions %}{{ ui('action.link', {label: 'The overview', href: path('cattophp_marketing_overview'), icon: 'action-back'}) }}{% endblock %}
+{% block stock_main %}
+{% if why_not %}
+<section class="cl-page-section">
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p>{{ why_not }}</p>{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section" id="settings-{{ group.key }}">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'settings-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'How visitors and sales are counted', heading_id: 'settings-heading', summary: group.description ~ ' ' ~ group.summary}) }}
+{% include '@CattoPHP/admin/settings-group.html.twig' with {group: group, may_change: may_change, save_action: path('cattophp_marketing_settings_save'), reset_group_action: path('cattophp_marketing_settings_reset_group'), reset_route: 'cattophp_marketing_settings_reset', reset_params: {}} only %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="channels">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'channels-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Channels', heading_id: 'channels-heading', summary: 'The places a publication can go, in the order they are offered. A channel with publications is retired, never deleted, so its publications keep it.'}) }}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The channels, in their order', stack: true})} %}
+{% block header %}<tr><th scope="col">Channel</th><th scope="col">Codes start</th><th scope="col" class="text-end">Publications</th><th scope="col">Offered</th><th scope="col" class="cell-actions">Actions</th></tr>{% endblock %}
+{% block body %}
+{% for channel in channels %}
+<tr><td class="cell-text" data-label="Channel"><span class="cl-marketing-channel" aria-hidden="true">{{ channel.icon|authored }}</span> {{ channel.label }}</td><td data-label="Codes start"><code>{{ channel.prefix }}</code></td><td class="text-end" data-label="Publications">{{ channel.publications }}</td><td data-label="Offered">{{ ui('feedback.badge', {label: channel.active ? 'Offered' : 'Retired', tone: channel.active ? 'success' : 'neutral', size: 'small'}) }}</td><td class="cell-actions" data-label="Actions">{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Actions', aria_label: 'Actions for ' ~ channel.label, icon: 'action-open'})} %}{% block body %}
+{% if not channel.first %}<form method="post" action="{{ channel.move_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Up', type: 'submit', icon: 'action-up', size: 'small', name: 'direction', value: 'up', aria_label: 'Move ' ~ channel.label ~ ' up'}) }}</form>{% endif %}
+{% if not channel.last %}<form method="post" action="{{ channel.move_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Down', type: 'submit', icon: 'action-down', size: 'small', name: 'direction', value: 'down', aria_label: 'Move ' ~ channel.label ~ ' down'}) }}</form>{% endif %}
+{{ ui('action.link', {label: 'Change', href: channel.edit_href, icon: 'action-edit', size: 'small', aria_label: 'Change ' ~ channel.label}) }}
+<form method="post" action="{{ channel.retire_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{% if channel.active %}{{ ui('action.button', {label: 'Retire', type: 'submit', icon: 'action-disable', size: 'small', aria_label: 'Retire ' ~ channel.label}) }}{% else %}{{ ui('action.button', {label: 'Restore', type: 'submit', icon: 'action-enable', size: 'small', aria_label: 'Restore ' ~ channel.label}) }}{% endif %}</form>
+{% if not channel.in_use %}<form method="post" action="{{ channel.delete_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Delete', type: 'submit', icon: 'action-remove', size: 'small', variant: 'danger', aria_label: 'Delete ' ~ channel.label, confirm: 'Delete the channel ' ~ channel.label ~ '? No publication has used it.'}) }}</form>{% endif %}
+{% endblock %}{% endembed %}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% if edit %}
+<form class="cl-card-form" id="channel-edit" method="post" action="{{ edit.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+<h3>{{ edit.heading }}</h3>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'channel-edit-label', required: true, help: 'Up to 60 characters.', error: edit.errors.label})} %}{% block control %}<input class="cl-input" id="channel-edit-label" type="text" name="label" value="{{ edit.label }}" maxlength="60" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Codes start with', for: 'channel-edit-prefix', required: true, help: '1 to 3 small letters: its publications are suggested as fb1, fb2 and so on. Codes given already stay.', error: edit.errors.link_prefix})} %}{% block control %}<input class="cl-input" id="channel-edit-prefix" type="text" name="link_prefix" value="{{ edit.link_prefix }}" maxlength="3" pattern="[A-Za-z]{1,3}" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'icon', legend: 'Its icon', id: 'channel-edit-icon', items: edit.icon_cards, selected: edit.icon, required: true, error: edit.errors.icon, size: 'small'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save the channel', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: path('cattophp_marketing_settings') ~ '#channels', icon: 'action-back', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+{% endif %}
+<details class="cl-disclosure cl-card-form" id="channel-add"{% if add.open %} open{% endif %}>
+<summary>Add a channel</summary>
+<form method="post" action="{{ add.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'channel-add-label', required: true, help: 'Up to 60 characters, such as Local radio.', error: add.errors.label})} %}{% block control %}<input class="cl-input" id="channel-add-label" type="text" name="label" value="{{ add.label }}" maxlength="60" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Codes start with', for: 'channel-add-prefix', required: true, help: '1 to 3 small letters, such as ra: its publications are suggested as ra1, ra2 and so on.', error: add.errors.link_prefix})} %}{% block control %}<input class="cl-input" id="channel-add-prefix" type="text" name="link_prefix" value="{{ add.link_prefix }}" maxlength="3" pattern="[A-Za-z]{1,3}" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{{ ui('form.picture-choice', {name: 'icon', legend: 'Its icon', id: 'channel-add-icon', items: icon_cards, selected: add.icon, required: true, error: add.errors.icon, size: 'small'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add the channel', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}{% endembed %}
+</form>
+</details>
+{% endblock %}{% endembed %}
+</section>
+{% include '@CattoPHP/marketing/settings-sites.html.twig' %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{#
+	A landing page editor's answer to htmx: the part of the editor the form belongs to (answer_main: list, pane, settings,
+	add, checks, publish or address), then each other part the change touched as an htmx partial, swapped into its own
+	element by its id. Each part is the same template the whole page draws.
+#}
+{% set answer_parts = {
+	list: '@CattoPHP/marketing/landing-edit/list.html.twig',
+	pane: '@CattoPHP/marketing/landing-edit/pane.html.twig',
+	settings: '@CattoPHP/marketing/landing-edit/settings.html.twig',
+	add: '@CattoPHP/marketing/landing-edit/add.html.twig',
+	checks: '@CattoPHP/marketing/landing-edit/checks.html.twig',
+	publish: '@CattoPHP/marketing/landing-edit/publish.html.twig',
+	address: '@CattoPHP/marketing/landing-edit/address.html.twig',
+} %}
+{% set answer_ids = {list: 'landing-section-list', pane: 'landing-edit-pane', settings: 'settings', add: 'landing-add', checks: 'landing-checks', publish: 'landing-publish', address: 'landing-address'} %}
+{% include answer_parts[answer_main] %}
+{% for part in answer_partials %}
+<hx-partial hx-target="#{{ answer_ids[part] }}" hx-swap="outerHTML">
+{% include answer_parts[part] %}
+</hx-partial>
+{% endfor %}

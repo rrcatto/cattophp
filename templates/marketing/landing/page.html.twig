@@ -1,0 +1,49 @@
+{#
+	A landing page, drawn by Marketing\Landing\LandingViewBuilder for the public page, the editor's preview, a kept version
+	and one section's preview alike: the preview's notice (with the way back to the editor), the hero in the page-head
+	band, then the shown sections in their order, each on its own card. Sections are put in rows by their width
+	(Ui\HalfRows): a full section alone, two half sections side by side at one height, a half section with no half beside
+	it in half a row; on a phone every section is full width. In a project with themes, whose page renderer gives the page
+	its layout, the page wears the theme (the page landing-page); in any other it extends the project's layout
+	(cattophp.layout). Everything here is resolved before it is drawn: the templates read the view and query nothing. The
+	editor's preview of one section (landing.section_only) has no notice, and the hero only when that is the section.
+#}
+{% extends layout is defined ? layout : cattophp.layout %}
+{% block page_body %}{{ block('landing_content') }}{% endblock %}
+{% block body %}
+<main class="cl-landing-page">
+{{ block('landing_content') }}
+</main>
+{% endblock %}
+{% block landing_content %}
+{% if landing.preview and not landing.section_only %}
+<section class="cl-page-section" aria-label="Preview">
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Preview of the landing page'})} %}{% block body %}
+<p>{{ landing.notice }}</p>
+{% if landing.back %}<p>{{ ui('action.link', {label: 'Back to the landing page editor', href: landing.back, icon: 'action-back', size: 'small'}) }}</p>{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{# The editor's preview of one section draws the hero only when that section is the hero, and never as the page's h1. #}
+{% if not landing.section_only or landing.hero.shown %}
+{% include '@CattoPHP/marketing/landing/hero.html.twig' with {hero: landing.hero, landing: landing, hero_heading: landing.section_only ? 'p' : 'h1'} only %}
+{% endif %}
+{% if landing.note and landing.sections|filter(s => s.note)|length == 0 %}
+<div class="cl-page-section cl-landing-note-band">
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p>{{ landing.note }}</p>{% endblock %}{% endembed %}
+</div>
+{% endif %}
+{% if landing.sections %}
+<div class="cl-page-section cl-landing-sections">
+{% for row in landing.rows %}
+{% if row|length > 1 or row[0].width == 'half' %}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
+{% for section in row %}{% include '@CattoPHP/marketing/landing/section.html.twig' with {section: section, landing: landing} only %}{% endfor %}
+{% endblock %}{% endembed %}
+{% else %}
+{% include '@CattoPHP/marketing/landing/section.html.twig' with {section: row[0], landing: landing} only %}
+{% endif %}
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

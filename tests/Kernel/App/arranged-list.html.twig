@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrange the sections</title>
+<link rel="stylesheet" href="/cattophp/css/cattophp.css">
+<script src="/htmx.min.js" nonce="{{ csp_nonce() }}" defer></script>
+<script src="/cattophp/js/cattophp.js" nonce="{{ csp_nonce() }}" defer></script>
+</head>
+<body>
+<main class="cl-main" id="cl-main">
+<section class="cl-page-section">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'The spring special'}) }}
+{{ ui('data.rating', {average: 4.6, count: 128}) }}
+<div data-cl-countdown-scope>
+{{ ui('feedback.countdown', {ends_at: ends_at, now: now, words: 'Offer ends in'}) }}
+</div>
+{% endblock %}
+{% endembed %}
+</section>
+<section class="cl-page-section cl-landing-editor">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Sections'}) }}
+<div class="cl-tree-wrap" data-cl-sortable>
+{% include '@CattoPHP/page/sortable-lines.html.twig' with {sl_keys_id: 'arranged-keys', sl_error: error} only %}
+{{ list|raw }}
+</div>
+{% endblock %}
+{% endembed %}
+</section>
+</main>
+</body>
+</html>

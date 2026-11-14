@@ -1,0 +1,15 @@
+{#
+	A tracking link to copy: a read-only field holding it, which a person selects and copies without JavaScript, and a
+	Copy button that does it in one press, shown by CattoPHP's script only where it can (data-cl-copy, the field named by
+	aria-controls). cf_id: the field's id; cf_label: its label (cf_label_hidden keeps it for screen readers only); cf_value:
+	the link; cf_help: a line under it, if any. Drawn in spans, so it keeps its shape inside a table cell whatever a
+	project's tables do with a cell's blocks.
+#}
+<span class="cl-copy-field">
+<label class="{{ cf_label_hidden|default(false) ? 'visually-hidden' : 'cl-label' }}" for="{{ cf_id }}">{{ cf_label }}</label>
+<span class="cl-copy-field-control">
+<input class="cl-input" id="{{ cf_id }}" type="text" value="{{ cf_value }}" readonly spellcheck="false" autocomplete="off"{% if cf_help|default('') %} aria-describedby="{{ cf_id }}-help"{% endif %}>
+{{ ui('action.button', {label: 'Copy', type: 'button', icon: 'action-copy', size: 'small', hook: 'cl-copy', controls: cf_id, hidden: true}) }}
+</span>
+{% if cf_help|default('') %}<span class="cl-ui-field-help" id="{{ cf_id }}-help">{{ cf_help }}</span>{% endif %}
+</span>

@@ -1,7 +1,7 @@
 /*
   CattoPHP's components on the page: the functional styling of every component (@CattoPHP/ui/), the page head, the identity
-  band and page sections, lists with their pager and search, trees, notices, fields and lookups, live status, and the
-  Bootstrap 6 safety net, built from the theme's --cl-* tokens. A theme paints them (colour, type, borders, corners,
+  band and page sections, lists with their pager and search, trees and lists put in order by hand, notices, fields and
+  lookups, live status, the layout of landing pages and their editor, and the Bootstrap 6 safety net, built from the theme's --cl-* tokens. A theme paints them (colour, type, borders, corners,
   decoration) and never changes their structure. Loaded after Bootstrap's reboot, grid and utilities and before the
   project's own stylesheet and its theme.
 */
@@ -809,6 +809,8 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem;overflow-wrap
 .cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):not([data-label]){padding-left:.75rem!important}
 .cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):not([data-label])::before{content:none}
 .cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th):empty{display:none!important}
+/* A badge in a stacked cell wraps like the rest of the value, so a long one never runs past its card. */
+.cl-ui-table[data-stack="narrow"]>table>tbody>tr>:is(td,th) .cl-ui-badge{white-space:normal!important}
 }
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}
 .cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -865,6 +867,31 @@ a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-off
 .cl-ui-progress{height:.6rem;border-radius:99px;overflow:hidden;background:color-mix(in srgb,currentColor 15%,transparent)}
 .cl-ui-progress--large{height:1rem}
 .cl-ui-progress-bar{height:100%;background:var(--cl-accent,#386c8b)}
+.cl-ui-progress-bar.cl-share{width:var(--cl-share)}
+/* data.column-chart: columns over time, each height a share class (cl-share-N), the scale beside, names beneath. */
+.cl-ui-column-chart{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.5rem;margin:0}
+.cl-ui-column-chart-scale{display:flex;flex-direction:column;justify-content:space-between;height:11rem;font-size:.75rem;line-height:1;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.8}
+.cl-ui-column-chart-columns{display:flex;align-items:flex-end;gap:2px;height:11rem;margin:0 0 1.6rem;padding:0;list-style:none;border-top:1px dashed color-mix(in srgb,currentColor 25%,transparent);border-bottom:1px solid color-mix(in srgb,currentColor 55%,transparent)}
+.cl-ui-column-chart[data-density="dense"] .cl-ui-column-chart-columns{gap:1px}
+.cl-ui-column-chart-column{position:relative;display:flex;align-items:flex-end;flex:1 1 0;min-width:1px;height:100%;margin:0;padding:0}
+.cl-ui-column-chart-bar{display:block;width:100%;height:var(--cl-share,0%);background:var(--cl-accent,#386c8b);opacity:.85}
+a.cl-ui-column-chart-bar{min-height:3px}
+a.cl-ui-column-chart-bar:hover,a.cl-ui-column-chart-bar:focus-visible{opacity:1}
+a.cl-ui-column-chart-bar:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+.cl-ui-column-chart-label{position:absolute;top:calc(100% + .35rem);left:0;font-size:.75rem;line-height:1;white-space:nowrap;opacity:.8}
+.cl-ui-column-chart-column:last-child .cl-ui-column-chart-label{left:auto;right:0}
+.cl-ui-column-chart-figures{margin-top:.5rem}
+.cl-ui-column-chart-figures>summary{cursor:pointer;font-size:.9rem}
+/* data.bar-list: label, bar, value in a row; on a phone the bar goes under the label and value. */
+.cl-ui-bar-list{display:grid;grid-template-columns:minmax(7rem,14rem) minmax(4rem,1fr) auto;gap:.6rem .75rem;margin:0;padding:0;list-style:none}
+.cl-ui-bar-list-row{display:grid;grid-column:1/-1;grid-template-columns:subgrid;grid-template-areas:"label bar value";align-items:center;margin:0}
+.cl-ui-bar-list-label{grid-area:label;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.cl-ui-bar-list-value{grid-area:value;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cl-ui-bar-list-note{display:block;font-size:.75rem;font-weight:400;opacity:.8}
+.cl-ui-bar-list-track{grid-area:bar;display:block;height:.7rem;border-radius:99px;overflow:hidden;background:color-mix(in srgb,currentColor 12%,transparent)}
+.cl-ui-bar-list-bar{display:block;width:var(--cl-share,0%);height:100%;background:var(--cl-accent,#386c8b)}
+@media(max-width:575.98px){.cl-ui-column-chart-label--wide{display:none}.cl-ui-bar-list{grid-template-columns:minmax(0,1fr)}.cl-ui-bar-list-row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"label value" "bar bar";gap:.3rem .75rem}}
+@media(forced-colors:active){.cl-ui-column-chart-bar,.cl-ui-bar-list-bar,.cl-ui-progress-bar{background:CanvasText}.cl-ui-bar-list-track,.cl-ui-progress{border:1px solid CanvasText}}
 .cl-ui-action{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:var(--cl-action-padding-y,.5rem) var(--cl-action-padding-x,.85rem);min-height:2.5rem;border:1px solid currentColor;border-radius:.4rem;font:inherit;text-decoration:none;cursor:pointer;line-height:1.3;background:transparent;color:inherit}
 .cl-ui-action--small{font-size:var(--cl-action-font-size,.85rem);padding:var(--cl-action-padding-y,.35rem) var(--cl-action-padding-x,.6rem)}
 .cl-ui-action--large{padding:var(--cl-action-padding-y,.75rem) var(--cl-action-padding-x,1rem);font-size:var(--cl-action-font-size,1.1rem)}
@@ -1185,6 +1212,157 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 
 
 .cl-input-code{font-size:1.6rem;letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums}
+/* A link to copy (the Campaign Marketing Manager's tracking links): a read-only field to select without JavaScript, and
+   a Copy button beside it that cattophp.js shows where it can copy in one press. */
+.cl-copy-field{display:grid;gap:.35rem;min-width:0}
+.cl-copy-field .cl-label{margin:0}
+.cl-copy-field-control{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-width:0}
+.cl-copy-field-control .cl-input{flex:1 1 8rem;min-width:0;font-family:var(--cl-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:.875em}
+.cl-copy-field-control [data-cl-copy][hidden]{display:none}
+.cl-copy-field-control [data-cl-copy]{flex:0 0 auto}
+/* The Campaign Marketing Manager's pages: a channel's icon beside its name, a publication's links beside its QR code
+   (under them on a phone), an advert's picture, a line of small print. */
+.cl-marketing-channel{display:inline-flex;vertical-align:-.15em}
+.cl-marketing-channel svg{width:1.1em;height:1.1em}
+.cl-marketing-link{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1.5rem;align-items:start}
+.cl-marketing-link-forms{display:grid;gap:1rem;min-width:0}
+.cl-marketing-qr{display:grid;justify-items:center;gap:.5rem;margin:0;text-align:center}
+.cl-qr-code-frame{padding:.5rem;background:#fff;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px)}
+.cl-qr-code{display:block;width:12rem;max-width:100%;height:auto}
+.cl-marketing-picture{margin:0 0 1rem}
+.cl-marketing-picture img{display:block;max-width:100%;max-height:20rem;height:auto;border-radius:var(--cl-radius,10px)}
+.cl-marketing-note{margin:.75rem 0 0;font-size:.875rem;opacity:.8}
+/* A further line in a table cell (a publication's day and code, a campaign's code, each line of a change in the history):
+   a span or small of its own line, which a project's rules for a cell's blocks leave alone. */
+.cl-marketing-line{display:block;margin-top:.15rem}
+small.cl-marketing-line{opacity:.8}
+.cl-copy-field .cl-ui-field-help{display:block}
+/* What can be done to the record a form changes (retire, restore, delete), in a row of its own under the form. */
+.cl-marketing-record-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}
+.cl-marketing-aside{margin:0;padding-bottom:1rem}
+@media(max-width:700px){.cl-marketing-link{grid-template-columns:minmax(0,1fr)}}
+/* data.rating: the stars, then the mean and the number of reviews, on one line where they fit. */
+.cl-rating-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.75rem 0 0}
+.cl-rating-summary.is-compact{margin:0 0 .5rem;font-size:.9rem}
+.cl-rating-stars{letter-spacing:.1em;color:var(--cl-warning,#c98a00);white-space:nowrap}
+.cl-rating-stars>span:not(.is-filled){opacity:.55}
+.cl-rating-none{opacity:.8}
+.cl-rating-figures{white-space:nowrap}
+/* feedback.countdown: the words and the units on a line, wrapping a unit at a time, the moment beneath. The hidden
+   attribute must win over the flex layout, since the script shows and hides the units by it. */
+.cl-ui-countdown{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem;margin:0}
+.cl-ui-countdown-count{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem}
+.cl-ui-countdown[hidden],.cl-ui-countdown-count[hidden],.cl-ui-countdown-unit[hidden],[data-cl-countdown-scope][hidden]{display:none}
+.cl-ui-countdown-words{font-weight:600}
+.cl-ui-countdown-unit{white-space:nowrap}
+.cl-ui-countdown-unit strong{font-size:1.15em;font-variant-numeric:tabular-nums}
+.cl-ui-countdown-until{flex-basis:100%;font-size:.875em;opacity:.85}
+.cl-ui-notice .cl-ui-countdown{margin-top:.5rem}
+/* A list put in order by hand (data-cl-sortable, @CattoPHP/page/sortable-*.html.twig) uses the tree's rows above; a
+   row's move buttons sit together at its end. */
+:is([data-cl-sortable],.cl-landing-editor) .cl-tree-row>.cl-ui-action-group{flex:0 1 auto;justify-content:flex-end;gap:.35rem}
+/* Landing pages: the hero is the page head, as wide as the cards below it, a picture filling it with the words over it
+   (cl-picture-head), or the words alone in the page head's band; then each section on its own card, two half sections
+   side by side in a row (Ui\HalfRows) the same height. Layout only: a theme paints them through its tokens. Decorative
+   check marks are placed absolutely and never take a pointer. */
+.cl-landing-hero .cl-rating-summary{margin:.25rem 0 0}
+/* The picture covers the whole head: no band of the head's own shows above, below or beside it. */
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-landing-hero:has(.cl-picture-head){padding:0!important}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-landing-hero:has(.cl-picture-head)>.cl-container{padding-block:0!important}
+.cl-landing-picture-head{margin:0!important}
+.cl-landing-picture-head .cl-picture-head-art img{display:block;width:100%;height:100%;object-fit:cover}
+.cl-picture-head .cl-picture-head-text .cl-rating-summary{color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cl-picture-head .cl-landing-secondary{margin:1rem 0 0}
+.cl-picture-head .cl-landing-secondary .cl-ui-action{background:rgba(251,246,238,.95)!important;color:#2b2523!important;border-color:transparent!important}
+.cl-landing-hero-copy{min-width:0}
+.cl-landing-headline{margin:0 0 .75rem;font-size:clamp(2rem,1.4rem + 2.6vw,3.4rem);font-weight:700;line-height:1.1;text-wrap:balance;overflow-wrap:anywhere}
+.cl-landing-hero-copy .lead{margin:0 0 .75rem}
+.cl-landing-secondary{margin:.75rem 0 0}
+.cl-landing-sections{display:grid;gap:1.5rem}
+/* Two half sections side by side: the row keeps the sections' own gap, and each card fills its section, so the two
+   are the same height. */
+.cl-landing-sections>.cl-ui-section-grid{gap:inherit}
+.cl-landing-sections>.cl-ui-section-grid>.cl-landing-section{display:flex;flex-direction:column;min-width:0}
+.cl-landing-sections>.cl-ui-section-grid>.cl-landing-section>.cl-ui-surface{flex:1 1 auto}
+.cl-landing-section{min-width:0;scroll-margin-top:5rem}
+.cl-landing-section-head{max-width:48rem;margin-bottom:1rem}
+.cl-landing-section-heading{margin:0 0 .5rem;font-size:clamp(1.4rem,1.15rem + 1vw,2rem);text-wrap:balance}
+.cl-landing-intro{margin:0 0 .5rem}
+.cl-landing-checklist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:.6rem 1.5rem}
+.cl-landing-checklist>li{position:relative;padding-inline-start:1.75rem;overflow-wrap:anywhere}
+.cl-landing-checklist>li::before{content:"";position:absolute;inset-inline-start:.15rem;top:.35em;width:.9rem;height:.5rem;border-inline-start:3px solid var(--cl-accent,#2563eb);border-bottom:3px solid var(--cl-accent,#2563eb);transform:rotate(-45deg);pointer-events:none}
+.cl-landing-benefits{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:1rem}
+.cl-landing-benefit{min-width:0;padding:1rem 1.1rem;border:1px solid var(--cl-border,#dfe4ea);border-top:3px solid var(--cl-accent,#2563eb);border-radius:var(--cl-radius,10px)}
+.cl-landing-benefit-title{margin:0 0 .4rem;font-size:1.1rem;overflow-wrap:anywhere}
+.cl-landing-benefit p{margin:0 0 .4rem}
+.cl-landing-faq{display:grid;gap:.5rem}
+.cl-landing-more{margin:1rem 0 0}
+.cl-landing-section--cta .cl-landing-section-head{margin-inline:auto;text-align:center}
+/* The hero's band and its badges (the sizes of the utilities they were first drawn with); a section's offers as cards in a
+   grid, each its picture, words, price and buttons; a picture with its caption; a framed video at 16:9; the buttons of a
+   call to action, centred. Layout only: a theme paints them. */
+.cl-landing-hero-inner{padding-top:3rem!important;padding-bottom:3rem!important}
+.cl-landing-badges{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+.cl-landing-offers{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,16rem),1fr));gap:1rem}
+.cl-landing-offer{display:flex;flex-direction:column;min-width:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px);overflow:hidden}
+.cl-landing-offer.is-first{border-width:2px;border-color:var(--cl-accent,#2563eb)}
+.cl-landing-offer-picture img,.cl-landing-offer-picture svg{display:block;width:100%;height:auto;aspect-ratio:3 / 2;object-fit:cover}
+.cl-landing-offer-body{display:flex;flex-direction:column;gap:.5rem;flex:1 1 auto;padding:1rem 1.1rem}
+.cl-landing-offer-badges{display:flex;flex-wrap:wrap;gap:.4rem}
+.cl-landing-offer-name{margin:0;font-size:1.15rem;overflow-wrap:anywhere}
+.cl-landing-offer-line,.cl-landing-offer-price,.cl-landing-offer-saving,.cl-landing-offer-note{margin:0}
+.cl-landing-offer-facts{margin:0;padding-inline-start:1.1rem}
+.cl-landing-offer-price strong{font-size:1.25rem}
+.cl-landing-offer-note{font-size:.9rem;opacity:.85}
+.cl-landing-offer-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:auto;padding-top:.5rem}
+.cl-landing-action{display:inline-flex;margin:0}
+* + .cl-landing-offers{margin-top:1rem}
+.cl-landing-figure{margin:0}
+.cl-landing-figure img,.cl-landing-figure-art svg{display:block;max-width:100%;height:auto;border-radius:var(--cl-radius,10px)}
+.cl-landing-figure figcaption{margin-top:.5rem;font-size:.9rem;opacity:.85}
+.cl-landing-video{position:relative;aspect-ratio:16 / 9;width:100%}
+.cl-landing-video iframe{display:block;width:100%;height:100%;border:0;border-radius:var(--cl-radius,10px)}
+.cl-landing-video-title{margin:.5rem 0 0}
+.cl-landing-cta-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.75rem}
+.cl-landing-note-band{margin-bottom:1.5rem}
+/* A landing page's editor: the hero's row fixed above the list of sections (its name lined up with theirs once their
+   handles show), the address with its fixed start, the rows of a section's repeated parts, a section's width as two
+   small feature cards (cl-width-choice), and a small drawing of the page beside the list on a wide screen
+   (cl-page-sketch: a cell for each section, a half one half as wide; data-accent marks the ones that sell). */
+.cl-landing-address{margin:0 0 1rem;overflow-wrap:anywhere}
+.cl-landing-note{margin:.5rem 0 0;font-size:.9rem;opacity:.85}
+.cl-tree--landing .cl-tree-name,.cl-landing-fixed .cl-tree-name{font-weight:600}
+.cl-landing-fixed>.cl-tree-row{border-top:1px solid var(--cl-border,#dfe4ea)}
+.cl-landing-editor:has(.cl-tree-handle:not([hidden])) .cl-landing-fixed>.cl-tree-row{padding-inline-start:calc(.25rem + 36px + .6rem)}
+.cl-landing-slug{display:flex;align-items:center;gap:.25rem}
+.cl-landing-slug>input{flex:1 1 auto;min-width:0}
+.cl-landing-picture,.cl-landing-rows{display:grid;gap:.75rem;min-width:0;margin:0;padding:0;border:0}
+.cl-landing-row{display:grid;gap:.5rem;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px)}
+.cl-landing-add{display:grid;gap:.4rem;margin:0;padding:0;border:0}
+.cl-landing-width{flex:0 1 20rem;min-width:min(100%,14rem);margin:0}
+.cl-landing-width .cl-width-choice{flex:1 1 12rem}
+/* Two small feature cards side by side however narrow, Half and Full width. */
+.cl-width-choice{min-width:0}
+.cl-width-choice .cl-ui-picture-choice--cards{margin:0}
+.cl-width-choice .cl-ui-picture-choice.cl-ui-picture-choice--small.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cl-landing-sketch{padding:1rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-landing-sketch h3{margin:0 0 .5rem}
+.cl-landing-sketch p{margin:.6rem 0 0;font-size:.82rem;color:var(--cl-muted,#5f6b7a)}
+@media (min-width:992px){.cl-tree--landing:has(>.cl-landing-sketch){display:grid;grid-template-columns:minmax(0,1fr) 16rem;gap:1.5rem;align-items:start}.cl-landing-sketch{grid-column:2;grid-row:1 / span 2}}
+/* The editor's two columns (the sections and templates; the open section and its preview), each a stack of cards; the
+   head's address and publish button, which htmx swaps in place; a form's fields, disabled for someone who may only look;
+   the open section's preview, inert. */
+.cl-landing-column{display:grid;gap:1.5rem;align-content:start;min-width:0}
+.cl-landing-head-address,.cl-landing-publish{display:contents}
+.cl-landing-fields{min-width:0;margin:0;padding:0;border:0}
+.cl-landing-shown-when{margin:0 0 1rem}
+.cl-landing-add-section{margin-top:1rem}
+.cl-landing-preview{min-width:0;overflow:hidden;border:1px dashed var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px);padding:.75rem}
+.cl-page-sketch{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin:.75rem 0;color:var(--cl-ink,#22303f)}
+.cl-page-sketch>span{display:flex;align-items:center;justify-content:center;min-height:2rem;padding:.15rem .3rem;overflow:hidden;border-radius:2px;font-size:.62rem;line-height:1.15;text-align:center;background:color-mix(in srgb,currentColor 10%,transparent)}
+.cl-page-sketch>[data-width="full"],.cl-page-sketch-fixed{grid-column:1 / -1}
+.cl-page-sketch>[data-accent]{background:var(--cl-accent,#2563eb);color:var(--cl-on-color-1,#fff)}
+.cl-page-sketch>[hidden]{display:none}
 /* A bar's or a column's length: the page names it as a class, cl-share-0 to cl-share-100 (the
    Twig filter share, whole percent, anything above nothing at least 1), because no template has an inline style. */
 .cl-share-0{--cl-share:0%}

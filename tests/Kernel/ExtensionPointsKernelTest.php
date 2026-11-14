@@ -11,6 +11,7 @@ use CattoPHP\ServiceTags;
 use CattoPHP\Tests\Kernel\App\TestKernel;
 use CattoPHP\Tests\Support\EveryExtension;
 use CattoPHP\Tests\Support\Foundations;
+use CattoPHP\Theme\Menus;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -37,7 +38,7 @@ final class ExtensionPointsKernelTest extends TestCase
 
     public function testNoExtensionInterfaceDeclaresAConstantAndEachTagIsNamedOnce(): void
     {
-        self::assertCount(14, ServiceTags::EXTENSION_POINTS);
+        self::assertCount(20, ServiceTags::EXTENSION_POINTS);
         foreach (ServiceTags::EXTENSION_POINTS as $interface => $tag) {
             $reflection = new ReflectionClass($interface);
             self::assertTrue($reflection->isInterface(), $interface);
@@ -79,6 +80,9 @@ final class ExtensionPointsKernelTest extends TestCase
             $details = $services->get(ActivityDetails::class);
             self::assertInstanceOf(ActivityDetails::class, $details);
             self::assertSame('Due at', $details->label('example.everything_done', 'due_at'), 'As detail words, its empty label leaves the log\'s own.');
+            $menus = $services->get(Menus::class);
+            self::assertInstanceOf(Menus::class, $menus);
+            self::assertSame([], $menus->sections(), 'As a menu provider giving no section, it adds nothing to the menu.');
         } finally {
             $kernel->shutdown();
         }

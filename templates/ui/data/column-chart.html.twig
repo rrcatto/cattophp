@@ -1,0 +1,31 @@
+{#
+	Amounts over time as columns: one for each slice of the period, the empty ones included, the tallest at the top of the
+	scale. Each column says its slice and amount to a pointer and to a screen reader, a column with href opens what it adds
+	up, and about six slices are named beneath (half of them on a phone). The same figures follow as a table, opened by
+	hand, so they can be read exactly and without the chart's colour. Heights are classes (the share filter), never a style.
+#}
+{% set cc = props %}
+{% if cc.blank %}
+{{ ui('feedback.empty', {summary: cc.empty}) }}
+{% else %}
+<figure class="cl-ui-column-chart"{% if cc.dense %} data-density="dense"{% endif %} aria-label="{{ cc.label }}">
+<div class="cl-ui-column-chart-scale" aria-hidden="true"><span>{{ cc.top }}</span><span>0</span></div>
+<ol class="cl-ui-column-chart-columns">
+{% for column in cc.columns %}
+<li class="cl-ui-column-chart-column">
+{% if column.href %}<a class="cl-ui-column-chart-bar {{ column.share|share }}" href="{{ column.href }}" title="{{ column.title }}" aria-label="{{ column.title }}"></a>{% else %}<span class="cl-ui-column-chart-bar {{ column.share|share }}" title="{{ column.title }}"><span class="visually-hidden">{{ column.title }}</span></span>{% endif %}
+{% if column.named %}<span class="cl-ui-column-chart-label{% if column.wide %} cl-ui-column-chart-label--wide{% endif %}" aria-hidden="true">{{ column.label }}</span>{% endif %}
+</li>
+{% endfor %}
+</ol>
+</figure>
+{% if cc.table %}
+<details class="cl-disclosure cl-ui-column-chart-figures">
+<summary>Show the figures</summary>
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: cc.label, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">{{ cc.label_heading }}</th><th scope="col" class="text-end">{{ cc.value_heading }}</th></tr>{% endblock %}
+{% block body %}{% for column in cc.columns %}<tr><th scope="row">{% if column.href %}<a href="{{ column.href }}">{{ column.label }}</a>{% else %}{{ column.label }}{% endif %}</th><td class="text-end">{{ column.words }}</td></tr>{% endfor %}{% endblock %}
+{% endembed %}
+</details>
+{% endif %}
+{% endif %}

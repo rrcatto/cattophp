@@ -1,0 +1,103 @@
+{#
+	One sale, everything about it on one page: its reference with its state, campaign, channel and "Sold on <site>" as
+	badges; Open the order (the project's page, where every money action stays) and Open the customer's journey (for a
+	reader who may see who customers are); its facts and money; its lines (a bundle's offers in small text); its money as
+	it moved; which campaign gets it (both touches, the time a sale counted within as it was, how each was found, and
+	which the reports count now); and what was reported of it to connected sites.
+#}
+{% extends '@CattoPHP/page/stock.html.twig' %}
+{% block stock_badges %}
+{{ ui('feedback.badge', {label: state, tone: tone}) }}
+{{ ui('feedback.badge', {label: campaign}) }}
+{% if channel %}{{ ui('feedback.badge', {label: channel}) }}{% endif %}
+{% if sold_on %}{{ ui('feedback.badge', {label: sold_on, tone: 'info'}) }}{% endif %}
+{% endblock %}
+{% block stock_actions %}
+{% if order_href %}{{ ui('action.link', {label: 'Open the order', href: order_href, icon: 'action-open', variant: 'primary'}) }}{% endif %}
+{% if journey_href %}{{ ui('action.link', {label: 'Open the customer\'s journey', href: journey_href, icon: 'action-view'}) }}{% endif %}
+{{ ui('action.link', {label: 'Every sale', href: sales_href, icon: 'action-back'}) }}
+{% endblock %}
+{% block stock_main %}
+{% if other_currency %}
+<section class="cl-page-section">
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p>{{ other_currency }}</p>{% endblock %}{% endembed %}
+</section>
+{% endif %}
+<section class="cl-page-section">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'facts', labelledby: 'facts-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Its facts', heading_id: 'facts-heading'}) }}
+{{ ui('data.key-value-list', {items: facts}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money', labelledby: 'money-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Its money', heading_id: 'money-heading', summary: 'Gross is what was paid, wallet credit included; net is gross less refunds and chargebacks.'}) }}
+{{ ui('data.key-value-list', {items: money}) }}
+{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="lines">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'lines-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'What it held', heading_id: 'lines-heading', summary: 'Each line as it was sold.'}) }}
+{% if lines %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The order\'s lines, each with its kind, quantity, price, discount, what was paid, refunded and charged back', stack: true})} %}
+{% block header %}<tr><th scope="col">Offer</th><th scope="col">Kind</th><th scope="col" class="text-end">Quantity</th><th scope="col" class="text-end">Price</th><th scope="col" class="text-end">Discount</th><th scope="col" class="text-end">Paid</th><th scope="col" class="text-end">Refunded</th><th scope="col" class="text-end">Charged back</th></tr>{% endblock %}
+{% block body %}
+{% for line in lines %}
+<tr><td class="cell-text" data-label="Offer">{{ line.label }}{% if line.holds %}<small class="cl-marketing-line">{{ line.holds }}</small>{% endif %}</td><td class="cell-text" data-label="Kind">{{ line.kind }}</td><td class="text-end" data-label="Quantity">{{ line.quantity }}</td><td class="text-end" data-label="Price">{% if line.was %}<s><span class="visually-hidden">Was </span>{{ line.was }}</s> {% endif %}{{ line.price }}</td><td class="text-end" data-label="Discount">{{ line.discount }}</td><td class="text-end" data-label="Paid">{{ line.paid }}</td><td class="text-end" data-label="Refunded">{{ line.refunded }}</td><td class="text-end" data-label="Charged back">{{ line.charged_back }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No lines', summary: 'The site reported this order without its lines.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="movements">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'movements-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Money as it moved', heading_id: 'movements-heading', summary: 'The payment, each refund and each chargeback, the oldest first.'}) }}
+{% if movements %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The order\'s money as it moved, the oldest first', stack: true})} %}
+{% block header %}<tr><th scope="col">When</th><th scope="col">What</th><th scope="col" class="text-end">Amount</th><th scope="col">How</th></tr>{% endblock %}
+{% block body %}
+{% for movement in movements %}
+<tr><td data-label="When">{{ movement.at }}</td><td class="cell-text" data-label="What">{{ movement.kind }}</td><td class="text-end" data-label="Amount">{{ movement.takes_back ? '-' : '' }}{{ movement.amount }}</td><td class="cell-text" data-label="How">{{ movement.how }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Nothing paid yet', summary: 'Its payment, and any refund or chargeback after it, is written here.'}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+<section class="cl-page-section" id="which-campaign">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'which-campaign-heading'})} %}{% block surface_body %}
+{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Which campaign gets the sale', heading_id: 'which-campaign-heading', summary: window})} %}
+{% block section_actions %}{% if settings_href %}{{ ui('action.link', {label: 'Change how a sale is counted', href: settings_href, icon: 'action-edit'}) }}{% endif %}{% endblock %}
+{% endembed %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The last and the first touch, each with its campaign, what it came through, when and how it was found', stack: true})} %}
+{% block header %}<tr><th scope="col">Touch</th><th scope="col">Campaign</th><th scope="col">Came through</th><th scope="col">When</th><th scope="col">How it was found</th></tr>{% endblock %}
+{% block body %}
+{% for touch in touches %}
+<tr><td class="cell-text" data-label="Touch">{{ touch.which }}{% if touch.counts %} {{ ui('feedback.badge', {label: touch.counts, tone: 'info', size: 'small'}) }}{% endif %}</td><td class="cell-text" data-label="Campaign">{% if touch.campaign_href %}<a href="{{ touch.campaign_href }}">{{ touch.campaign }}</a>{% else %}{{ touch.campaign }}{% endif %}</td><td class="cell-text" data-label="Came through">{{ touch.through }}</td><td data-label="When">{{ touch.at }}</td><td class="cell-text" data-label="How it was found">{{ touch.how }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+<p class="cl-marketing-note">{{ counts_now }}{% if promotion_words %} {{ promotion_words }}{% endif %}</p>
+{% endblock %}{% endembed %}
+</section>
+{% if reports %}
+<section class="cl-page-section" id="connected-site">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'connected-site-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Connected site', heading_id: 'connected-site-heading', summary: 'What was reported of this sale to the site whose campaign brought it, and whether it was delivered.'}) }}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The reports of this sale to connected sites, the oldest first', stack: true})} %}
+{% block header %}<tr><th scope="col">Site</th><th scope="col">Report</th><th scope="col">Made</th><th scope="col">Delivered</th></tr>{% endblock %}
+{% block body %}
+{% for report in reports %}
+<tr><td class="cell-text" data-label="Site">{{ report.site }}</td><td class="cell-text" data-label="Report">{{ report.kind }}</td><td data-label="Made">{{ report.made }}</td><td data-label="Delivered">{{ ui('feedback.badge', {label: report.state, tone: report.tone, size: 'small'}) }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endif %}
+{% endblock %}

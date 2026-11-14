@@ -1,0 +1,19 @@
+{#
+	A picture field of a landing page's form, for any section kind or setting (CattoPHP's and a project's): where the
+	picture comes from as feature cards (each picture source the page may take pictures from, and No picture), each
+	source's pictures to choose from, and an upload for someone who may upload, kept by the source that takes uploads. It
+	posts <field>[source], <field>[refs][<source>], upload[<field>] and upload_title[<field>]; the editor makes them the
+	{source, ref} the section stores. Variables: picture (the editor's picture field: field, id, source, cards, choices,
+	upload), legend, and optionally help, error and may_upload.
+#}
+<fieldset class="cl-landing-picture">
+<legend>{{ legend }}</legend>
+{{ ui('form.picture-choice', {name: picture.field ~ '[source]', legend: 'Where the picture comes from', legend_hidden: true, id: picture.id ~ '-source', help: help|default(''), error: error|default(''), size: 'small', selected: picture.source, items: picture.cards}) }}
+{% for choice in picture.choices %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: choice.own ? 'Which ' ~ choice.label|lower : 'Choose from: ' ~ choice.label, for: picture.id ~ '-' ~ choice.source, help: 'Used when ' ~ choice.label ~ ' is chosen above.'})} %}{% block control %}<select class="cl-select" id="{{ picture.id }}-{{ choice.source }}" name="{{ picture.field }}[refs][{{ choice.source }}]" {{ ui_field_attrs(props) }}>{% if choice.own %}<option value="">The page's own</option>{% else %}<option value="">Choose a picture</option>{% endif %}{% for option in choice.options %}<option value="{{ option.ref }}"{{ option.ref == choice.ref ? ' selected' : '' }}>{{ option.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endfor %}
+{% if picture.upload and may_upload|default(false) %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Or upload a new picture', for: picture.id ~ '-upload', help: 'A JPEG, PNG or WebP picture. It is kept and chosen when you save. A wide picture, about 3:2, looks best.'})} %}{% block control %}<input class="cl-input" type="file" id="{{ picture.id }}-upload" name="upload[{{ picture.field }}]" accept="image/jpeg,image/png,image/webp" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title for the uploaded picture (optional)', for: picture.id ~ '-upload-title', help: 'Its name where pictures are kept. Left empty, its file name is used.'})} %}{% block control %}<input class="cl-input" type="text" id="{{ picture.id }}-upload-title" name="upload_title[{{ picture.field }}]" value="" maxlength="200" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+</fieldset>

@@ -7,6 +7,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title|default('') }}{% if cattophp.installation.name %} · {{ cattophp.installation.name }}{% endif %}</title>
+{#- A page's head when it gives one (page_meta: description, robots, canonical, og, twitter_card), as a landing page does. -#}
+{% set cl_meta = page_meta|default({}) %}
+{% if cl_meta.description|default('') %}<meta name="description" content="{{ cl_meta.description }}">{% endif %}
+{% if cl_meta.robots|default('') %}<meta name="robots" content="{{ cl_meta.robots }}">{% endif %}
+{% if cl_meta.canonical|default('') %}<link rel="canonical" href="{{ cl_meta.canonical }}">{% endif %}
+{% for property, content in cl_meta.og|default({}) %}<meta property="og:{{ property }}" content="{{ content }}">{% endfor %}
+{% if cl_meta.twitter_card|default('') %}<meta name="twitter:card" content="{{ cl_meta.twitter_card }}">{% endif %}
 </head>
 <body>
 {% if cattophp.site_mode.isDemo %}<div class="cl-site-demo" role="note"><strong>{{ cattophp.site_mode.heading }}</strong> {{ cattophp.site_mode.notice }}</div>{% endif %}

@@ -1,0 +1,12 @@
+{#
+	A countdown's fields: its words, and, on an offer's page, the date and time it counts to; a campaign's page counts to
+	the campaign's end. It is shown only while there is time left, and always the full width of the page.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Words', for: 'landing-words', help: 'Before the time left, at most ' ~ form.limits.words ~ ' characters. Left empty: "' ~ form.placeholder ~ '".', error: errors.words|default('')})} %}{% block control %}<input class="cl-input" type="text" id="landing-words" name="words" value="{{ values.words|default('') }}" maxlength="{{ form.limits.words }}" placeholder="{{ form.placeholder }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if form.typed_end %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'It counts to', for: 'landing-ends-at', help: 'A date and time, such as 2026-11-30 23:59, in the site\'s time zone.', error: errors.ends_at|default('')})} %}{% block control %}<input class="cl-input" type="datetime-local" id="landing-ends-at" name="ends_at" value="{{ values.ends_at|default('')|replace({' ': 'T'}) }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% else %}
+<p class="cl-landing-note">{{ form.campaign_end ? 'It counts to the campaign\'s end, ' ~ form.campaign_end ~ ', and is left out once the campaign is not running.' : 'The campaign has no end date, so the countdown is left off the page until it has one.' }}</p>
+{% endif %}
+{% endblock %}{% endembed %}

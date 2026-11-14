@@ -1,0 +1,19 @@
+{#
+	A video: framed from YouTube (youtube-nocookie.com) or Vimeo only when the site's Content-Security-Policy lets that
+	host be framed; otherwise, and for any other address, a link to watch it. Its title and length in words under it.
+#}
+{% if section.framed %}
+<div class="cl-landing-video">
+<iframe src="{{ section.embed }}" title="{{ section.title ?: 'Video' }}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+</div>
+{% if section.title or section.length %}<p class="cl-landing-video-title">{{ section.title }}{% if section.title and section.length %} · {% endif %}{{ section.length }}</p>{% endif %}
+{% else %}
+{% if section.title or section.length %}<p class="cl-landing-video-title">{{ section.title }}{% if section.title and section.length %} · {% endif %}{{ section.length }}</p>{% endif %}
+<p class="cl-landing-more">
+{% if landing.preview %}
+{{ ui('action.button', {label: 'Watch the video', type: 'button', disabled: true, title: 'In a preview the buttons do nothing', icon: 'action-play'}) }}
+{% else %}
+{{ ui('action.link', {label: 'Watch the video', href: section.address, icon: 'action-play', new_window: true}) }}
+{% endif %}
+</p>
+{% endif %}

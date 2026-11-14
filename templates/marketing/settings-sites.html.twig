@@ -1,0 +1,83 @@
+{#
+	The Connected sites card of the Campaign Marketing Manager's settings (#connected-sites): each site connected to this
+	one, how it stands in words (Connected, Not connected with why, Not checked yet), its facts (address, the shared secret
+	as asterisks, when it was checked, how far apart the clocks are, its reports), the last arrival or message from it that
+	was refused and why, and its actions: Check the connection, Send them again for reports given up, Drop connection (with
+	Remove it and drop the waiting reports while some wait), and the forms to change its name or address and its shared
+	secret. Then the form to add a site. Make a secret is a link that fills the form's secret with a new one, shown that once
+	to copy. connected: SettingsController::connectedSites().
+#}
+<section class="cl-page-section" id="connected-sites">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {labelledby: 'connected-sites-heading'})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Connected sites', heading_id: 'connected-sites-heading', summary: 'Another site of yours where a campaign\'s links lead: the links send each click with a signed reference, and that site reports back the registrations, sales and refunds they brought. Connect each site to the other with the same shared secret. Nothing about a person is ever sent.'}) }}
+{% if not connected.can_send %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>Connected sites need symfony/http-client, which this installation does not have, so nothing is sent to them. Install it with Composer to send reports and check connections.</p>{% endblock %}{% endembed %}
+{% endif %}
+{% for site in connected.sites %}
+<div class="cl-card-form" id="site-{{ site.key }}">
+<h3 id="site-{{ site.key }}-name">{{ site.name }} {{ ui('feedback.badge', {label: site.state, tone: site.tone, size: 'small'}) }}</h3>
+{{ ui('data.key-value-list', {items: site.facts}) }}
+{% if site.problem %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger'})} %}{% block body %}<p>{{ site.problem }}</p>{% endblock %}{% endembed %}
+{% endif %}
+{% if site.refused %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ site.refused }}</p>{% endblock %}{% endembed %}
+{% endif %}
+{% if site.given_up %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ site.given_up }}</p>
+<form method="post" action="{{ site.send_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Send them again', type: 'submit', icon: 'action-restore', size: 'small', aria_label: 'Send the reports to ' ~ site.name ~ ' again'}) }}</form>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+<form method="post" action="{{ site.check_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: site.connected ? 'Check again' : 'Check the connection', type: 'submit', icon: 'action-done', size: 'small', variant: site.connected ? 'secondary' : 'primary', aria_label: (site.connected ? 'Check again the connection to ' : 'Check the connection to ') ~ site.name}) }}</form>
+<form method="post" action="{{ site.remove_action }}"><input type="hidden" name="_token" value="{{ form_token() }}">{{ ui('action.button', {label: 'Drop connection', type: 'submit', icon: 'action-remove', size: 'small', variant: 'danger', aria_label: 'Drop the connection to ' ~ site.name, confirm: 'Drop the connection to ' ~ site.name ~ '? Its links stop being signed and its reports are refused. Its touches and sales keep its name.'}) }}</form>
+{% if site.undelivered %}
+<form method="post" action="{{ site.remove_action }}"><input type="hidden" name="_token" value="{{ form_token() }}"><input type="hidden" name="drop" value="yes">{{ ui('action.button', {label: 'Remove it and drop the waiting reports', type: 'submit', icon: 'action-remove', size: 'small', variant: 'danger', aria_label: 'Remove ' ~ site.name ~ ' and drop the reports waiting for it', confirm: site.undelivered ~ ' Remove ' ~ site.name ~ ' and drop them? They are never sent.'}) }}</form>
+{% endif %}
+{% endblock %}{% endembed %}
+{% if site.undelivered %}<p class="cl-ui-field-help">{{ site.undelivered }}</p>{% endif %}
+<details class="cl-disclosure" id="site-{{ site.key }}-change"{% if site.change.open %} open{% endif %}>
+<summary>Change its name or address</summary>
+<form method="post" action="{{ site.change.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'site-' ~ site.key ~ '-change-name', required: true, help: 'Up to 120 characters, as this site\'s pages name it.', error: site.change.errors.name})} %}{% block control %}<input class="cl-input" id="site-{{ site.key }}-change-name" type="text" name="name" value="{{ site.change.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address', for: 'site-' ~ site.key ~ '-change-address', required: true, help: 'Its own address, starting with https://.', error: site.change.errors.address})} %}{% block control %}<input class="cl-input" id="site-{{ site.key }}-change-address" type="url" name="address" value="{{ site.change.address }}" maxlength="300" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save', type: 'submit', icon: 'action-save', variant: 'primary', aria_label: 'Save ' ~ site.name}) }}{% endblock %}{% endembed %}
+</form>
+</details>
+<details class="cl-disclosure" id="site-{{ site.key }}-secret"{% if site.secret.open %} open{% endif %}>
+<summary>Change the shared secret</summary>
+<form method="post" action="{{ site.secret.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+<input type="hidden" name="change" value="secret">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'New shared secret', for: 'site-' ~ site.key ~ '-secret-value', required: true, help: site.secret.made ? 'A new secret, shown this once: copy it now and put it in on ' ~ site.name ~ '\'s card for this site too. Until it is there, the one it has now is still accepted.' : 'Paste the new secret ' ~ site.name ~ ' made, or make one here and put it in there too. Until both have it, the one they have now is still accepted.', error: site.secret.errors.secret})} %}{% block control %}<span class="cl-copy-field-control"><input class="cl-input" id="site-{{ site.key }}-secret-value" type="text" name="secret" value="{{ site.secret.value }}" minlength="32" maxlength="200" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% if site.secret.made %}{{ ui('action.button', {label: 'Copy', type: 'button', icon: 'action-copy', size: 'small', hook: 'cl-copy', controls: 'site-' ~ site.key ~ '-secret-value', hidden: true}) }}{% endif %}</span>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save the new secret', type: 'submit', icon: 'action-save', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Make a secret', href: site.secret.make_href, icon: 'action-generate', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+</details>
+</div>
+{% endfor %}
+<details class="cl-disclosure cl-card-form" id="site-add"{% if connected.add.open %} open{% endif %}>
+<summary>Connect a site</summary>
+<form method="post" action="{{ connected.add.action }}">
+<input type="hidden" name="_token" value="{{ form_token() }}">
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'site-add-name', required: true, help: 'Up to 120 characters, such as Example Shop.', error: connected.add.errors.name})} %}{% block control %}<input class="cl-input" id="site-add-name" type="text" name="name" value="{{ connected.add.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address', for: 'site-add-address', required: true, help: 'Its own address, starting with https://, such as https://example.org.', error: connected.add.errors.address})} %}{% block control %}<input class="cl-input" id="site-add-address" type="url" name="address" value="{{ connected.add.address }}" maxlength="300" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Shared secret', for: 'site-add-secret', required: true, help: connected.add.made ? 'A new secret, shown this once: copy it now, and put it in on the other site\'s Connected sites card when you connect this site there. Once saved it is shown only as asterisks.' : 'The same secret goes in on both sites: paste the one the other site made, or press Make a secret and put that one in there. 32 characters or more, with no spaces.', error: connected.add.errors.secret})} %}{% block control %}<span class="cl-copy-field-control"><input class="cl-input" id="site-add-secret" type="text" name="secret" value="{{ connected.add.secret }}" minlength="32" maxlength="200" required spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{% if connected.add.made %}{{ ui('action.button', {label: 'Copy', type: 'button', icon: 'action-copy', size: 'small', hook: 'cl-copy', controls: 'site-add-secret', hidden: true}) }}{% endif %}</span>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Connect the site', type: 'submit', icon: 'action-add', variant: 'primary'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Make a secret', href: connected.add.make_href, icon: 'action-generate', variant: 'quiet'}) }}{% endblock %}
+{% endembed %}
+</form>
+</details>
+{% endblock %}{% endembed %}
+</section>

@@ -13,4 +13,5 @@
 /README.md      -export-ignore
 /CHANGELOG.md   -export-ignore
 /GUIDE-v*.md    -export-ignore
+/MODULES-v*.md  -export-ignore
 /LICENSE        -export-ignore

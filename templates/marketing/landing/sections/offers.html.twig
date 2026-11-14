@@ -1,0 +1,7 @@
+{# The offers: the note while the campaign is not running (on the first offers section), then each offer's card. #}
+{% if section.note %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p>{{ section.note }}</p>{% endblock %}{% endembed %}
+{% endif %}
+<ul class="cl-landing-offers">
+{% for card in section.cards %}{% include '@CattoPHP/marketing/landing/offer-card.html.twig' with {card: card, landing: landing} only %}{% endfor %}
+</ul>

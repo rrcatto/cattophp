@@ -1,0 +1,8 @@
+{# Questions and answers: each a closed accordion (details and summary), so it opens without JavaScript. #}
+<div class="cl-landing-faq">
+{% for item in section.items %}
+{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: item.question})} %}{% block body %}
+{% include '@CattoPHP/marketing/landing/paragraphs.html.twig' with {paragraphs: item.paragraphs, paragraph_class: ''} only %}
+{% endblock %}{% endembed %}
+{% endfor %}
+</div>

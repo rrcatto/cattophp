@@ -1,0 +1,5 @@
+{# A picture with its caption: a file at the page's own picture address, an address its source gives, or a drawing its source vouches for. #}
+<figure class="cl-landing-figure">
+{% if section.picture.kind == 'svg' %}<div class="cl-landing-figure-art"{% if not section.caption %} aria-hidden="true"{% endif %}>{{ section.picture.markup|authored }}</div>{% else %}<img src="{{ section.picture.src }}" alt="{{ section.picture.alt }}" loading="lazy" decoding="async">{% endif %}
+{% if section.caption %}<figcaption>{{ section.caption }}</figcaption>{% endif %}
+</figure>
